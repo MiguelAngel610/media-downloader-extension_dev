@@ -1,0 +1,169 @@
+/* Media Downloader - Content CSS */
+
+.md-btn-container {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    z-index: 9999;
+}
+
+.md-download-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.md-download-btn:hover {
+    background: rgba(15, 23, 42, 1);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.md-download-btn:active {
+    transform: translateY(0);
+}
+
+.md-download-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Floating button for stories/reels where article is full screen */
+#md-floating-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 56px;
+    height: 56px;
+    border-radius: 28px;
+    background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
+    color: white;
+    border: none;
+    cursor: pointer;
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+#md-floating-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.4);
+}
+
+#md-floating-btn:active {
+    transform: scale(0.95);
+}
+
+/* States */
+.md-loading {
+    opacity: 0.8;
+    pointer-events: none;
+}
+
+.md-success {
+    background: #10b981 !important; /* Green */
+    color: white !important;
+}
+
+.md-error {
+    background: #ef4444 !important; /* Red */
+    color: white !important;
+}
+
+.md-skipped {
+    background: #64748b !important; /* Gray */
+    color: white !important;
+}
+
+/* Native-looking IG buttons */
+.md-native-btn {
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ig-primary-text, inherit);
+    transition: opacity 0.2s ease;
+}
+
+.md-native-btn:hover {
+    opacity: 0.5;
+}
+
+.md-native-btn svg {
+    color: currentColor;
+    width: 24px;
+    height: 24px;
+}
+
+.md-story-dl-btn {
+    color: white !important;
+}
+
+.md-story-dl-btn svg {
+    color: white !important;
+    fill: none !important;
+}
+
+/* Force hide the 3-dots button which is the next sibling */
+.md-story-dl-btn + * {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.md-hidden-dots {
+    display: none !important;
+}
+
+.md-native-btn.md-success {
+    color: #10b981 !important;
+}
+
+.md-native-btn.md-success svg {
+    color: #10b981 !important;
+}
+
+/* Story Overlay Hide Original SVG */
+.md-hijacked-dots {
+    pointer-events: none !important;
+    opacity: 0 !important;
+}
+.md-hijacked-dots * {
+    opacity: 0 !important;
+}
+
+.md-story-dl-btn-inline.md-success {
+    color: white !important;
+}
+
+.md-story-dl-btn-inline.md-success svg {
+    color: white !important;
+}
+
+/* Post Button Success State */
+.md-post-btn.md-success {
+    background: transparent !important;
+    color: var(--ig-primary-text, black) !important;
+}
+
+.md-post-btn.md-success svg {
+    color: var(--ig-primary-text, black) !important;
+}

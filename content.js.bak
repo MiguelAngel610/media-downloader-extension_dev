@@ -1,0 +1,1638 @@
+/* Media Downloader - Content Script */
+
+const style = document.createElement('style');
+style.textContent = `
+.md-mini-btn {
+    position: absolute;
+    bottom: 50px;
+    right: 12px;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 9999;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+.md-mini-btn:hover {
+    background: rgba(15, 23, 42, 0.9);
+    transform: scale(1.1);
+}
+.md-mini-btn.md-loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+.md-mini-btn.md-success {
+    background: #10b981;
+    color: white;
+    border-color: transparent;
+}
+.md-mini-btn.md-skipped {
+    background: #f59e0b;
+    color: white;
+    border-color: transparent;
+}
+.md-mini-btn.md-error {
+    background: #ef4444;
+    color: white;
+    border-color: transparent;
+}
+/* For the floating story button */
+#md-floating-btn {
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 999999;
+    transition: all 0.2s ease;
+}
+#md-floating-btn:hover {
+    background: rgba(15, 23, 42, 0.9);
+    transform: scale(1.1);
+}
+/* Continuous Story Progress Bar */
+#md-story-progress-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    z-index: 99999;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+#md-story-progress-container.md-visible {
+    opacity: 1;
+}
+
+#md-story-slider {
+    flex-grow: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    height: 100%;
+    margin: 0;
+}
+#md-story-slider::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 5px;
+    background: linear-gradient(to right, rgba(255,255,255,0.9) var(--md-progress, 0%), rgba(255,255,255,0.2) var(--md-progress, 0%));
+    border-radius: 2px;
+    transition: height 0.2s ease;
+}
+#md-story-slider:hover::-webkit-slider-runnable-track {
+    height: 7px;
+}
+#md-story-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    margin-top: -5.5px;
+    box-shadow: 0 0 4px rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    transform: scale(0.8);
+}
+#md-story-slider:hover::-webkit-slider-thumb {
+    opacity: 1;
+    transform: scale(1);
+}
+
+#md-story-counter {
+    color: white;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    pointer-events: none;
+    user-select: none;
+    min-width: 36px;
+    text-align: center;
+    opacity: 0.9;
+}
+
+.md-hide-native-segments > div:not(#md-story-progress-container) {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Custom Video Progress Bar for Reels/Popups */
+.md-video-progress-container {
+    position: absolute;
+    height: 16px;
+    display: flex;
+    align-items: stretch;
+    z-index: 2147483647;
+    pointer-events: none; /* Let clicks pass through to video */
+    overflow: hidden; /* Clips the inner progress bar to match border-radius */
+}
+.md-video-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    pointer-events: auto; /* Only slider gets clicks */
+}
+.md-video-slider::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    margin-top: 12px;
+    background: linear-gradient(to right, rgba(255,255,255,0.95) var(--md-vid-progress, 0%), rgba(255,255,255,0.3) var(--md-vid-progress, 0%));
+    transition: height 0.2s ease, margin-top 0.2s ease;
+    border-radius: 0px;
+    box-shadow: 0 -1px 3px rgba(0,0,0,0.3); /* Visibility on white videos, shadow upwards */
+}
+.md-video-slider:hover::-webkit-slider-runnable-track {
+    height: 8px;
+    margin-top: 8px;
+}
+.md-video-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 0px;
+    width: 0px;
+}
+
+
+`;
+(document.head || document.documentElement).appendChild(style);
+
+// Inject Vanish Mode Script
+const vanishScript = document.createElement('script');
+vanishScript.src = chrome.runtime.getURL('vanish.js');
+vanishScript.onload = function() { this.remove(); };
+(document.head || document.documentElement).appendChild(vanishScript);
+
+window.__md_storyMediaDict = {};
+
+chrome.storage.onChanged.addListener(function(changes, namespace) {
+    if (namespace === 'local') {
+        if (changes.vanishMode) {
+            window.postMessage({ type: 'MD_VANISH_TOGGLE', enabled: changes.vanishMode.newValue }, '*');
+        }
+        if (changes.ghostOnline) {
+            window.postMessage({ type: 'MD_GHOST_ONLINE_TOGGLE', enabled: changes.ghostOnline.newValue }, '*');
+        }
+        if (changes.ghostSeen) {
+            window.postMessage({ type: 'MD_GHOST_SEEN_TOGGLE', enabled: changes.ghostSeen.newValue }, '*');
+        }
+    }
+});
+
+chrome.storage.local.get(['vanishMode', 'ghostOnline', 'ghostSeen'], function(result) {
+    setTimeout(() => {
+        if (result.vanishMode !== undefined) window.postMessage({ type: 'MD_VANISH_TOGGLE', enabled: !!result.vanishMode }, '*');
+        if (result.ghostOnline !== undefined) window.postMessage({ type: 'MD_GHOST_ONLINE_TOGGLE', enabled: !!result.ghostOnline }, '*');
+        if (result.ghostSeen !== undefined) window.postMessage({ type: 'MD_GHOST_SEEN_TOGGLE', enabled: !!result.ghostSeen }, '*');
+    }, 100);
+});
+
+chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'MD_UPDATE_SETTINGS') {
+        if (msg.ghostOnline !== undefined) window.postMessage({ type: 'MD_GHOST_ONLINE_TOGGLE', enabled: !!msg.ghostOnline }, '*');
+        if (msg.ghostSeen !== undefined) window.postMessage({ type: 'MD_GHOST_SEEN_TOGGLE', enabled: !!msg.ghostSeen }, '*');
+    }
+});
+
+window.addEventListener('message', function(event) {
+    if (event.source !== window || !event.data) return;
+    if (event.data.type === 'MD_STORY_MEDIA_UPDATE') {
+        Object.assign(window.__md_storyMediaDict, event.data.media);
+        console.log("Media Downloader: Updated internal dictionary. Total items:", Object.keys(window.__md_storyMediaDict).length);
+    }
+    if (event.data.type === 'MD_FIBER_RESULT') {
+        window.__md_fiberResults = window.__md_fiberResults || {};
+        window.__md_fiberResults[event.data.id] = { url: event.data.url, dash: event.data.dash, media_id: event.data.media_id };
+    }
+    if (event.data.type === 'MD_PFP_RESULT') {
+        window.__md_pfpResults = window.__md_pfpResults || {};
+        window.__md_pfpResults[event.data.id] = event.data.url;
+    }
+});
+
+function getPlatform() {
+    const hostname = window.location.hostname;
+    if (hostname.includes("instagram.com")) return "instagram";
+    if (hostname.includes("facebook.com")) return "facebook";
+    if (hostname.includes("twitter.com") || hostname.includes("x.com")) return "twitter";
+    return "unknown";
+}
+
+const SVG_DOWNLOAD = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`;
+const SVG_CHECK = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+const SVG_SKIP = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+
+function extractSignature(url) {
+    if (!url) return null;
+    try {
+        let urlObj = new URL(url);
+        let parts = urlObj.pathname.split('/');
+        return parts[parts.length - 1];
+    } catch(e) {
+        let match = url.match(/\/([^\/]+\.(jpg|webp|mp4))/);
+        return match ? match[1] : null;
+    }
+}
+
+function idToShortcode(idStr) {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    try {
+        let num = BigInt(idStr);
+        let res = '';
+        while (num > 0n) {
+            res = alphabet[Number(num % 64n)] + res;
+            num /= 64n;
+        }
+        return res;
+    } catch(e) {
+        return idStr; // fallback to original if parsing fails
+    }
+}
+
+function updateButtonIcon(btn, newSvgCode, isFloating) {
+    if (isFloating) {
+        btn.innerHTML = newSvgCode;
+        return;
+    }
+    let oldSvg = btn.querySelector('svg');
+    if (oldSvg) {
+        let tmp = document.createElement('div');
+        tmp.innerHTML = newSvgCode;
+        let newSvg = tmp.querySelector('svg');
+        if (newSvg) {
+            if (oldSvg.hasAttribute('class')) newSvg.setAttribute('class', oldSvg.getAttribute('class'));
+            if (oldSvg.hasAttribute('color')) newSvg.setAttribute('color', oldSvg.getAttribute('color'));
+            newSvg.setAttribute('fill', 'none');
+            newSvg.setAttribute('stroke-width', '2');
+            oldSvg.replaceWith(newSvg);
+        }
+    }
+}
+
+function sendDownloadRequest(btn, url, metadata, isFloating = false, originalElement = null) {
+    btn.classList.add('md-loading');
+    
+    let parentArticle = (originalElement || btn).closest('article, main, div[role="dialog"]');
+    if (parentArticle) {
+        parentArticle.__md_download_state = { time: Date.now(), class: 'md-loading', html: SVG_DOWNLOAD, isFloating: isFloating };
+    }
+    
+    if (!metadata) metadata = {};
+    
+    // Patch missing username
+    if (!metadata.username || metadata.username === "") {
+        let username = "Unknown";
+        let urlMatch = window.location.href.match(/(?:instagram\.com\/)([a-zA-Z0-9_.-]+)/);
+        let storyMatch = window.location.href.match(/\/stories\/([a-zA-Z0-9_.-]+)\//);
+        
+        if (storyMatch) {
+            username = storyMatch[1];
+        } else if (urlMatch && !['p', 'reel', 'stories', 'explore', 'direct'].includes(urlMatch[1])) {
+            username = urlMatch[1];
+        } else {
+            // Priority 1: Document title or meta tags (perfect for dedicated post pages)
+            let foundInMeta = false;
+            let mTitle = document.title.match(/@([a-zA-Z0-9_.-]+)/);
+            if (!mTitle) {
+                let ogDesc = document.querySelector('meta[property="og:description"]');
+                if (ogDesc) mTitle = ogDesc.content.match(/@([a-zA-Z0-9_.-]+)/) || ogDesc.content.match(/^([a-zA-Z0-9_.-]+) (?:on|en) Instagram/);
+            }
+            if (!mTitle) {
+                let ogTitle = document.querySelector('meta[property="og:title"]');
+                if (ogTitle) mTitle = ogTitle.content.match(/@([a-zA-Z0-9_.-]+)/) || ogTitle.content.match(/^([a-zA-Z0-9_.-]+) (?:on|en) Instagram/);
+            }
+            
+            if (mTitle) {
+                username = mTitle[1];
+                foundInMeta = true;
+            }
+
+            // We only trust the page title/meta username if we are actually ON a dedicated post page
+            if (foundInMeta && !window.location.pathname.includes('/p/') && !window.location.pathname.includes('/reel/') && !window.location.pathname.includes('/reels/')) {
+                username = "Unknown"; // Revert if we are on a feed page
+            }
+            
+            if (username === "Unknown") {
+                let container = (originalElement || btn).closest('article, main, div[role="dialog"]');
+                if (container) {
+                    // Priority 2: Profile picture link
+                    let pfpImg = container.querySelector('img[alt*="profile"], img[alt*="perfil"], img[alt*="pic"]');
+                    if (pfpImg) {
+                        let aTag = pfpImg.closest('a');
+                        if (aTag) {
+                            let match = aTag.getAttribute('href').match(/^\/([a-zA-Z0-9_.-]+)\/?/);
+                            if (match && !['p', 'reel', 'reels', 'stories', 'explore', 'direct'].includes(match[1])) {
+                                username = match[1];
+                            }
+                        }
+                    }
+                    
+                    // Priority 3: Explicit header links
+                    if (username === "Unknown") {
+                        let userLinks = container.querySelectorAll('header a, div[dir="auto"] a, span[dir="auto"] a');
+                        for (let a of userLinks) {
+                            let text = a.textContent.trim();
+                            if (text && text.length > 0 && !text.includes(' ') && !a.querySelector('img') && !['Follow', 'Seguir'].includes(text)) {
+                                username = text;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        metadata.username = username;
+    }
+    
+    // If we have the exact media_id from vanish.js, use it to calculate the perfect shortcode
+    if (metadata.media_id) {
+        metadata.shortcode = idToShortcode(String(metadata.media_id).split('_')[0]);
+    }
+    
+    // Patch shortcode if missing, if it's a numeric ID, or if it's an unusually long hash (>15 chars)
+    if (!metadata.shortcode || String(metadata.shortcode).match(/^\d+(_\d+)?$/) || String(metadata.shortcode).length > 15) {
+        
+        let foundShortcode = null;
+        
+        // 1. Try closest anchor (e.g. Grid thumbnails)
+        let aTag = btn.closest('a');
+        if (aTag && aTag.href) {
+            let m1 = aTag.href.match(/\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/);
+            if (m1) {
+                let s = m1[1];
+                if (s.length > 15 && s.includes('-')) s = s.split('-')[0];
+                foundShortcode = s;
+            }
+        }
+        
+        // 2. Try any anchor inside the post (e.g. Timestamp or Comments link)
+        if (!foundShortcode) {
+            let article = btn.closest('article, main, div[role="dialog"]');
+            if (article) {
+                let links = article.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"]');
+                for (let a of links) {
+                    let m2 = a.href.match(/\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/);
+                    if (m2) {
+                        let s = m2[1];
+                        if (s.length > 15 && s.includes('-')) s = s.split('-')[0];
+                        foundShortcode = s;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // 3. Try address bar (Posts) - ONLY as a fallback if the button is on the main post itself
+        if (!foundShortcode) {
+            let m3 = window.location.href.match(/\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/);
+            if (m3) {
+                let s = m3[1];
+                if (s.length > 15 && s.includes('-')) s = s.split('-')[0];
+                foundShortcode = s;
+            }
+        }
+        
+        // 4. Try address bar (Stories)
+        if (!foundShortcode) {
+            let m4 = window.location.href.match(/\/stories\/[^\/]+\/(\d+)/);
+            if (m4) foundShortcode = idToShortcode(m4[1]);
+        }
+        
+        if (foundShortcode) {
+            metadata.shortcode = foundShortcode;
+        } else if (String(metadata.shortcode).length > 15) {
+            metadata.shortcode = null;
+        }
+    }
+    
+    if (!metadata.timestamp) metadata.timestamp = Math.floor(Date.now() / 1000);
+    
+    // Ensure we have a unique media_id to prevent carousel overwrites
+    if (!metadata.media_id && url && url.startsWith('http')) {
+        try {
+            let urlFilename = url.split('?')[0].split('/').pop();
+            if (urlFilename && urlFilename.includes('_')) {
+                metadata.media_id = urlFilename.split('.')[0];
+            }
+        } catch (e) {}
+    }
+    
+    chrome.storage.local.get(['selectedAccount'], function(result) {
+        const account = result.selectedAccount || 'M';
+        
+        let finalUrl = url;
+        let mediaType = "auto";
+        
+        if (getPlatform() === "instagram") {
+            if (metadata && metadata.is_pfp_bot) {
+                mediaType = "pfp_bot";
+            } else if (url && url.startsWith('blob:') && (!metadata || !metadata.dash_manifest)) {
+                // We have a blob URL but no dash manifest. We cannot download this natively.
+                // We MUST use gallery-dl with the official post URL.
+                let isStoryBtn = btn && (btn.id === 'md-story-dl-btn-inline');
+                
+                if (isStoryBtn || window.location.href.includes('/stories/')) {
+                    let m = window.location.href.match(/\/stories\/([^\/]+)\/(\d+)/);
+                    if (m) {
+                        finalUrl = window.location.href;
+                    } else if (metadata.username && metadata.media_id) {
+                        finalUrl = "https://www.instagram.com/stories/" + metadata.username + "/" + String(metadata.media_id).split('_')[0] + "/";
+                    } else if (metadata.username) {
+                        // Safety net: just point to the user's stories. gallery-dl handles this perfectly.
+                        finalUrl = "https://www.instagram.com/stories/" + metadata.username + "/";
+                    }
+                } else if (metadata.shortcode) {
+                    finalUrl = "https://www.instagram.com/p/" + metadata.shortcode + "/";
+                } else {
+                    let m = window.location.href.match(/\/(?:p|reel)\/([a-zA-Z0-9_-]+)/);
+                    if (m) finalUrl = "https://www.instagram.com/p/" + m[1] + "/";
+                }
+                
+                if (finalUrl.startsWith('blob:')) {
+                    console.error("Media Downloader: Cannot resolve original URL for blob.");
+                    btn.classList.remove('md-loading');
+                    btn.classList.add('md-error');
+                    if (parentArticle) parentArticle.__md_download_state = { time: Date.now(), class: 'md-error', html: SVG_DOWNLOAD, isFloating: isFloating };
+                    
+                    setTimeout(() => {
+                        btn.classList.remove('md-error');
+                        updateButtonIcon(btn, isFloating ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>` : SVG_DOWNLOAD, isFloating);
+                        if (parentArticle) delete parentArticle.__md_download_state;
+                    }, 2000);
+                    return; // abort
+                }
+                
+                mediaType = "auto"; 
+            } else {
+                // We have a direct CDN url (or a dash manifest). We can download natively!
+                // This is lightning fast and bypasses any cookie/login requirements.
+                mediaType = "direct_story";
+            }
+        }
+
+        chrome.runtime.sendMessage({
+            action: "queue_download",
+            url: finalUrl,
+            mediaType: mediaType,
+            platform: getPlatform(),
+            account: account,
+            direct_metadata: metadata
+        }, (response) => {
+            btn.classList.remove('md-loading');
+            
+            // Queue response is instant
+            btn.classList.add('md-success');
+            updateButtonIcon(btn, SVG_CHECK, isFloating);
+            
+            if (parentArticle) parentArticle.__md_download_state = { time: Date.now(), class: 'md-success', html: SVG_CHECK, isFloating: isFloating };
+            
+            setTimeout(() => {
+                btn.classList.remove('md-success');
+                updateButtonIcon(btn, isFloating ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>` : SVG_DOWNLOAD, isFloating);
+                if (parentArticle) delete parentArticle.__md_download_state;
+            }, 2000);
+        });
+    });
+}
+
+function injectMinimalistButtons() {
+    if (!document.body) return;
+    
+    let overlayRoot = document.getElementById('md-overlay-root');
+    if (!overlayRoot) {
+        overlayRoot = document.createElement('div');
+        overlayRoot.id = 'md-overlay-root';
+        overlayRoot.style.position = 'absolute';
+        overlayRoot.style.top = '0';
+        overlayRoot.style.left = '0';
+        overlayRoot.style.width = '0';
+        overlayRoot.style.height = '0';
+        overlayRoot.style.overflow = 'visible';
+        overlayRoot.style.pointerEvents = 'none';
+        overlayRoot.style.zIndex = '2147483647';
+        // Attach to <html> element, NOT <body>.
+        // Instagram's React manages document.body via React Portals.
+        // Any foreign node inside body causes React reconciliation crashes (black screen).
+        // The <html> element is never touched by React, making it completely safe.
+        document.documentElement.appendChild(overlayRoot);
+    }
+
+    // 1. Posts/Reels: Inject next to Bookmark button
+    let bookmarkSvgs = [];
+    document.querySelectorAll('svg').forEach(s => {
+        let label = (s.getAttribute('aria-label') || '').toLowerCase();
+        // Incluir "remove" / "eliminar" por si el usuario ya tiene el post guardado
+        if (['save', 'guardar', 'salvar', 'enregistrer', 'speichern', 'remove', 'eliminar'].includes(label)) {
+            // Verificar que esté dentro de un botón (para no agarrar SVGs de la UI general)
+            if (s.closest('button, [role="button"]')) {
+                bookmarkSvgs.push(s);
+            }
+        } else if (s.querySelector('polygon[points*="20 21 12 13.44 4 21"]') || s.querySelector('path[d*="m20 21-8-7.56L4 21"]')) {
+            if (s.closest('button, [role="button"]')) {
+                bookmarkSvgs.push(s);
+            }
+        }
+    });
+    
+    bookmarkSvgs.forEach((svg, index) => {
+        if (svg.__md_processed) return;
+        // CRITICAL: Never process SVGs that are inside our own overlay root (the clone's bookmark icon)
+        if (svg.closest('#md-overlay-root')) return;
+        svg.__md_processed = true;
+        
+        let wrapper = svg.closest('button, [role="button"]') || svg.parentElement;
+        
+        // Ensure we don't duplicate via tracking map
+        if (window.__md_dlButtons && window.__md_dlButtons.has(wrapper)) return;
+        
+        let clone = wrapper.cloneNode(true);
+        clone.classList.add('md-post-btn');
+        clone.title = "Download Media";
+        clone.style.cursor = 'pointer';
+        clone.style.pointerEvents = 'auto'; // ensure it's clickable
+        
+        // Find and replace the inner SVG
+        let innerSvg = clone.querySelector('svg');
+        if (innerSvg) {
+            let tempDiv = document.createElement('div');
+            tempDiv.innerHTML = SVG_DOWNLOAD;
+            let newSvg = tempDiv.querySelector('svg');
+            // Inherit native classes and colors
+            if (innerSvg.hasAttribute('class')) newSvg.setAttribute('class', innerSvg.getAttribute('class'));
+            if (innerSvg.hasAttribute('color')) newSvg.setAttribute('color', innerSvg.getAttribute('color'));
+            
+            // DO NOT copy fill! Our icon is an outline using stroke="currentColor".
+            newSvg.setAttribute('fill', 'none');
+            // Fix stroke-width to match IG's thin icons better (IG usually uses 2px)
+            newSvg.setAttribute('stroke-width', '2');
+            
+            innerSvg.replaceWith(newSvg);
+        }
+        
+        let parentArticle = wrapper.closest('article, main, div[role="dialog"]');
+        
+        // Restore state if React destroyed the button mid-animation
+        if (parentArticle && parentArticle.__md_download_state && !parentArticle.__md_download_state.isFloating) {
+            let state = parentArticle.__md_download_state;
+            let elapsed = Date.now() - state.time;
+            if (elapsed < 2000 || state.class === 'md-loading') {
+                clone.classList.add(state.class);
+                
+                let oldSvg = clone.querySelector('svg');
+                if (oldSvg) {
+                    let tmp = document.createElement('div');
+                    tmp.innerHTML = state.html;
+                    let freshSvg = tmp.querySelector('svg');
+                    if (freshSvg) {
+                        if (oldSvg.hasAttribute('class')) freshSvg.setAttribute('class', oldSvg.getAttribute('class'));
+                        if (oldSvg.hasAttribute('color')) freshSvg.setAttribute('color', oldSvg.getAttribute('color'));
+                        freshSvg.setAttribute('fill', 'none');
+                        freshSvg.setAttribute('stroke-width', '2');
+                        oldSvg.replaceWith(freshSvg);
+                    }
+                }
+            } else {
+                delete parentArticle.__md_download_state;
+            }
+        }
+        
+        // Detect native layout orientation
+        let isVertical = false;
+        let targetVisualGapX = 16; // Standard IG horizontal spacing between SVGs
+        let targetVisualGapY = 24; // Standard IG vertical spacing
+        
+        let container = wrapper;
+        let likeBtn = null;
+        let commentBtn = null;
+        
+        // Walk up to find the closest action bar for THIS specific post (max 8 levels, stop at MAIN to avoid cross-post bleed)
+        for (let i = 0; i < 8; i++) {
+            if (!container || container.tagName === 'MAIN' || container === document.body) break;
+            
+            let likes = Array.from(container.querySelectorAll('svg[aria-label="Like"], svg[aria-label="Me gusta"]'));
+            let comments = Array.from(container.querySelectorAll('svg[aria-label="Comment"], svg[aria-label="Comentar"]'));
+            
+            if (likes.length > 0 && comments.length > 0) {
+                likeBtn = likes[0].closest('button, [role="button"]');
+                commentBtn = comments[0].closest('button, [role="button"]');
+                break;
+            }
+            container = container.parentElement;
+        }
+        
+        if (likeBtn && commentBtn) {
+            let r1 = likeBtn.getBoundingClientRect();
+            let r2 = commentBtn.getBoundingClientRect();
+            isVertical = Math.abs(r1.top - r2.top) > Math.abs(r1.left - r2.left);
+        } else {
+            // Fallback if action bar not found
+            isVertical = window.location.pathname.includes('/reel/') || window.location.pathname.includes('/reels/');
+        }
+
+        // Calculate exact margin needed by subtracting the native padding/margins the clone will inherently provide
+        let wRect = wrapper.getBoundingClientRect();
+        let wSvg = wrapper.querySelector('svg');
+        let builtInVisualGapX = 0;
+        let builtInVisualGapY = 0;
+        
+        let wStyle = window.getComputedStyle(wrapper);
+        let wMarLeft = parseFloat(wStyle.marginLeft) || 0;
+        let wMarTop = parseFloat(wStyle.marginTop) || 0;
+        
+        if (wSvg) {
+            let svgRect = wSvg.getBoundingClientRect();
+            // The clone will naturally provide this much visual gap from its inherited padding and left/top margins
+            builtInVisualGapX = wRect.width - svgRect.width + wMarLeft;
+            builtInVisualGapY = wRect.height - svgRect.height + wMarTop;
+        } else {
+            // Fallback
+            builtInVisualGapX = wRect.width * 0.4;
+            builtInVisualGapY = wRect.height * 0.4;
+        }
+        
+        let applyGapX = Math.max(0, targetVisualGapX - builtInVisualGapX);
+        let applyGapY = Math.max(0, targetVisualGapY - builtInVisualGapY);
+        
+        // ABSOLUTE POSITIONING FIX: Do not mutate React's container AT ALL.
+        // Mutating the container causes Invariant Violations when scrolling in Reels.
+        clone.style.position = 'absolute';
+        clone.style.zIndex = '2147483647';
+        clone.style.margin = '0';
+        overlayRoot.appendChild(clone);
+        
+        if (!window.__md_dlButtons) window.__md_dlButtons = new WeakMap();
+        if (!window.__md_activeDlButtons) window.__md_activeDlButtons = new Set();
+        
+        window.__md_dlButtons.set(wrapper, clone);
+        window.__md_activeDlButtons.add({ wrapper: wrapper, clone: clone, isVertical: isVertical, gapX: applyGapX, gapY: applyGapY });
+        
+        // Reset download button instantly when carousel slide changes
+        if (parentArticle && !parentArticle.__md_carouselReset) {
+            parentArticle.__md_carouselReset = true;
+            parentArticle.addEventListener('click', (evt) => {
+                let target = evt.target.closest('button, [role="button"]');
+                if (!target) return;
+                // Detect carousel arrows: they have aria-label like "Next", "Siguiente", "Go Back", etc.
+                // Or they are the dot indicators inside the carousel
+                let label = (target.getAttribute('aria-label') || '').toLowerCase();
+                let isArrow = ['next', 'go forward', 'siguiente', 'go back', 'volver', 'zurück', 'suivant', 'précédent', 'anterior'].some(k => label.includes(k));
+                let isDot = target.closest('[role="tablist"]') || target.getAttribute('role') === 'tab';
+                if (isArrow || isDot) {
+                    let dlBtn = parentArticle.querySelector('.md-post-btn');
+                    if (dlBtn) {
+                        dlBtn.classList.remove('md-success', 'md-loading', 'md-error', 'md-skipped');
+                        let svg = dlBtn.querySelector('svg');
+                        if (svg) {
+                            let tmp = document.createElement('div');
+                            tmp.innerHTML = SVG_DOWNLOAD;
+                            let fresh = tmp.querySelector('svg');
+                            if (svg.hasAttribute('class')) fresh.setAttribute('class', svg.getAttribute('class'));
+                            if (svg.hasAttribute('color')) fresh.setAttribute('color', svg.getAttribute('color'));
+                            fresh.setAttribute('fill', 'none');
+                            fresh.setAttribute('stroke-width', '2');
+                            svg.replaceWith(fresh);
+                        }
+                    }
+                }
+            }, true);
+        }
+        
+        clone.onclick = async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            let btnSvg = clone.querySelector('svg');
+            if(btnSvg) btnSvg.style.opacity = '0.5';
+            
+            let bestUrl = null;
+            let bestMetadata = {};
+            let media = null;
+            
+            let article = svg.closest('article, main, div[role="dialog"]');
+            
+            if (!article) {
+                // For the Reels tab or other weird views, walk up the DOM to find the media container.
+                let parent = svg.parentElement;
+                while (parent && parent !== document.body) {
+                    let hasLargeMedia = Array.from(parent.querySelectorAll('video, img')).some(el => {
+                        let r = el.getBoundingClientRect();
+                        return r.width > 200 && r.height > 200;
+                    });
+                    if (hasLargeMedia) {
+                        article = parent;
+                        break;
+                    }
+                    parent = parent.parentElement;
+                }
+            }
+            
+            if (article) {
+                let mediaElements = Array.from(article.querySelectorAll('video, img'));
+                
+                // 1. Filter by basic size and opacity
+                let validMedia = mediaElements.filter(el => {
+                    let rect = el.getBoundingClientRect();
+                    if (rect.width < 200 || rect.height < 200) return false;
+                    
+                    // FOOLPROOF OPACITY CHECK: Walk up the tree to make sure no ancestor is hiding this element
+                    let isVisible = true;
+                    let curr = el;
+                    while (curr && curr !== article && curr !== document.body) {
+                        let st = window.getComputedStyle(curr);
+                        if (st.opacity === '0' || st.visibility === 'hidden' || st.display === 'none') {
+                            isVisible = false;
+                            break;
+                        }
+                        curr = curr.parentElement;
+                    }
+                    if (!isVisible) return false;
+                    
+                    // 2. FOOLPROOF VISIBILITY CHECK:
+                    let centerX = rect.left + (rect.width / 2);
+                    let centerY = rect.top + (rect.height / 2);
+                    
+                    // If the user scrolled so the center is off-screen, clamp it to the visible viewport
+                    // to ensure elementsFromPoint actually hits the visible portion of the image.
+                    if (centerX < 0) centerX = 10;
+                    if (centerX > window.innerWidth) centerX = window.innerWidth - 10;
+                    if (centerY < 0) centerY = 10;
+                    if (centerY > window.innerHeight) centerY = window.innerHeight - 10;
+                    
+                    let elementsAtCenter = document.elementsFromPoint(centerX, centerY);
+                    if (!elementsAtCenter || !elementsAtCenter.includes(el)) {
+                        return false; 
+                    }
+                    
+                    return true;
+                }).sort((a, b) => {
+                    // Tiebreaker visual supremo: Si ambos elementos pasaron los filtros (ej. apilados),
+                    // el que esté más arriba en la jerarquía visual de la pantalla gana.
+                    let aCenter = a.getBoundingClientRect().left + (a.getBoundingClientRect().width / 2);
+                    let aTop = a.getBoundingClientRect().top + (a.getBoundingClientRect().height / 2);
+                    
+                    let elementsAtPoint = document.elementsFromPoint(aCenter, aTop);
+                    let aIndex = elementsAtPoint.indexOf(a);
+                    let bIndex = elementsAtPoint.indexOf(b);
+                    
+                    if (aIndex !== -1 && bIndex !== -1 && aIndex !== bIndex) {
+                        return aIndex - bIndex; // Menor índice significa más al frente
+                    }
+                    if (aIndex !== -1 && bIndex === -1) return -1;
+                    if (bIndex !== -1 && aIndex === -1) return 1;
+                    
+                    // 1. Preferir VIDEO solo si están en la misma capa visual
+                    if (a.tagName === 'VIDEO' && b.tagName !== 'VIDEO') return -1;
+                    if (b.tagName === 'VIDEO' && a.tagName !== 'VIDEO') return 1;
+                    
+                    // 2. Preferir el de mayor área
+                    let aArea = a.getBoundingClientRect().width * a.getBoundingClientRect().height;
+                    let bArea = b.getBoundingClientRect().width * b.getBoundingClientRect().height;
+                    return bArea - aArea;
+                });
+                
+                media = validMedia[0] || mediaElements[0];
+            }
+            
+            if (media) {
+                let src = media.src;
+                if (media.tagName === 'IMG') src = media.currentSrc || media.src;
+                bestUrl = src;
+                
+                function getRealShortcode(element) {
+                    const rgx = /\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)(?:[/?]|$)/;
+                    let s = null;
+                    if (typeof article !== 'undefined' && article) {
+                        let links = article.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"]');
+                        for (let a of links) {
+                            let m = a.href.match(rgx);
+                            if (m) { s = m[1]; break; }
+                        }
+                    }
+                    if (!s) {
+                        let m2 = window.location.href.match(rgx);
+                        if (m2) s = m2[1];
+                    }
+                    if (!s) {
+                        let og = document.querySelector('meta[property="og:url"]');
+                        if (og && og.content) { let m3 = og.content.match(rgx); if (m3) s = m3[1]; }
+                    }
+                    if (s && s.length > 15 && s.includes('-')) {
+                        s = s.split('-')[0];
+                    }
+                    return s;
+                }
+                
+                let expectedShortcode = getRealShortcode(media);
+                bestMetadata.shortcode = expectedShortcode;
+                
+                // === STEP 1: Try vanish.js intercepted dictionary ===
+                if (window.__md_storyMediaDict) {
+                    let signature = extractSignature(src);
+                    if (signature) {
+                        for (let id in window.__md_storyMediaDict) {
+                            let apiMedia = window.__md_storyMediaDict[id];
+                            if ((apiMedia.url && apiMedia.url.includes(signature)) || 
+                                (apiMedia.signatures && apiMedia.signatures.includes(signature))) {
+                                bestUrl = apiMedia.url;
+                                bestMetadata = Object.assign({}, apiMedia, bestMetadata);
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // === STEP 2: React Fiber extraction (runs in page context) ===
+                if (media.tagName === 'VIDEO' && (!bestMetadata.dash_manifest)) {
+                    let id = "md_vid_" + Date.now();
+                    media.setAttribute("data-md-id", id);
+                    
+                    window.__md_fiberResults = window.__md_fiberResults || {};
+                    window.postMessage({ type: 'MD_REQUEST_FIBER', id: id, shortcode: expectedShortcode }, '*');
+                    
+                    // Wait up to 500ms for result
+                    for (let i = 0; i < 10; i++) {
+                        await new Promise(r => setTimeout(r, 50));
+                        if (window.__md_fiberResults[id]) break;
+                    }
+                    
+                    let res = window.__md_fiberResults[id];
+                    if (res) {
+                        let extractedUrl = res.url;
+                        let extractedDash = res.dash;
+                        if (extractedUrl && extractedUrl.length > 0) { bestUrl = extractedUrl; bestMetadata.url = bestUrl; }
+                        if (extractedDash && extractedDash.length > 50) {
+                            let decoded = extractedDash;
+                            try { if (extractedDash.includes('%3C') || extractedDash.includes('%3c')) decoded = decodeURIComponent(extractedDash); } catch(e) {}
+                            if (decoded.includes('<MPD') || decoded.includes('<Period')) {
+                                bestMetadata.dash_manifest = decoded;
+                            }
+                        }
+                        if (res.media_id && res.media_id.length > 0) { bestMetadata.media_id = res.media_id; }
+                        if (res.shortcode && res.shortcode.length > 0) { bestMetadata.shortcode = res.shortcode; expectedShortcode = res.shortcode; }
+                    }
+                }
+                
+                // === STEP 4: Vanish dict brute-force ===
+                if (media.tagName === 'VIDEO' && (!bestUrl || bestUrl.startsWith('blob:')) && !bestMetadata.dash_manifest) {
+                    if (window.__md_storyMediaDict) {
+                        let videos = Object.values(window.__md_storyMediaDict).filter(m => m.is_video || m.dash_manifest);
+                        
+                        if (expectedShortcode) {
+                            let matched = videos.find(m => m.code === expectedShortcode);
+                            if (matched) {
+                                bestMetadata = Object.assign({}, matched, bestMetadata);
+                                if (bestMetadata.url) bestUrl = bestMetadata.url;
+                            }
+                        }
+                        
+                        if ((!bestUrl || bestUrl.startsWith('blob:')) && !bestMetadata.dash_manifest && videos.length > 0) {
+                            let imgMatch = window.location.search.match(/img_index=(\d+)/);
+                            let idx = imgMatch ? parseInt(imgMatch[1]) - 1 : 0;
+                            if (idx < 0 || idx >= videos.length) idx = 0;
+                            bestMetadata = Object.assign({}, videos[idx] || videos[0], bestMetadata);
+                            if (bestMetadata.url) bestUrl = bestMetadata.url;
+                        }
+                    }
+                }
+            }
+            
+            // Re-apply original opacity after a delay
+            setTimeout(() => { if(btnSvg) btnSvg.style.opacity = '1'; }, 2000);
+            if (bestUrl) {
+                sendDownloadRequest(clone, bestUrl, bestMetadata, true, svg);
+            }
+        };
+    });
+
+    // 2. Profile Pictures: High Res Download
+    let profilePic = document.querySelector('header img[alt*="profile picture"], header img[alt*="foto de perfil"]');
+    if (profilePic && !profilePic.__md_processed) {
+        profilePic.__md_processed = true;
+        let id = 'md-pfp-dl';
+        profilePic.dataset.mdId = id;
+        
+        let dlBtn = document.createElement('button');
+        dlBtn.id = id;
+        dlBtn.className = 'md-pfp-btn';
+        dlBtn.innerHTML = SVG_DOWNLOAD;
+        dlBtn.title = "Download Profile Picture";
+        
+        // --- Rediseño Premium (Efecto Glassmorphism/Cristal) ---
+        dlBtn.style.position = 'absolute';
+        dlBtn.style.pointerEvents = 'auto';
+        dlBtn.style.background = 'rgba(255, 255, 255, 0.2)'; // Blanco cristalino translúcido
+        dlBtn.style.backdropFilter = 'blur(12px)';
+        dlBtn.style.WebkitBackdropFilter = 'blur(12px)'; // Soporte Apple
+        dlBtn.style.borderRadius = '50%';
+        dlBtn.style.width = '34px';
+        dlBtn.style.height = '34px';
+        dlBtn.style.display = 'flex';
+        dlBtn.style.alignItems = 'center';
+        dlBtn.style.justifyContent = 'center';
+        dlBtn.style.color = '#fff'; // Ícono blanco
+        dlBtn.style.border = '1px solid rgba(255, 255, 255, 0.4)';
+        dlBtn.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.25)'; // Sombra difuminada para dar profundidad sobre cualquier foto
+        dlBtn.style.cursor = 'pointer';
+        dlBtn.style.padding = '0';
+        dlBtn.style.outline = 'none';
+        dlBtn.style.transition = 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+        
+        // Corrección de la simetría / Ilusión óptica
+        let svgIcon = dlBtn.querySelector('svg');
+        if (svgIcon) {
+            svgIcon.style.width = '18px'; // Ícono un poco más pequeño para dar un marco elegante
+            svgIcon.style.height = '18px';
+            // El ícono de descarga tiene un "plato" abajo que lo hace ver pesado hacia abajo; 
+            // lo subimos 1.5 pixeles para que ópticamente esté perfecto en el centro del círculo.
+            svgIcon.style.transform = 'translateY(-1.5px)';
+        }
+        
+        // Animaciones fluidas
+        dlBtn.onmouseenter = () => { 
+            dlBtn.style.background = 'rgba(255, 255, 255, 0.35)'; 
+            dlBtn.style.transform = 'scale(1.1)'; 
+            dlBtn.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.35)';
+        };
+        dlBtn.onmouseleave = () => { 
+            dlBtn.style.background = 'rgba(255, 255, 255, 0.2)'; 
+            dlBtn.style.transform = 'scale(1)'; 
+            dlBtn.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.25)';
+        };
+        
+        overlayRoot.appendChild(dlBtn);
+        
+        dlBtn.onclick = async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            let src = profilePic.src || profilePic.currentSrc;
+            if (src) {
+                let username = window.location.pathname.split('/').filter(Boolean)[0];
+                
+                // Enviar la señal al host nativo para que ejecute pfp_downloader.py localmente con cookies de bot
+                sendDownloadRequest(dlBtn, src, { username: username, shortcode: 'profile', is_pfp_bot: true }, true);
+            }
+        };
+    }
+    
+    // 3. Stories: Inject download button NEXT TO the 3-dots button
+    if (window.location.href.includes('/stories/')) {
+        let dotsBtn = null;
+        let allCandidates = document.querySelectorAll('header button, header [role="button"], header svg, ._aa61 button, ._aa61 [role="button"], ._aa61 svg, section button, section [role="button"], section svg');
+        for (let b of allCandidates) {
+            let label = (b.getAttribute('aria-label') || '').toLowerCase();
+            if (label === 'more' || label === 'más' || label === 'mas' || label.includes('opciones')) {
+                let rect = b.getBoundingClientRect();
+                if (window.getComputedStyle(b).display !== 'none' && rect.width > 0 && rect.height > 0) {
+                    dotsBtn = b.tagName.toLowerCase() === 'svg' ? (b.closest('button, [role="button"], div[role="button"]') || b) : b;
+                    if (dotsBtn) break;
+                }
+            }
+        }
+        
+        if (!dotsBtn) {
+            let storySvgs = document.querySelectorAll('header svg, section svg');
+            for (let s of storySvgs) {
+                let circles = s.querySelectorAll('circle');
+                if (circles.length === 3) {
+                    let rect = s.getBoundingClientRect();
+                    if (window.getComputedStyle(s).display !== 'none' && rect.width > 0 && rect.height > 0) {
+                        dotsBtn = s.closest('button, [role="button"], div[role="button"]') || s;
+                        if (dotsBtn) break;
+                    }
+                }
+            }
+        }
+        
+        if (dotsBtn) {
+            // Un-hijack if it was hijacked before
+            if (dotsBtn.classList.contains('md-hijacked-dots')) {
+                dotsBtn.classList.remove('md-hijacked-dots');
+            }
+            
+            let header = dotsBtn.closest('header, section, ._aa61') || dotsBtn.parentNode;
+            
+            // Check if our button is already there in the current header
+            let existingBtn = header.querySelector('.md-story-dl-btn-inline');
+            if (!existingBtn) {
+                let dlBtn = document.createElement('div');
+                dlBtn.className = 'md-native-btn md-story-dl-btn-inline';
+                dlBtn.innerHTML = SVG_DOWNLOAD;
+                dlBtn.style.color = 'white';
+                dlBtn.style.cursor = 'pointer';
+                dlBtn.style.display = 'flex';
+                dlBtn.style.alignItems = 'center';
+                dlBtn.style.justifyContent = 'center';
+                dlBtn.style.padding = '8px';
+                dlBtn.style.margin = '0';
+                dlBtn.style.lineHeight = '0';
+                dlBtn.style.background = 'transparent';
+                dlBtn.title = "Download Story";
+                
+                // Keep Instagram's native hover effects if possible, or use ours
+                dlBtn.onmouseenter = () => dlBtn.style.opacity = '0.5';
+                dlBtn.onmouseleave = () => dlBtn.style.opacity = '1';
+                
+                // Ocultar los 3 puntos nativos y poner el botón de descarga en su lugar exacto
+                dotsBtn.style.display = 'none';
+                dotsBtn.parentNode.insertBefore(dlBtn, dotsBtn);
+                
+                dlBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dlBtn.classList.add('md-loading');
+                    dlBtn.style.opacity = '0.5';
+                    
+                    let currentUrl = window.location.href;
+                    let storyIdMatch = currentUrl.match(/\/stories\/[^\/]+\/(\d+)/);
+                    let bestUrl = null;
+                    let bestMetadata = {};
+                    let media = null;
+                    
+                    if (storyIdMatch && window.__md_storyMediaDict && window.__md_storyMediaDict[storyIdMatch[1]]) {
+                        bestMetadata = window.__md_storyMediaDict[storyIdMatch[1]];
+                        bestUrl = bestMetadata.url;
+                    }
+                    
+                    if (!bestUrl) {
+                        let mediaElements = Array.from(document.querySelectorAll('video, img'));
+                        let validMedia = mediaElements.filter(el => {
+                            let rect = el.getBoundingClientRect();
+                            // Must be reasonably large and horizontally on-screen
+                            return rect.width > 200 && rect.height > 200 && 
+                                   rect.right > 0 && rect.left < window.innerWidth;
+                        }).sort((a, b) => {
+                            let aR = a.getBoundingClientRect();
+                            let bR = b.getBoundingClientRect();
+                            let screenCenter = window.innerWidth / 2;
+                            let aDist = Math.abs((aR.left + aR.width / 2) - screenCenter);
+                            let bDist = Math.abs((bR.left + bR.width / 2) - screenCenter);
+                            
+                            // Sort primarily by closest to center of screen.
+                            // If they are equally centered (unlikely), fallback to largest area.
+                            if (Math.abs(aDist - bDist) < 10) {
+                                return (bR.width * bR.height) - (aR.width * aR.height);
+                            }
+                            return aDist - bDist;
+                        });
+                        
+                        if (validMedia.length > 0) {
+                            media = validMedia[0];
+                            bestUrl = media.src || media.currentSrc;
+                            if (media.tagName === 'VIDEO' && (!bestUrl || bestUrl === '')) {
+                                let srcTag = media.querySelector('source');
+                                if (srcTag) bestUrl = srcTag.src;
+                            }
+                        }
+                    }
+                    
+                    if (media && media.tagName === 'VIDEO' && (!bestMetadata.dash_manifest)) {
+                        let id = "md_vid_" + Date.now();
+                        media.setAttribute("data-md-id", id);
+                        
+                        window.__md_fiberResults = window.__md_fiberResults || {};
+                        window.postMessage({ type: 'MD_REQUEST_FIBER', id: id }, '*');
+                        
+                        for (let i = 0; i < 10; i++) {
+                            await new Promise(r => setTimeout(r, 50));
+                            if (window.__md_fiberResults[id]) break;
+                        }
+                        
+                        let res = window.__md_fiberResults[id];
+                        if (res) {
+                            let extractedUrl = res.url;
+                            let extractedDash = res.dash;
+                            if (extractedUrl && extractedUrl.length > 0) { bestUrl = extractedUrl; bestMetadata.url = bestUrl; }
+                            if (extractedDash && extractedDash.length > 50) {
+                                let decoded = extractedDash;
+                                try { if (extractedDash.includes('%3C') || extractedDash.includes('%3c')) decoded = decodeURIComponent(extractedDash); } catch(e) {}
+                                if (decoded.includes('<MPD') || decoded.includes('<Period')) {
+                                    bestMetadata.dash_manifest = decoded;
+                                }
+                            }
+                            if (res.shortcode && res.shortcode.length > 0) { bestMetadata.shortcode = res.shortcode; }
+                            if (res.media_id && res.media_id.length > 0) { 
+                                bestMetadata.media_id = res.media_id;
+                                // If the DOM gave us the ID, but no manifest, we can look it up in the intercepted API dict!
+                                if (window.__md_storyMediaDict && window.__md_storyMediaDict[res.media_id]) {
+                                    bestMetadata = Object.assign({}, window.__md_storyMediaDict[res.media_id], bestMetadata);
+                                    if (bestUrl.startsWith('blob:') && bestMetadata.url) {
+                                        bestUrl = bestMetadata.url;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (bestUrl && !bestMetadata.dash_manifest) {
+                        let signature = extractSignature(bestUrl);
+                        if (window.__md_storyMediaDict && signature) {
+                            for (let id in window.__md_storyMediaDict) {
+                                let apiMedia = window.__md_storyMediaDict[id];
+                                if (apiMedia.url && apiMedia.url.includes(signature)) {
+                                    bestUrl = apiMedia.url;
+                                    bestMetadata = apiMedia;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!bestUrl && bestMetadata.username) {
+                        bestUrl = "https://www.instagram.com/stories/" + bestMetadata.username + "/";
+                    }
+                    
+                    if (bestUrl || window.location.href.includes('/stories/')) {
+                        sendDownloadRequest(dlBtn, bestUrl || window.location.href, bestMetadata, true);
+                    } else {
+                        console.error("Media Downloader: Could not find media URL.");
+                        dlBtn.classList.remove('md-loading');
+                        dlBtn.style.opacity = '1';
+                    }
+                };
+            }
+        }
+    }
+    
+    // Global floating overlay sync loop
+    if (!window.__md_overlaySyncLoopStarted) {
+        window.__md_overlaySyncLoopStarted = true;
+        function syncOverlays() {
+            // Sync PFP Button
+            let pfp = document.querySelector('header img[alt*="profile picture"], header img[alt*="foto de perfil"]');
+            let pfpBtn = document.getElementById('md-pfp-dl');
+            if (pfpBtn) {
+                // Ocultar el botón automáticamente si el reproductor de historias está abierto
+                let isStoryOpen = window.location.pathname.includes('/stories/');
+                let openDialog = document.querySelector('div[role="dialog"]');
+                
+                if (!isStoryOpen && !openDialog && pfp && document.body.contains(pfp) && window.getComputedStyle(pfp).display !== 'none') {
+                    let rect = pfp.getBoundingClientRect();
+                    pfpBtn.style.display = 'flex';
+                    pfpBtn.style.left = (rect.right + window.scrollX - 45) + 'px';
+                    pfpBtn.style.top = (rect.bottom + window.scrollY - 45) + 'px';
+                } else {
+                    pfpBtn.style.display = 'none';
+                }
+            }
+            
+            // Sync Story Button removed, now injected directly into DOM
+            
+            // Sync Continuous Story Progress Bar
+            try {
+                let isStoryOpenMode = window.location.pathname.includes('/stories/');
+                if (isStoryOpenMode) {
+                    let possibleSegmentRows = [];
+                    document.querySelectorAll('div[style*="width:"], div[style*="transform:"]').forEach(inner => {
+                        let current = inner.parentElement;
+                        let climbs = 0;
+                        while (current && climbs < 4) {
+                            let style = window.getComputedStyle(current);
+                            if (style.display === 'flex' || style.display === 'grid') {
+                                if (current.children.length > 0 && !possibleSegmentRows.includes(current)) {
+                                    possibleSegmentRows.push(current);
+                                }
+                                break;
+                            }
+                            current = current.parentElement;
+                            climbs++;
+                        }
+                    });
+                    
+                    let segmentsContainer = null;
+                    for (let row of possibleSegmentRows) {
+                        let rect = row.getBoundingClientRect();
+                        // Must be reasonably wide, near the top, and physically thin
+                        if (rect.width > 50 && rect.top >= -50 && rect.top < 200 && rect.height > 0 && rect.height < 50) {
+                            segmentsContainer = row;
+                            break;
+                        }
+                    }
+                
+                if (segmentsContainer) {
+                    let customContainer = segmentsContainer.querySelector('#md-story-progress-container');
+                    
+                    if (!customContainer) {
+                        // Remove any old ones lying around
+                        document.querySelectorAll('#md-story-progress-container').forEach(e => e.remove());
+                        
+                        customContainer = document.createElement('div');
+                        customContainer.id = 'md-story-progress-container';
+                        
+                        let slider = document.createElement('input');
+                        slider.type = 'range';
+                        slider.id = 'md-story-slider';
+                        slider.min = '0';
+                        slider.max = '100';
+                        slider.step = '0.1';
+                        slider.value = '0';
+                        
+                        let counter = document.createElement('div');
+                        counter.id = 'md-story-counter';
+                        
+                        customContainer.appendChild(slider);
+                        customContainer.appendChild(counter);
+                        
+                        if (window.getComputedStyle(segmentsContainer).position === 'static') {
+                            segmentsContainer.style.position = 'relative'; 
+                        }
+                        segmentsContainer.appendChild(customContainer);
+                            
+                            // Event listeners to prevent native story skips and enable scrubbing
+                            slider.addEventListener('mousedown', (e) => {
+                                slider.__md_isDragging = true;
+                                e.stopPropagation();
+                            }, true);
+                            slider.addEventListener('touchstart', (e) => {
+                                slider.__md_isDragging = true;
+                                e.stopPropagation();
+                            }, {passive: false, capture: true});
+                            slider.addEventListener('mouseup', () => slider.__md_isDragging = false);
+                            slider.addEventListener('touchend', () => slider.__md_isDragging = false);
+                            slider.addEventListener('click', (e) => e.stopPropagation(), true);
+                            
+                            slider.addEventListener('input', (e) => {
+                                let pct = parseFloat(e.target.value);
+                                e.target.style.setProperty('--md-progress', `${pct}%`);
+                                // Scrub active video if present
+                                let videos = document.querySelectorAll('video');
+                                for (let v of videos) {
+                                    let vr = v.getBoundingClientRect();
+                                    if (vr.width > 0 && vr.left >= -50 && vr.right <= window.innerWidth + 50) {
+                                        if (!isNaN(v.duration) && v.duration > 0) {
+                                            v.currentTime = (pct / 100) * v.duration;
+                                        }
+                                        break;
+                                    }
+                                }
+                            });
+                            
+                            setTimeout(() => customContainer.classList.add('md-visible'), 50);
+                        }
+                        
+                        if (!segmentsContainer.classList.contains('md-hide-native-segments')) {
+                            segmentsContainer.classList.add('md-hide-native-segments');
+                        }
+                        
+                        let totalSegments = segmentsContainer.children.length;
+                        // Adjust totalSegments since we added our custom container as a child
+                        if (segmentsContainer.lastElementChild === customContainer) {
+                            totalSegments = Math.max(1, totalSegments - 1);
+                        }
+                        
+                        let activeIndex = totalSegments;
+                        let activePct = 0;
+                        
+                        for (let i = 0; i < totalSegments; i++) {
+                            let seg = segmentsContainer.children[i];
+                            if (seg.id === 'md-story-progress-container') continue; // Skip our own container
+                            
+                            let parentRect = seg.getBoundingClientRect();
+                            if (parentRect.width === 0) continue;
+                            
+                            let minPct = 100;
+                            let nodes = [seg, ...Array.from(seg.querySelectorAll('div'))];
+                            for (let n of nodes) {
+                                let nRect = n.getBoundingClientRect();
+                                if (nRect.height > 0 && nRect.height <= 15 && nRect.width <= parentRect.width + 2) {
+                                    let overlapLeft = Math.max(nRect.left, parentRect.left);
+                                    let overlapRight = Math.min(nRect.right, parentRect.right);
+                                    let visibleWidth = Math.max(0, overlapRight - overlapLeft);
+                                    
+                                    let pct = (visibleWidth / parentRect.width) * 100;
+                                    pct = Math.max(0, Math.min(100, pct));
+                                    if (pct < minPct) {
+                                        minPct = pct;
+                                    }
+                                }
+                            }
+                            
+                            let val = minPct;
+                            if (val < 0.5) {
+                                activeIndex = i + 1;
+                                activePct = 0;
+                                break;
+                            } else if (val < 99.5) {
+                                activeIndex = i + 1;
+                                activePct = val;
+                                break;
+                            }
+                        }
+                        
+                        if (activeIndex > totalSegments) activeIndex = totalSegments;
+                        if (activeIndex === 0) activeIndex = 1;
+                        
+                        let counter = customContainer.querySelector('#md-story-counter');
+                        if (counter && counter.textContent !== `${activeIndex}/${totalSegments}`) {
+                            counter.textContent = `${activeIndex}/${totalSegments}`;
+                        }
+                        
+                        let slider = customContainer.querySelector('#md-story-slider');
+                        if (slider && !slider.__md_isDragging) {
+                            let pct = activePct;
+                            let videos = document.querySelectorAll('video');
+                            for (let v of videos) {
+                                let vr = v.getBoundingClientRect();
+                                if (vr.width > 0 && vr.left >= -50 && vr.right <= window.innerWidth + 50) {
+                                    if (!isNaN(v.duration) && v.duration > 0) {
+                                        pct = (v.currentTime / v.duration) * 100;
+                                    }
+                                    break;
+                                }
+                            }
+                            slider.value = pct;
+                            slider.style.setProperty('--md-progress', `${pct}%`);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Media Downloader syncOverlays error:", err);
+            }
+            
+            // Sync Download Buttons — "Winner Takes All" approach:
+            // Only ONE download button is shown at any time: the one whose original
+            // bookmark button is closest to the vertical center of the screen.
+            // This handles the case where Instagram keeps multiple reels in the DOM.
+            if (window.__md_activeDlButtons) {
+                let candidates = [];
+                
+                for (let item of Array.from(window.__md_activeDlButtons)) {
+                    let wrapper = item.wrapper;
+                    let clone = item.clone;
+                    
+                    if (!document.body.contains(wrapper)) {
+                        if (clone && clone.parentNode) clone.remove();
+                        window.__md_activeDlButtons.delete(item);
+                        continue;
+                    }
+                    
+                    let rect = wrapper.getBoundingClientRect();
+                    let inViewport = rect.width > 0 && rect.height > 0 &&
+                        rect.top >= 0 && rect.bottom <= window.innerHeight &&
+                        rect.left >= 0 && rect.right <= window.innerWidth &&
+                        window.getComputedStyle(wrapper).display !== 'none';
+                    
+                    if (inViewport) {
+                        candidates.push({ item, clone, rect });
+                    } else {
+                        clone.style.display = 'none';
+                    }
+                }
+                
+                // If a dialog is open, prefer candidates inside the dialog
+                let openDialog = document.querySelector('div[role="dialog"]');
+                if (openDialog) {
+                    candidates = candidates.filter(c => openDialog.contains(c.item.wrapper));
+                }
+                
+                // Pick the single winner: bookmark closest to screen center
+                let centerY = window.innerHeight / 2;
+                let winner = null;
+                let winnerDist = Infinity;
+                for (let c of candidates) {
+                    let dist = Math.abs((c.rect.top + c.rect.height / 2) - centerY);
+                    if (dist < winnerDist) { winnerDist = dist; winner = c; }
+                }
+                
+                for (let { item, clone, rect } of candidates) {
+                    if (item === winner.item) {
+                        let wrapper = item.wrapper;
+                        let baseW = wrapper.offsetWidth || rect.width;
+                        let baseH = wrapper.offsetHeight || rect.height;
+                        let cx = rect.left + rect.width / 2;
+                        let cy = rect.top + rect.height / 2;
+                        let uLeft = cx - baseW / 2;
+                        let uTop = cy - baseH / 2;
+                        
+                        clone.style.display = 'flex';
+                        clone.style.alignItems = 'center';
+                        clone.style.justifyContent = 'center';
+                        clone.style.width = baseW + 'px';
+                        clone.style.height = baseH + 'px';
+                        clone.style.transition = 'opacity 0.15s ease-out';
+                        
+                        let lastUTop = parseFloat(clone.dataset.lastUTop);
+                        let diff = Math.abs(uTop - lastUTop);
+                        
+                        let isReels = window.location.pathname.includes('/reel/') || window.location.pathname.includes('/reels/');
+                        
+                        if (isReels && !isNaN(lastUTop) && diff > 5) {
+                            clone.style.opacity = '0';
+                            clone.style.pointerEvents = 'none';
+                        } else {
+                            clone.style.opacity = '1';
+                            clone.style.pointerEvents = 'auto';
+                            
+                            if (item.isVertical) {
+                                // Above bookmark: document coords (absolute positioning)
+                                clone.style.left = (uLeft + window.scrollX) + 'px';
+                                clone.style.top = (uTop - baseH - 16 + window.scrollY) + 'px';
+                            } else {
+                                // Left of bookmark: document coords
+                                clone.style.left = (uLeft - baseW - item.gapX + window.scrollX) + 'px';
+                                clone.style.top = (uTop + window.scrollY) + 'px';
+                            }
+                        }
+                        clone.dataset.lastUTop = uTop;
+                    } else {
+                        clone.style.display = 'none';
+                    }
+                }
+            }
+            
+            // Sync Video Progress Bars for Reels, Popups and feed videos
+            try {
+                let isStoryOpenMode = window.location.pathname.includes('/stories/');
+                let overlayRoot = document.getElementById('md-overlay-root');
+                
+                if (!window.__md_videoSliders) window.__md_videoSliders = new WeakMap();
+                if (!window.__md_activeSliders) window.__md_activeSliders = new Set();
+                
+                if (!isStoryOpenMode && overlayRoot) {
+                    let videos = Array.from(document.querySelectorAll('video'));
+                    
+                    for (let c of Array.from(window.__md_activeSliders)) {
+                        let stillExists = videos.includes(c.videoElement);
+                        if (!stillExists) {
+                            if (c.container && c.container.parentNode) c.container.remove();
+                            window.__md_activeSliders.delete(c);
+                        }
+                    }
+                    
+                    for (let v of videos) {
+                        let rect = v.getBoundingClientRect();
+                        
+                        // Calculate visible rect by intersecting with clipping ancestors
+                        // This prevents the bar from extending outside carousels
+                        let visibleRect = { 
+                            left: rect.left, 
+                            top: rect.top, 
+                            right: rect.right, 
+                            bottom: rect.bottom, 
+                            width: rect.width, 
+                            height: rect.height 
+                        };
+                        
+                        let parent = v.parentElement;
+                        let bRadL = window.getComputedStyle(v).borderBottomLeftRadius || '0px';
+                        let bRadR = window.getComputedStyle(v).borderBottomRightRadius || '0px';
+
+                        while(parent && parent !== document.body && parent !== document.documentElement) {
+                            let style = window.getComputedStyle(parent);
+                            if (style.overflow === 'hidden' || style.overflowX === 'hidden' || style.overflowY === 'hidden' || style.clipPath !== 'none') {
+                                if (parseFloat(style.borderBottomLeftRadius) > 0) bRadL = style.borderBottomLeftRadius;
+                                if (parseFloat(style.borderBottomRightRadius) > 0) bRadR = style.borderBottomRightRadius;
+
+                                let pRect = parent.getBoundingClientRect();
+                                visibleRect.left = Math.max(visibleRect.left, pRect.left);
+                                visibleRect.top = Math.max(visibleRect.top, pRect.top);
+                                visibleRect.right = Math.min(visibleRect.right, pRect.right);
+                                visibleRect.bottom = Math.min(visibleRect.bottom, pRect.bottom);
+                                visibleRect.width = visibleRect.right - visibleRect.left;
+                                visibleRect.height = visibleRect.bottom - visibleRect.top;
+                                if (visibleRect.width <= 0 || visibleRect.height <= 0) break;
+                            }
+                            parent = parent.parentElement;
+                        }
+                        
+                        // isOnScreen prevents ghost bars from hidden carousel slides.
+                        let isOnScreen = visibleRect.width > 0 && visibleRect.height > 0 && visibleRect.right > 0 && visibleRect.left < window.innerWidth && visibleRect.top < window.innerHeight && visibleRect.bottom > 0;
+                        let openDialog = document.querySelector('div[role="dialog"]');
+                        if (openDialog && !openDialog.contains(v)) isOnScreen = false;
+                        
+                        if (isOnScreen && v.duration > 0 && visibleRect.width > 300 && visibleRect.height > 300 && window.getComputedStyle(v).display !== 'none') {
+                            
+                            let customContainer = window.__md_videoSliders.get(v);
+                            
+                            if (!customContainer) {
+                                customContainer = document.createElement('div');
+                                customContainer.className = 'md-video-progress-container';
+                                
+                                let slider = document.createElement('input');
+                                slider.type = 'range';
+                                slider.className = 'md-video-slider';
+                                slider.min = '0';
+                                slider.max = '100';
+                                slider.step = '0.1';
+                                slider.value = '0';
+                                
+                                customContainer.appendChild(slider);
+                                overlayRoot.appendChild(customContainer);
+                                
+                                window.__md_videoSliders.set(v, customContainer);
+                                window.__md_activeSliders.add({ videoElement: v, container: customContainer });
+                                
+                                // Container is pointer-events:none so clicks on the video area pass through.
+                                // The slider itself uses CSS pointer-events:auto (from .md-video-slider in our CSS),
+                                // so only the 4px bar area intercepts pointer events - not the space above it.
+                                customContainer.style.pointerEvents = 'none';
+                                // Do NOT set slider pointer-events to none - the CSS handles this correctly.
+                                
+                                slider.addEventListener('mousedown', (e) => { e.stopPropagation(); }, true);
+                                slider.addEventListener('click', (e) => { e.stopPropagation(); }, true);
+                                
+                                slider.addEventListener('input', (e) => {
+                                    let pct = parseFloat(e.target.value);
+                                    e.target.style.setProperty('--md-vid-progress', `${pct}%`);
+                                    if (!isNaN(v.duration)) {
+                                        v.currentTime = (pct / 100) * v.duration;
+                                    }
+                                });
+                            }
+                            
+                            if (customContainer && customContainer.parentNode !== overlayRoot) {
+                                overlayRoot.appendChild(customContainer);
+                            }
+                            
+                            if (customContainer && customContainer.parentNode === overlayRoot) {
+                                // Flush with the very bottom of the video frame, full width edge-to-edge
+                                customContainer.style.left = (visibleRect.left + window.scrollX) + 'px';
+                                customContainer.style.width = visibleRect.width + 'px';
+                                // Container is 16px tall. top = visibleRect.bottom - 16 places it flush with the frame bottom.
+                                customContainer.style.top = (visibleRect.bottom - 16 + window.scrollY) + 'px';
+                                customContainer.style.borderBottomLeftRadius = bRadL;
+                                customContainer.style.borderBottomRightRadius = bRadR; 
+                                
+                                let slider = customContainer.querySelector('input');
+                                if (slider && !slider.__md_isDragging) {
+                                    let pct = (v.currentTime / v.duration) * 100;
+                                    slider.value = pct;
+                                    slider.style.setProperty('--md-vid-progress', `${pct}%`);
+                                }
+                            }
+                        } else {
+                            let customContainer = window.__md_videoSliders.get(v);
+                            if (customContainer && customContainer.parentNode) {
+                                customContainer.remove();
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Progress bar sync error:", err);
+            }
+            
+            requestAnimationFrame(syncOverlays);
+        }
+        syncOverlays();
+    }
+}
+
+const observer = new MutationObserver(() => {
+    injectMinimalistButtons();
+});
+
+observer.observe(document.documentElement, { childList: true, subtree: true });
+injectMinimalistButtons();
+
+
+// Global click interceptor to defeat invisible overlays
+document.addEventListener('click', (e) => {
+    let buttons = document.querySelectorAll('.md-native-btn');
+    for (let btn of buttons) {
+        if (btn.style.visibility === 'hidden' || btn.style.display === 'none') continue;
+        
+        let rect = btn.getBoundingClientRect();
+        // Check if the physical click coordinates intersect with the button
+        if (e.clientX >= rect.left && e.clientX <= rect.right &&
+            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+            
+            // If the event target is already the button, let it process normally
+            if (e.target === btn || btn.contains(e.target)) return;
+            
+            // Otherwise, an invisible overlay stole the click! Steal it back!
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Trigger our button manually
+            btn.click();
+            return;
+        }
+    }
+}, true); // Use capture phase to intercept BEFORE the overlay gets it

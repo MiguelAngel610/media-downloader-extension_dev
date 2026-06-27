@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Downloader</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <img src="icon48.png" alt="Logo">
+                <h1>Media Downloader</h1>
+            </div>
+            <p class="subtitle">IG • FB • X</p>
+        </header>
+
+        <main>
+            <div class="input-group">
+                <label for="account-select">Instagram Account</label>
+                <select id="account-select" class="premium-select">
+                    <option value="M">Cuenta M (Default)</option>
+                    <option value="V">Cuenta V</option>
+                </select>
+            </div>
+
+            <div class="input-group vanish-group" style="margin-top: 12px; margin-bottom: 12px;">
+                <label for="vanish-toggle" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 0;">
+                    <span>👻 Vanish Mode (Stories)</span>
+                    <label class="switch" style="position: relative; display: inline-block; width: 34px; height: 20px;">
+                        <input type="checkbox" id="vanish-toggle" style="opacity: 0; width: 0; height: 0;">
+                        <span class="slider round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px;">
+                            <span style="position: absolute; content: ''; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;" class="slider-dot"></span>
+                        </span>
+                    </label>
+                </label>
+                <p style="font-size: 11px; color: #94a3b8; margin-top: 4px; margin-bottom: 0;">Watch anonymously.</p>
+            </div>
+
+            <div class="input-group vanish-group" style="margin-bottom: 12px;">
+                <label for="ghost-online-toggle" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 0;">
+                    <span>🟢 Ocultar "En Línea"</span>
+                    <label class="switch" style="position: relative; display: inline-block; width: 34px; height: 20px;">
+                        <input type="checkbox" id="ghost-online-toggle" style="opacity: 0; width: 0; height: 0;">
+                        <span class="slider round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px;">
+                            <span style="position: absolute; content: ''; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;" class="slider-dot"></span>
+                        </span>
+                    </label>
+                </label>
+            </div>
+
+            <div class="input-group vanish-group" style="margin-bottom: 12px;">
+                <label for="ghost-seen-toggle" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 0;">
+                    <span>👀 Ocultar "Visto"</span>
+                    <label class="switch" style="position: relative; display: inline-block; width: 34px; height: 20px;">
+                        <input type="checkbox" id="ghost-seen-toggle" style="opacity: 0; width: 0; height: 0;">
+                        <span class="slider round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px;">
+                            <span style="position: absolute; content: ''; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;" class="slider-dot"></span>
+                        </span>
+                    </label>
+                </label>
+            </div>
+
+            <div class="input-group">
+                <label for="url-input">Quick Download</label>
+                <input type="text" id="url-input" placeholder="Paste link here...">
+            </div>
+            
+            <button id="download-btn" class="primary-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download Media
+            </button>
+
+            <div id="status-message" class="status hidden"></div>
+        </main>
+
+        <footer>
+            <p>Ensure Native Host is running on your PC.</p>
+        </footer>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

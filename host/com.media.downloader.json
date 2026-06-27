@@ -1,0 +1,9 @@
+{
+  "name": "com.media.downloader",
+  "description": "Media Downloader Native Host",
+  "path": "C:\\Users\\Migue\\Downloads\\media_downloader_extension_dev\\host\\host.bat",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://meoaknlmjboeniofdbbcbchfhjgggbfa/"
+  ]
+}
