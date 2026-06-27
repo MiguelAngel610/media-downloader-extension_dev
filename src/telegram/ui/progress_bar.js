@@ -99,4 +99,33 @@
         progressBar.querySelector("div").style.backgroundColor = "#D16666";
         progressBar.querySelector("div").style.width = "100%";
     };
+
+    // Lightweight one-off toast for failures that don't have an associated progress bar
+    // (e.g. image downloads, which previously failed completely silently).
+    window.__md_tel_showToast = (message, isError = false) => {
+        let container = document.getElementById("tel-downloader-progress-bar-container");
+        if (!container) {
+            container = document.createElement("div");
+            container.id = "tel-downloader-progress-bar-container";
+            container.style.position = "fixed";
+            container.style.bottom = 0;
+            container.style.right = 0;
+            container.style.zIndex = location.pathname.startsWith("/k/") ? 4 : 1600;
+            document.body.appendChild(container);
+        }
+
+        const toast = document.createElement("div");
+        toast.style.width = "20rem";
+        toast.style.marginTop = "0.4rem";
+        toast.style.padding = "0.6rem";
+        toast.style.borderRadius = "0.4rem";
+        toast.style.color = "white";
+        toast.style.backgroundColor = isError ? "#D16666" : "#6093B5";
+        toast.innerText = message;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 4000);
+    };
 })();
