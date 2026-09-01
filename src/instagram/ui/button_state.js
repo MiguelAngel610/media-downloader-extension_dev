@@ -195,6 +195,10 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
 
             if (parentArticle) parentArticle.__md_download_state = { time: Date.now(), class: 'md-success', html: SVG_CHECK, isFloating: isFloating };
 
+            if (window.MDToastManager) {
+                window.MDToastManager.showSuccess("¡Descarga exitosa! (Enviado al gestor)", 3000);
+            }
+
             setTimeout(() => {
                 btn.classList.remove('md-success');
                 updateButtonIcon(btn, SVG_DOWNLOAD, isFloating);

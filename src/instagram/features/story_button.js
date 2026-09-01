@@ -94,13 +94,11 @@ function showSharedReelWarning(info) {
 
     let btnActionHtml = info.href ? `
         <a href="${info.href}" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 6px; background: #2563eb; color: #ffffff; font-weight: 600; font-size: 13px; padding: 10px 14px; border-radius: 8px; text-decoration: none; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25); transition: background 0.2s;">
-            <span style="font-size: 15px;">${typeIcon}</span>
-            <span>Open Full ${typeText} in New Window</span>
+            <span>Open Full ${typeText}</span>
         </a>
     ` : `
         <div style="cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; background: #2563eb; color: #ffffff; font-weight: 600; font-size: 13px; padding: 10px 14px; border-radius: 8px; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);">
-            <span style="font-size: 15px;">${typeIcon}</span>
-            <span>Open "${info.label}"</span>
+            <span>Open Full ${typeText}</span>
         </div>
     `;
 
@@ -201,7 +199,7 @@ function injectStoryButton() {
                     }
 
                     if (check && check.detected) {
-                        if (window.MDToastManager) window.MDToastManager.showWarning(check.label || "Shared post blocked");
+                        showSharedReelWarning(check);
                         dlBtn.classList.remove('md-loading');
                         dlBtn.style.opacity = '1';
                         return;

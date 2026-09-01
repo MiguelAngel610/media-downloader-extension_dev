@@ -183,40 +183,67 @@
     pointer-events: auto !important;
 }
 
-/* Simple Toasts (Info, Error, Warning) */
-.md-toast-info, .md-toast-error, .md-toast-warning {
-    bottom: 30px !important;
-    left: 50% !important;
-    transform: translateX(-50%) translateY(10px) !important;
-    padding: 12px 24px !important;
+/* Simple Toasts (Info, Success, Error, Warning) */
+.md-toast-info, .md-toast-success, .md-toast-error, .md-toast-warning {
+    bottom: 24px !important;
+    right: 24px !important;
+    left: auto !important;
+    transform: translateX(15px) translateY(0) !important;
+    padding: 12px 18px !important;
     border-radius: 12px !important;
-    font-size: 14px !important;
+    font-size: 14.5px !important;
     font-weight: 500 !important;
-    backdrop-filter: blur(12px) !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
-    color: #ffffff !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    color: #f8fafc !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    pointer-events: none !important;
 }
 
-.md-toast-info.md-show, .md-toast-error.md-show, .md-toast-warning.md-show {
+.md-toast-info.md-show, .md-toast-success.md-show, .md-toast-error.md-show, .md-toast-warning.md-show {
     opacity: 1;
-    transform: translateX(-50%) translateY(0) !important;
+    transform: translateX(0) translateY(0) !important;
 }
 
 .md-toast-info {
-    background-color: rgba(14, 165, 233, 0.95) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    background-color: rgba(15, 23, 42, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
+.md-toast-info .md-toast-icon-wrapper { color: #38bdf8 !important; }
+
+.md-toast-success {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    color: #064e3b !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+}
+.md-toast-success .md-toast-icon-wrapper { color: #10b981 !important; }
 
 .md-toast-error {
-    background-color: rgba(239, 68, 68, 0.95) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    background-color: rgba(30, 10, 10, 0.85) !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
 }
+.md-toast-error .md-toast-icon-wrapper { color: #ef4444 !important; }
 
 .md-toast-warning {
-    background-color: rgba(24, 24, 27, 0.95) !important;
-    color: #ff6b6b !important;
-    border: 1px solid rgba(255, 107, 107, 0.3) !important;
+    background-color: rgba(30, 20, 10, 0.85) !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
 }
+.md-toast-warning .md-toast-icon-wrapper { color: #f59e0b !important; }
+
+.md-toast-icon-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.md-toast-msg {
+    line-height: 1.2 !important;
+}
+
 
 /* Complex Modal/Toast (e.g., IG Shared Reel Warning) */
 .md-toast-complex {
