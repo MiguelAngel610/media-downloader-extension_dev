@@ -35,8 +35,8 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
         metadata.username = resolveUsername(btn, originalElement);
     }
 
-    // If we have the exact media_id from vanish.js, use it to calculate the perfect shortcode
-    if (metadata.media_id) {
+    // If we have the exact media_id from ig_interceptor, use it to calculate the perfect shortcode ONLY if missing
+    if (!metadata.shortcode && metadata.media_id) {
         metadata.shortcode = idToShortcode(String(metadata.media_id).split('_')[0]);
     }
 
@@ -97,6 +97,20 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
 
     if (!metadata.timestamp) metadata.timestamp = Math.floor(Date.now() / 1000);
 
+    // Patch timestamp using DOM <time> if it seems like a fallback (within last 1 min)
+    if (Math.abs((Date.now()/1000) - metadata.timestamp) < 60) {
+        let container = (originalElement || btn).closest('article, main, div[role="dialog"]');
+        if (container) {
+            let timeEl = container.querySelector('time[datetime]');
+            if (timeEl) {
+                let dtStr = timeEl.getAttribute('datetime');
+                if (dtStr) {
+                    metadata.timestamp = Math.floor(new Date(dtStr).getTime() / 1000);
+                }
+            }
+        }
+    }
+
     // Ensure we have a unique media_id to prevent carousel overwrites
     if (!metadata.media_id && url && url.startsWith('http')) {
         try {
@@ -105,6 +119,12 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
                 metadata.media_id = urlFilename.split('.')[0];
             }
         } catch (e) {}
+    }
+
+    if (!chrome.runtime || !chrome.runtime.id) {
+        alert("La extensión fue actualizada. Por favor, recarga esta pestaña de Instagram para seguir descargando.");
+        btn.classList.remove('md-loading');
+        return;
     }
 
     chrome.storage.local.get(['selectedAccount'], function(result) {
@@ -156,6 +176,10 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
             }
         }
 
+        if (!metadata.media_category) {
+            metadata.media_category = "post";
+        }
+        
         chrome.runtime.sendMessage({
             action: "queue_download",
             url: finalUrl,

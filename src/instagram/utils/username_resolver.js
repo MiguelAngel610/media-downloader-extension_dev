@@ -15,11 +15,11 @@ function resolveUsername(btn, originalElement) {
         let mTitle = document.title.match(/@([a-zA-Z0-9_.-]+)/);
         if (!mTitle) {
             let ogDesc = document.querySelector('meta[property="og:description"]');
-            if (ogDesc) mTitle = ogDesc.content.match(/@([a-zA-Z0-9_.-]+)/) || ogDesc.content.match(/^([a-zA-Z0-9_.-]+) (?:on|en) Instagram/);
+            if (ogDesc) mTitle = ogDesc.content.match(/@([a-zA-Z0-9_.-]+)/);
         }
         if (!mTitle) {
             let ogTitle = document.querySelector('meta[property="og:title"]');
-            if (ogTitle) mTitle = ogTitle.content.match(/@([a-zA-Z0-9_.-]+)/) || ogTitle.content.match(/^([a-zA-Z0-9_.-]+) (?:on|en) Instagram/);
+            if (ogTitle) mTitle = ogTitle.content.match(/@([a-zA-Z0-9_.-]+)/);
         }
 
         if (mTitle) {

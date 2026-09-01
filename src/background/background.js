@@ -1,0 +1,329 @@
+const NATIVE_HOST = "com.media.downloader";
+
+// Disable Chrome's intrusive download tray/bubble/shelf UI during downloads
+function disableChromeDownloadUI() {
+    try {
+        if (chrome.downloads && typeof chrome.downloads.setUiOptions === "function") {
+            chrome.downloads.setUiOptions({ enabled: false }, () => {
+                if (chrome.runtime.lastError) {
+                    console.warn("Could not disable download UI via setUiOptions:", chrome.runtime.lastError.message);
+                } else {
+                    console.log("Chrome download UI successfully silenced.");
+                }
+            });
+        } else if (chrome.downloads && typeof chrome.downloads.setShelfEnabled === "function") {
+            chrome.downloads.setShelfEnabled(false);
+            console.log("Chrome download shelf silenced via legacy API.");
+        }
+    } catch (e) {
+        console.warn("Error trying to silence Chrome download UI:", e);
+    }
+}
+
+disableChromeDownloadUI();
+
+let downloadQueue = [];
+let isProcessing = false;
+let activeHdTabId = null;
+let activeHdWindowId = null;
+let nativePort = null;
+let backupQueue = [];
+let isBackingUp = false;
+let currentBackupTabId = null;
+
+function connectToNativeHost() {
+    console.log("Connecting to Native Host...");
+    nativePort = chrome.runtime.connectNative(NATIVE_HOST);
+
+    nativePort.onMessage.addListener((message) => {
+        console.log("Received from host via port:", message);
+        if (message.action === "start_backup") {
+            console.log("Starting backup for users:", message.users);
+            backupQueue = backupQueue.concat(message.users);
+            processBackupQueue();
+        } else if (message.action === "stop_backup") {
+            console.log("Stopping backup...");
+            backupQueue = [];
+            isBackingUp = false;
+            if (currentBackupTabId) {
+                try {
+                    chrome.tabs.remove(currentBackupTabId);
+                } catch (e) { }
+                currentBackupTabId = null;
+            }
+            if (nativePort) {
+                nativePort.postMessage({ action: "backup_log", status: "error", message: `\n[Backup] 🛑 Stopped manually by user.` });
+            }
+        }
+    });
+
+    nativePort.onDisconnect.addListener(() => {
+        console.error("Native host disconnected", chrome.runtime.lastError);
+        nativePort = null;
+        setTimeout(connectToNativeHost, 5000);
+    });
+}
+
+connectToNativeHost();
+
+let currentBackupCuenta = "M";
+let currentBackupUsername = null;
+
+function processBackupQueue() {
+    if (isBackingUp || backupQueue.length === 0) return;
+
+    isBackingUp = true;
+    let target = backupQueue.shift();
+    let username = typeof target === 'object' ? target.username : target;
+    currentBackupCuenta = typeof target === 'object' ? (target.cuenta || "M") : "M";
+    currentBackupUsername = username;
+
+    console.log(`Processing backup for: ${username} (Account: ${currentBackupCuenta})`);
+
+    // Tell TCP clients we started
+    if (nativePort) {
+        nativePort.postMessage({ action: "backup_log", status: "info", message: `\n[Backup] Starting backup for @${username}...` });
+    }
+
+    chrome.tabs.create({ url: `https://www.instagram.com/${username}/`, active: false }, (tab) => {
+        currentBackupTabId = tab.id;
+        // Content script auto_backup.js will take over in this tab.
+        // It will signal back when done via "backup_user_done"
+    });
+}
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+    if (isBackingUp && tabId === currentBackupTabId) {
+        console.log(`Backup tab ${tabId} was closed externally.`);
+        currentBackupTabId = null;
+        isBackingUp = false;
+
+        if (nativePort) {
+            nativePort.postMessage({ action: "backup_log", status: "error", message: `\n[Backup] ⚠️ Tab was closed externally. Moving to next user...` });
+        }
+
+        setTimeout(processBackupQueue, 1000);
+    }
+});
+
+// Listen for messages from content.js or popup.js
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "queue_download") {
+        downloadQueue.push(request);
+        sendResponse({ status: "queued" });
+        processQueue();
+        return true;
+    } else if (request.action === "browser_download") {
+        disableChromeDownloadUI();
+        chrome.downloads.download({
+            url: request.url,
+            filename: request.filename || "download.jpeg",
+            conflictAction: "uniquify"
+        }, (downloadId) => {
+            if (chrome.runtime.lastError) {
+                sendResponse({ success: false, error: chrome.runtime.lastError.message });
+            } else {
+                sendResponse({ success: true, downloadId: downloadId });
+            }
+        });
+        return true;
+    } else if (request.action === "fetch_mobile_api") {
+        fetch(`https://i.instagram.com/api/v1/users/${request.userId}/info/`, {
+            credentials: "include",
+            headers: {
+                'x-ig-app-id': '936619743392459'
+            }
+        })
+            .then(res => res.json())
+            .then(data => sendResponse({ success: true, data: data }))
+            .catch(err => sendResponse({ success: false, error: err.toString() }));
+        return true;
+    } else if (request.action === "fetch_web_profile_info") {
+        fetch(`https://i.instagram.com/api/v1/users/web_profile_info/?username=${request.username}`, {
+            credentials: "include",
+            headers: { 'x-ig-app-id': '936619743392459' }
+        })
+            .then(res => res.json())
+            .then(data => sendResponse({ success: true, data: data }))
+            .catch(err => sendResponse({ success: false, error: err.toString() }));
+        return true;
+    } else if (request.action === "fetch_mobile_usernameinfo") {
+        fetch(`https://i.instagram.com/api/v1/users/${request.username}/usernameinfo/`, {
+            credentials: "include",
+            headers: {
+                'x-ig-app-id': '936619743392459',
+                'User-Agent': 'Instagram 314.0.0.28.118 Android (31/12; 480dpi; 1080x2340; samsung; SM-G988U; x1q; qcom; en_US; 553066319)'
+            }
+        })
+            .then(res => res.json())
+            .then(data => sendResponse({ success: true, data: data }))
+            .catch(err => sendResponse({ success: false, error: err.toString() }));
+        return true;
+    } else if (request.action === "open_hd_window") {
+        chrome.tabs.create({
+            url: request.url,
+            active: false
+        }, (tab) => {
+            activeHdTabId = tab.id;
+        });
+        return true;
+    } else if (request.action === "get_cdn_timestamp") {
+        let hdUrl = request.url;
+        if (!hdUrl) {
+            sendResponse({ timestamp: Math.floor(Date.now() / 1000) });
+            return true;
+        }
+
+        let controller = new AbortController();
+        let timeoutId = setTimeout(() => controller.abort(), 3000); // 3 sec timeout
+
+        fetch(hdUrl, { method: 'GET', signal: controller.signal })
+            .then(res => {
+                clearTimeout(timeoutId);
+                let lastMod = res.headers.get('Last-Modified');
+
+                // Abortar la descarga del cuerpo de la imagen inmediatamente (solo queriamos las cabeceras)
+                controller.abort();
+
+                let d = lastMod ? new Date(lastMod) : new Date();
+                let unixTime = Math.floor(d.getTime() / 1000);
+                sendResponse({ timestamp: unixTime });
+            })
+            .catch(err => {
+                // Fetch aborted intentionally or network error
+                clearTimeout(timeoutId);
+                let unixTime = Math.floor(Date.now() / 1000);
+                sendResponse({ timestamp: unixTime });
+            });
+
+        return true;
+    } else if (request.action === "report_hd_url") {
+        let username = request.username || "user";
+        let hdUrl = request.url;
+
+        console.log("HD URL captured:", hdUrl);
+
+        // Cierra la pestaña/ventana invisible inmediatamente para evitar interrupciones
+        if (activeHdWindowId) {
+            chrome.windows.remove(activeHdWindowId, () => {
+                activeHdWindowId = null;
+            });
+        }
+        if (activeHdTabId) {
+            chrome.tabs.remove(activeHdTabId);
+            activeHdTabId = null;
+        }
+
+        if (!hdUrl) {
+            chrome.tabs.sendMessage(sender.tab.id, { action: "hd_url_extracted", url: "", timestamp: "" });
+            return true;
+        }
+
+        // Intenta obtener la fecha original de subida desde los headers del CDN (Last-Modified)
+        let controller = new AbortController();
+        let timeoutId = setTimeout(() => controller.abort(), 2000);
+
+        fetch(hdUrl, { method: 'HEAD', signal: controller.signal })
+            .then(res => {
+                clearTimeout(timeoutId);
+                let lastMod = res.headers.get('Last-Modified');
+                let d = lastMod ? new Date(lastMod) : new Date();
+                let unixTime = Math.floor(d.getTime() / 1000);
+
+                chrome.tabs.sendMessage(sender.tab.id, {
+                    action: "hd_url_extracted",
+                    url: request.url,
+                    timestamp: unixTime
+                });
+            })
+            .catch(err => {
+                clearTimeout(timeoutId);
+                console.log("Could not get Last-Modified, using current date.", err);
+                let d = new Date();
+                let unixTime = Math.floor(d.getTime() / 1000);
+
+                chrome.tabs.sendMessage(sender.tab.id, {
+                    action: "hd_url_extracted",
+                    url: request.url,
+                    timestamp: unixTime
+                });
+            });
+
+        return true;
+    }
+});
+
+function processQueue() {
+    if (isProcessing || downloadQueue.length === 0) return;
+
+    isProcessing = true;
+    const request = downloadQueue.shift();
+
+    sendToNativeHost(request, (response) => {
+        isProcessing = false;
+        processQueue();
+    });
+}
+
+function sendToNativeHost(request, sendResponse) {
+    console.log(`Sending to host: ${request.url} using account ${request.account} with mediaType ${request.mediaType}`);
+
+    try {
+        let message = {
+            url: request.url,
+            account: request.account,
+            mediaType: request.mediaType,
+            platform: request.platform || "auto",
+            direct_metadata: request.direct_metadata || null
+        };
+
+        if (nativePort) {
+            nativePort.postMessage(message);
+            sendResponse({ status: "success", message: "Sent via persistent port" });
+        } else {
+            console.warn("Native port not connected, attempting to reconnect...");
+            connectToNativeHost();
+            // Retry sending in 1 second
+            setTimeout(() => {
+                if (nativePort) nativePort.postMessage(message);
+            }, 1000);
+            sendResponse({ status: "queued", message: "Waiting for port reconnect" });
+        }
+    } catch (e) {
+        console.error("Failed to connect to native host:", e);
+        sendResponse({ status: "error", message: e.toString() });
+    }
+}
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // Other existing listeners handled above
+    if (request.action === "backup_user_done") {
+        console.log(`Finished backup for tab ${sender.tab.id}. Closing tab.`);
+        if (nativePort) {
+            nativePort.postMessage({ action: "backup_log", status: "success", message: `[Backup] Finished processing @${request.username}.` });
+        }
+        chrome.tabs.remove(sender.tab.id);
+        isBackingUp = false;
+        setTimeout(processBackupQueue, 2000); // 2 second delay between users to avoid ratelimits
+        return true;
+    }
+
+    if (request.action === "backup_log") {
+        if (nativePort) {
+            nativePort.postMessage({ action: "backup_log", status: "info", message: request.message });
+        }
+        return true;
+    }
+
+    if (request.action === "check_backup_status") {
+        if (isBackingUp && sender.tab && sender.tab.id === currentBackupTabId) {
+            // Find username from URL
+            let usernameMatch = sender.tab.url.match(/instagram\.com\/([^\/?#]+)/);
+            let username = usernameMatch ? usernameMatch[1] : "unknown";
+            sendResponse({ isBackingUp: true, username: currentBackupUsername || username, cuenta: currentBackupCuenta });
+        } else {
+            sendResponse({ isBackingUp: false });
+        }
+        return true;
+    }
+});

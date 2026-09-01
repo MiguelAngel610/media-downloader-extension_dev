@@ -1,109 +1,145 @@
-/* Media Downloader - Media Resolver: Resolves best media URL via Fiber, vanish dict, and fallbacks */
+/* Media Downloader - Media Resolver: Resolves best media URL via Direct Fiber Bridge */
 
-async function resolveMediaUrl(media, article) {
+function extractSignature(url) {
+    if (!url) return null;
+    try {
+        let parts = new URL(url).pathname.split('/');
+        let filename = parts[parts.length - 1];
+        // Extract filename without extension (e.g., "467003456_123_456_n")
+        // This is unique to the specific slide, but ignores format differences (.jpg vs .webp)
+        return filename.replace(/\.[a-zA-Z0-9]+$/, '');
+    } catch (e) {
+        let match = url.match(/\/([^\/]+)\.(?:jpg|webp|mp4)/);
+        return match ? match[1] : null;
+    }
+}
+
+async function resolveMediaUrl(media, article, knownShortcode = null, carouselIndex = null) {
     let bestUrl = null;
     let bestMetadata = {};
 
     if (!media) return { bestUrl, bestMetadata };
 
-    let src = media.src;
-    if (media.tagName === 'IMG') src = media.currentSrc || media.src;
-    bestUrl = src;
+    // Set an ID to bridge with vanish.js
+    let id = "md_media_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
+    media.setAttribute("data-md-id", id);
 
-    function getRealShortcode(element) {
-        const rgx = /\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)(?:[/?]|$)/;
-        let s = null;
-        if (article) {
-            let links = article.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"]');
-            for (let a of links) {
-                let m = a.href.match(rgx);
-                if (m) { s = m[1]; break; }
+    let posterSig = null;
+    if (media.tagName === 'IMG') {
+        posterSig = extractSignature(media.src);
+    } else if (media.tagName === 'VIDEO') {
+        if (media.poster) {
+            posterSig = extractSignature(media.poster);
+        }
+        // Never use a blob: src for signature
+        if (!posterSig && media.src && !media.src.startsWith('blob:')) {
+            posterSig = extractSignature(media.src);
+        }
+        // Fallback to sibling img
+        if (!posterSig) {
+            let siblingImg = media.parentElement ? media.parentElement.querySelector('img') : null;
+            if (!siblingImg && media.parentElement && media.parentElement.parentElement) {
+                siblingImg = media.parentElement.parentElement.querySelector('img');
             }
+            if (!siblingImg) {
+                let slide = media.closest('li');
+                if (slide) siblingImg = slide.querySelector('img');
+            }
+            if (siblingImg) posterSig = extractSignature(siblingImg.src);
         }
-        if (!s) {
-            let m2 = window.location.href.match(rgx);
-            if (m2) s = m2[1];
-        }
-        if (!s) {
-            let og = document.querySelector('meta[property="og:url"]');
-            if (og && og.content) { let m3 = og.content.match(rgx); if (m3) s = m3[1]; }
-        }
-        if (s && s.length > 15 && s.includes('-')) {
-            s = s.split('-')[0];
-        }
-        return s;
     }
 
-    let expectedShortcode = getRealShortcode(media);
-    bestMetadata.shortcode = expectedShortcode;
+    let expectedShortcode = knownShortcode;
+    if (!expectedShortcode) {
+        let links = article ? Array.from(article.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]')) : [];
+        if (links.length > 0) {
+            let viewportCenterX = window.innerWidth / 2;
+            let viewportCenterY = window.innerHeight / 2;
+            
+            links.sort((a, b) => {
+                let aRect = a.getBoundingClientRect();
+                let bRect = b.getBoundingClientRect();
+                let aDist = Math.hypot((aRect.left + aRect.width / 2) - viewportCenterX, (aRect.top + aRect.height / 2) - viewportCenterY);
+                let bDist = Math.hypot((bRect.left + bRect.width / 2) - viewportCenterX, (bRect.top + bRect.height / 2) - viewportCenterY);
+                return aDist - bDist;
+            });
 
-    // === STEP 1: Try vanish.js intercepted dictionary ===
+            let match = links[0].href.match(/\/(?:p|reel)\/([^\/?#]+)/);
+            if (match) expectedShortcode = match[1];
+        }
+    }
+
+    window.__md_fiberResults = window.__md_fiberResults || {};
+    window.postMessage({ type: 'MD_REQUEST_FIBER', id: id, posterSig: posterSig, shortcode: expectedShortcode, carouselIndex: carouselIndex }, '*');
+
+    // Wait up to 500ms for result
+    for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 50));
+        if (window.__md_fiberResults[id] !== undefined) break;
+    }
+
+    let result = window.__md_fiberResults[id];
+    delete window.__md_fiberResults[id]; // Cleanup
+
+    if (result && (result.url || result.dash_manifest)) {
+        bestUrl = result.url || null;
+        bestMetadata.dash_manifest = result.dash_manifest || null;
+        bestMetadata.shortcode = result.shortcode || expectedShortcode || null;
+        bestMetadata.username = result.user || null;
+        bestMetadata.timestamp = result.timestamp || null;
+        bestMetadata.media_id = result.media_id || null;
+        // Determine is_video from result URL or dash manifest, not from the DOM element type
+        // (the media element might be an IMG thumbnail for a lazy-loaded video post)
+        bestMetadata.is_video = !!(result.dash_manifest || (bestUrl && bestUrl.includes('.mp4')));
+        if (bestUrl) bestMetadata.url = bestUrl;
+        return { bestUrl, bestMetadata };
+    }
+
+    // Fallback dictionary
     if (window.__md_storyMediaDict) {
-        let signature = extractSignature(src);
-        if (signature) {
-            for (let id in window.__md_storyMediaDict) {
-                let apiMedia = window.__md_storyMediaDict[id];
-                if ((apiMedia.url && apiMedia.url.includes(signature)) ||
-                    (apiMedia.signatures && apiMedia.signatures.includes(signature))) {
-                    bestUrl = apiMedia.url;
-                    bestMetadata = Object.assign({}, apiMedia, bestMetadata);
-                    break;
-                }
-            }
-        }
-    }
-
-    // === STEP 2: React Fiber extraction (runs in page context) ===
-    if (media.tagName === 'VIDEO' && (!bestMetadata.dash_manifest)) {
-        let id = "md_vid_" + Date.now();
-        media.setAttribute("data-md-id", id);
-
-        window.__md_fiberResults = window.__md_fiberResults || {};
-        window.postMessage({ type: 'MD_REQUEST_FIBER', id: id, shortcode: expectedShortcode }, '*');
-
-        // Wait up to 500ms for result
-        for (let i = 0; i < 10; i++) {
-            await new Promise(r => setTimeout(r, 50));
-            if (window.__md_fiberResults[id]) break;
+        let matchingItems = Object.values(window.__md_storyMediaDict);
+        
+        if (expectedShortcode) {
+            matchingItems = matchingItems.filter(m => m.shortcode === expectedShortcode || m.code === expectedShortcode);
         }
 
-        let res = window.__md_fiberResults[id];
-        if (res) {
-            let extractedUrl = res.url;
-            let extractedDash = res.dash;
-            if (extractedUrl && extractedUrl.length > 0) { bestUrl = extractedUrl; bestMetadata.url = bestUrl; }
-            if (extractedDash && extractedDash.length > 50) {
-                let decoded = extractedDash;
-                try { if (extractedDash.includes('%3C') || extractedDash.includes('%3c')) decoded = decodeURIComponent(extractedDash); } catch(e) {}
-                if (decoded.includes('<MPD') || decoded.includes('<Period')) {
-                    bestMetadata.dash_manifest = decoded;
-                }
-            }
-            if (res.media_id && res.media_id.length > 0) { bestMetadata.media_id = res.media_id; }
-            if (res.shortcode && res.shortcode.length > 0) { bestMetadata.shortcode = res.shortcode; expectedShortcode = res.shortcode; }
-        }
-    }
-
-    // === STEP 4: Vanish dict brute-force ===
-    if (media.tagName === 'VIDEO' && (!bestUrl || bestUrl.startsWith('blob:')) && !bestMetadata.dash_manifest) {
-        if (window.__md_storyMediaDict) {
-            let videos = Object.values(window.__md_storyMediaDict).filter(m => m.is_video || m.dash_manifest);
-
-            if (expectedShortcode) {
-                let matched = videos.find(m => m.code === expectedShortcode);
-                if (matched) {
-                    bestMetadata = Object.assign({}, matched, bestMetadata);
-                    if (bestMetadata.url) bestUrl = bestMetadata.url;
-                }
-            }
-
-            if ((!bestUrl || bestUrl.startsWith('blob:')) && !bestMetadata.dash_manifest && videos.length > 0) {
+        if (matchingItems.length > 0) {
+            let targetMedia = matchingItems[0];
+            
+            // If there are multiple items for the same shortcode (Carousel), find our index
+            if (matchingItems.length > 1) {
+                let idx = -1;
+                // Try URL first (for Modals)
                 let imgMatch = window.location.search.match(/img_index=(\d+)/);
-                let idx = imgMatch ? parseInt(imgMatch[1]) - 1 : 0;
-                if (idx < 0 || idx >= videos.length) idx = 0;
-                bestMetadata = Object.assign({}, videos[idx] || videos[0], bestMetadata);
-                if (bestMetadata.url) bestUrl = bestMetadata.url;
+                if (imgMatch) {
+                    idx = parseInt(imgMatch[1]) - 1;
+                } else if (media) {
+                    // Try DOM structure (for Feed Carousels)
+                    let parentUl = media.closest('ul');
+                    let myLi = media.closest('li');
+                    if (parentUl && myLi) {
+                        let lis = Array.from(parentUl.querySelectorAll('li'));
+                        idx = lis.indexOf(myLi);
+                    }
+                }
+                
+                if (idx >= 0 && idx < matchingItems.length) {
+                    targetMedia = matchingItems[idx];
+                }
             }
+
+            bestMetadata.shortcode = targetMedia.shortcode || targetMedia.code;
+            if (targetMedia.username) bestMetadata.username = targetMedia.username;
+            if (targetMedia.timestamp) bestMetadata.timestamp = targetMedia.timestamp;
+            
+            bestUrl = targetMedia.url || null;
+            if (targetMedia.dash_manifest) {
+                bestMetadata.dash_manifest = targetMedia.dash_manifest;
+                bestMetadata.is_video = true;
+            } else if (bestUrl && bestUrl.includes('.mp4')) {
+                bestMetadata.is_video = true;
+            }
+            if (bestUrl) bestMetadata.url = bestUrl;
         }
     }
 

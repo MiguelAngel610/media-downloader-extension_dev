@@ -1,6 +1,13 @@
 /* Media Downloader - Overlay Root: Creates and exposes the floating overlay container */
 
+// Prevent running UI in random iframes
+const isExtractionFrame = window.location.search.includes('__md_extract_hd=1');
+if (window.self !== window.top && !isExtractionFrame) {
+    window.__md_blocked_frame = true;
+}
+
 function getOverlayRoot() {
+    if (window.__md_blocked_frame) return null;
     let overlayRoot = document.getElementById('md-overlay-root');
     if (!overlayRoot) {
         overlayRoot = document.createElement('div');
@@ -13,6 +20,7 @@ function getOverlayRoot() {
         overlayRoot.style.overflow = 'visible';
         overlayRoot.style.pointerEvents = 'none';
         overlayRoot.style.zIndex = '2147483647';
+        overlayRoot.style.overflowAnchor = 'none'; // Prevent Chrome scroll anchoring from jumping during feed scroll
         // Attach to <html> element, NOT <body>.
         // Instagram's React manages document.body via React Portals.
         // Any foreign node inside body causes React reconciliation crashes (black screen).

@@ -1,10 +1,10 @@
-/* Media Downloader - Vanish Init: Loads vanish.js and wires settings listeners */
+/* Media Downloader - IG Interceptor Init: Loads ig_interceptor.js and wires settings listeners */
 
-// Inject Vanish Mode Script
-const vanishScript = document.createElement('script');
-vanishScript.src = chrome.runtime.getURL('vanish.js');
-vanishScript.onload = function() { this.remove(); };
-(document.head || document.documentElement).appendChild(vanishScript);
+// Inject IG Interceptor Script (for GraphQL interception, which can be async)
+const interceptorScript = document.createElement('script');
+interceptorScript.src = chrome.runtime.getURL('src/interceptors/ig_interceptor.js');
+interceptorScript.onload = function() { this.remove(); };
+(document.head || document.documentElement).appendChild(interceptorScript);
 
 chrome.storage.onChanged.addListener(function(changes, namespace) {
     if (namespace === 'local') {
@@ -47,6 +47,11 @@ window.addEventListener('message', function(event) {
     }
     if (event.data.type === 'MD_PFP_RESULT') {
         window.__md_pfpResults = window.__md_pfpResults || {};
-        window.__md_pfpResults[event.data.id] = event.data.url;
+        window.__md_pfpResults[event.data.username] = event.data.url;
+    }
+    if (event.data.type === 'MD_PFPS_DICT_UPDATE') {
+        try {
+            event.data.urls.forEach(url => window.__md_pfps_list.add(url));
+        } catch(e) {}
     }
 });

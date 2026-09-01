@@ -7,7 +7,9 @@
     "nativeMessaging",
     "storage",
     "webRequest",
-    "downloads"
+    "downloads",
+    "downloads.ui",
+    "downloads.shelf"
   ],
   "host_permissions": [
     "*://*.instagram.com/*",
@@ -16,21 +18,26 @@
     "*://*.twitter.com/*",
     "*://web.telegram.org/*",
     "*://webk.telegram.org/*",
-    "*://webz.telegram.org/*"
+    "*://webz.telegram.org/*",
+    "*://*.fbcdn.net/*",
+    "*://*.cdninstagram.com/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/background/background.js"
   },
   "content_scripts": [
     {
       "matches": [
-        "*://*.instagram.com/*",
-        "*://*.facebook.com/*"
+        "*://*.instagram.com/*"
       ],
       "js": [
+        "src/utils/toast_manager.js",
+        "src/utils/dom_observer.js",
+        "src/utils/shortcut_manager.js",
+        "src/utils/filename_formatter.js",
         "src/instagram/core/state.js",
         "src/instagram/core/styles.js",
-        "src/instagram/core/vanish_init.js",
+        "src/instagram/core/ig_interceptor_init.js",
         "src/instagram/utils/platform.js",
         "src/instagram/ui/svgs.js",
         "src/instagram/ui/overlay_root.js",
@@ -41,10 +48,14 @@
         "src/instagram/features/story_button.js",
         "src/instagram/features/feed_buttons.js",
         "src/instagram/features/video_progress.js",
+        "src/instagram/features/auto_backup.js",
         "src/instagram/main.js"
       ],
-      "css": ["content.css"],
-      "run_at": "document_start"
+      "css": [
+        "src/styles/content.css"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
     },
     {
       "matches": [
@@ -52,10 +63,36 @@
         "*://*.twitter.com/*"
       ],
       "js": [
-        "src/x/content_x_init.js",
-        "src/x/x_buttons.js"
+        "src/utils/toast_manager.js",
+        "src/utils/dom_observer.js",
+        "src/utils/shortcut_manager.js",
+        "src/utils/filename_formatter.js",
+        "src/x/x_buttons.js",
+        "src/x/main.js"
       ],
-      "css": ["content.css"],
+      "css": [
+        "src/styles/content.css"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "*://*.facebook.com/*"
+      ],
+      "js": [
+        "src/utils/toast_manager.js",
+        "src/utils/dom_observer.js",
+        "src/utils/shortcut_manager.js",
+        "src/utils/filename_formatter.js",
+        "src/facebook/utils/metadata_parser.js",
+        "src/facebook/features/ghost_mode.js",
+        "src/facebook/features/story_buttons.js",
+        "src/facebook/features/theater_buttons.js",
+        "src/facebook/main.js"
+      ],
+      "css": [
+        "src/styles/content.css"
+      ],
       "run_at": "document_end"
     },
     {
@@ -65,33 +102,68 @@
         "*://webz.telegram.org/*"
       ],
       "js": [
+        "src/utils/toast_manager.js",
+        "src/utils/dom_observer.js",
+        "src/utils/shortcut_manager.js",
+        "src/utils/filename_formatter.js",
+        "src/telegram/core/tg_interceptor_init.js",
+        "src/telegram/utils/mp4_remux.js",
         "src/telegram/core/downloader.js",
         "src/telegram/ui/progress_bar.js",
         "src/telegram/features/webz_buttons.js",
         "src/telegram/features/webk_buttons.js",
         "src/telegram/main.js"
       ],
-      "css": ["content.css"],
+      "css": [
+        "src/styles/content.css"
+      ],
       "run_at": "document_end"
     }
   ],
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "src/popup/popup.html",
     "default_title": "Media Downloader Dev"
   },
   "icons": {
-    "16": "icon16.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
   },
   "web_accessible_resources": [
     {
-      "resources": ["vanish.js"],
-      "matches": ["*://*.instagram.com/*"]
+      "resources": [
+        "src/interceptors/ig_interceptor.js"
+      ],
+      "matches": [
+        "*://*.instagram.com/*"
+      ]
     },
     {
-      "resources": ["x_interceptor.js"],
-      "matches": ["*://*.x.com/*", "*://*.twitter.com/*"]
+      "resources": [
+        "src/interceptors/x_interceptor.js"
+      ],
+      "matches": [
+        "*://*.x.com/*",
+        "*://*.twitter.com/*"
+      ]
+    },
+    {
+      "resources": [
+        "src/interceptors/fb_interceptor.js"
+      ],
+      "matches": [
+        "*://*.facebook.com/*"
+      ]
+    },
+    {
+      "resources": [
+        "src/interceptors/tg_interceptor.js"
+      ],
+      "matches": [
+        "*://web.telegram.org/*",
+        "*://webk.telegram.org/*",
+        "*://webz.telegram.org/*"
+      ]
     }
   ]
 }

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Downloader</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <img src="../../assets/icons/icon48.png" alt="Logo">
+                <h1>Media Downloader</h1>
+            </div>
+            <span class="subtitle">IG &bull; FB &bull; X &bull; TG</span>
+        </header>
+
+        <section>
+            <span class="section-title">Global Settings</span>
+            <div class="toggle-row">
+                <div>
+                    <div class="toggle-label">
+                        <span class="icon">⌨️</span> Universal Shortcut
+                    </div>
+                    <div class="toggle-desc">One hotkey for IG, X, and TG</div>
+                </div>
+                <input type="text" id="global-shortcut" placeholder="Ex: d" style="width: 100px; text-align: center; background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px; padding: 6px; font-weight: bold; font-size: 11px;">
+            </div>
+        </section>
+
+        <div class="divider"></div>
+
+        <section class="platform-tabs">
+            <div class="tab-buttons">
+                <button id="tab-btn-ig" class="tab-btn active" style="background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); color: white;">IG</button>
+                <button id="tab-btn-fb" class="tab-btn" style="background: #1877F2; color: white;">FB</button>
+                <button id="tab-btn-x" class="tab-btn" style="background: #000000; color: white; border: 1px solid #333;">X</button>
+                <button id="tab-btn-tg" class="tab-btn" style="background: #2AABEE; color: white;">TG</button>
+            </div>
+        </section>
+
+        <section id="ig-settings" class="tab-panel active">
+            <div class="toggle-row">
+                <div>
+                    <div class="toggle-label">
+                        <span class="icon">👻</span> Vanish Mode
+                    </div>
+                    <div class="toggle-desc">View stories without leaving a trace</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="vanish-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row">
+                <div>
+                    <div class="toggle-label">
+                        <span class="icon">🟢</span> Hide Online Status
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="ghost-online-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row">
+                <div>
+                    <div class="toggle-label">
+                        <span class="icon">👀</span> Hide Seen Status
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="ghost-seen-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div style="margin-top: 10px; padding: 0;">
+                <button id="btn-ghost-history" style="width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; transition: all 0.2s;">View Ghost History 👀</button>
+            </div>
+            
+            <div id="ghost-history-container" style="display: none; margin-top: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 11px; font-weight: bold; color: var(--text-secondary);">Recently viewed</span>
+                    <button id="btn-clear-ghost-history" style="background: none; border: none; color: #ef4444; font-size: 11px; cursor: pointer;">Clear</button>
+                </div>
+                <div id="ghost-history-list" style="max-height: 120px; overflow-y: auto; font-size: 12px;">
+                    <!-- List items will be injected here -->
+                </div>
+            </div>
+        </section>
+
+        <section id="fb-settings" class="tab-panel hidden">
+            <div class="toggle-row">
+                <div>
+                    <div class="toggle-label">
+                        <span class="icon">👻</span> Ghost Mode
+                    </div>
+                    <div class="toggle-desc">Hide read receipts</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="fb-ghost-seen-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row">
+                <div>
+                    <div class="toggle-label">
+                        <span class="icon">🛡️</span> Offline Status
+                    </div>
+                    <div class="toggle-desc">Hide active presence</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="fb-ghost-presence-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </section>
+
+        <section id="x-settings" class="tab-panel hidden">
+            <div style="text-align: center; color: var(--text-secondary); padding: 20px 0; font-size: 12px;">
+                No settings available for X yet.
+            </div>
+        </section>
+
+        <section id="tg-settings" class="tab-panel hidden">
+            <div style="text-align: center; color: var(--text-secondary); padding: 20px 0; font-size: 12px;">
+                No settings available for Telegram yet.
+            </div>
+        </section>
+
+        <div class="divider"></div>
+
+
+
+        <section>
+            <span class="section-title">Quick Download</span>
+
+            <div class="input-group">
+                <input type="text" id="url-input" placeholder="Paste an IG, FB, X or TG link...">
+            </div>
+
+            <button id="download-btn" class="primary-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download
+            </button>
+
+            <div id="status-message" class="status hidden"></div>
+        </section>
+
+        <footer>
+            Make sure the Native Host is running
+        </footer>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

@@ -8,7 +8,7 @@ function getPlatform() {
     return "unknown";
 }
 
-function extractSignature(url) {
+function extractUrlSignature(url) {
     if (!url) return null;
     try {
         let urlObj = new URL(url);

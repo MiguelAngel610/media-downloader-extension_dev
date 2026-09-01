@@ -1,16 +1,20 @@
 // src/telegram/features/webz_buttons.js
 (function() {
+    let inited = false;
     window.__md_tel_initWebZ = () => {
+        if (inited) return;
+        inited = true;
         // For webz /a/ webapp
     setInterval(() => {
-        const DOWNLOAD_ICON = "\ue979";
+        const SVG_DOWNLOAD = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`;
 
         // --- 1. STORIES ---
         const storiesContainer = document.getElementById("StoryViewer");
         if (storiesContainer) {
             const createDownloadButton = () => {
                 const downloadIcon = document.createElement("i");
-                downloadIcon.className = "icon icon-download";
+                downloadIcon.className = "icon";
+                downloadIcon.innerHTML = SVG_DOWNLOAD;
                 const downloadButton = document.createElement("button");
                 downloadButton.className = "Button TkphaPyQ tiny translucent-white round tel-download";
                 downloadButton.appendChild(downloadIcon);
@@ -19,57 +23,19 @@
                 downloadButton.setAttribute("aria-label", "Download");
                 downloadButton.onclick = () => {
                     const video = storiesContainer.querySelector("video");
-                    const videoSrc = video?.src || video?.currentSrc || video?.querySelector("source")?.src;
-                    if (videoSrc) {
-                        window.__md_tel_download_video(videoSrc);
+                    const dateStr = window.__md_tel_extract_post_date(storiesContainer);
+                    const postId = window.__md_tel_extract_post_id(storiesContainer);
+                    const hint = dateStr ? dateStr : null;
+                    if (video) {
+                        window.__md_tel_download_video_smart(video, hint, postId);
                         return;
                     }
 
-                    // NOTE: we used to rely on a hashed CSS-module class name here
-                    // (e.g. "img.PVZ8TOWS"). Telegram regenerates those hashes on
-                    // every frontend build, so the selector silently stops matching
-                    // anything after an update — no error, the button just does
-                    // nothing. We now resolve the post image structurally instead.
-                    //
-                    // IMPORTANT: the viewer header contains a small circular avatar
-                    // (profile picture) — a naive ".active"/largest-image heuristic
-                    // can grab that instead of the actual post media. We explicitly
-                    // exclude header/avatar regions and require the image to cover a
-                    // large fraction of the viewport (the post media always does;
-                    // the avatar never does).
-                    let imageSrc = null;
-
-                    const isInHeaderOrAvatar = (el) => {
-                        return !!el.closest(
-                            "header, [class*='Header'], [class*='avatar'], [class*='Avatar'], [class*='Profile']"
-                        );
-                    };
-
-                    const viewportArea = window.innerWidth * window.innerHeight;
-
-                    const candidates = Array.from(storiesContainer.querySelectorAll("img")).filter((im) => {
-                        if (!im.src || im.src.startsWith("data:")) return false;
-                        if (isInHeaderOrAvatar(im)) return false;
-                        const rect = im.getBoundingClientRect();
-                        if (rect.width < 100 || rect.height < 100) return false;
-                        // The real post/story image should take up a meaningful chunk
-                        // of the screen (it's the main viewer content). A small avatar
-                        // would never pass this bar even if it slipped past the
-                        // header/avatar class check above.
-                        const area = rect.width * rect.height;
-                        return area > viewportArea * 0.15;
-                    });
-
-                    candidates.sort((a, b) => {
-                        const ra = a.getBoundingClientRect();
-                        const rb = b.getBoundingClientRect();
-                        return (rb.width * rb.height) - (ra.width * ra.height);
-                    });
-
-                    if (candidates.length > 0) imageSrc = candidates[0].src;
+                    const bestImg = window.__md_tel_find_best_image ? window.__md_tel_find_best_image(storiesContainer) : null;
+                    const imageSrc = bestImg ? bestImg.src : storiesContainer.querySelector("img:not(.thumbnail), img")?.src;
 
                     if (imageSrc) {
-                        window.__md_tel_download_image(imageSrc);
+                        window.__md_tel_download_image(imageSrc, hint, postId);
                     } else if (window.__md_tel_showToast) {
                         window.__md_tel_showToast("No se encontró la imagen para descargar", true);
                     } else if (window.__md_tel_logger) {
@@ -95,7 +61,8 @@
         const allNativeBtns = mediaViewerActions.querySelectorAll("button");
         for (const btn of allNativeBtns) {
             if (btn.classList.contains("tel-download")) continue;
-            if (btn.title === "Download" || btn.classList.contains("tgico-download") || btn.textContent.includes(DOWNLOAD_ICON)) {
+            const title = btn.title || btn.getAttribute("aria-label") || "";
+            if (title === "Download" || title === "Descargar" || btn.classList.contains("tgico-download") || btn.querySelector(".icon-download")) {
                 if (!btn.classList.contains("hide") && getComputedStyle(btn).display !== "none") {
                     nativeBtn = btn;
                     break;
@@ -104,7 +71,8 @@
         }
 
         const videoPlayer = mediaContainer.querySelector(".MediaViewerContent > .VideoPlayer");
-        const img = mediaContainer.querySelector("img");
+        const bestImgInit = window.__md_tel_find_best_image ? window.__md_tel_find_best_image(mediaContainer) : null;
+        const img = bestImgInit || mediaContainer.querySelector("img:not(.thumbnail)") || mediaContainer.querySelector("img");
         const videoUrl = videoPlayer ? (videoPlayer.querySelector("video")?.currentSrc || videoPlayer.querySelector("video")?.src) : null;
 
         // If there IS a visible native button, don't inject a duplicate — but DO wire
@@ -117,19 +85,40 @@
 
             if (!nativeBtn.__md_tel_wired) {
                 nativeBtn.__md_tel_wired = true;
-                nativeBtn.addEventListener("click", (e) => {
-                    if (videoUrl) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        window.__md_tel_download_video(videoUrl);
-                    } else if (img && img.src) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        window.__md_tel_download_image(img.src);
+                
+                const interceptor = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    
+                    if (e.type !== "click") return;
+
+                    const getActiveContainer = (fallback) => Array.from(document.querySelectorAll("#MediaViewer")).find(el => window.getComputedStyle(el).display !== "none" && parseFloat(window.getComputedStyle(el).opacity || "1") > 0.01) || fallback;
+                    const activeContainer = getActiveContainer(mediaContainer);
+                    const dateStr = window.__md_tel_extract_post_date(activeContainer);
+                    const postId = window.__md_tel_extract_post_id(activeContainer);
+                    const hint = dateStr ? dateStr : null;
+
+                    const bestVideo = window.__md_tel_find_best_video ? window.__md_tel_find_best_video(activeContainer || mediaContainer) : null;
+                    const currentVideoPlayer = bestVideo || activeContainer.querySelector(".MediaViewerContent > .VideoPlayer, video") || mediaContainer.querySelector("video");
+                    const currentBestImg = window.__md_tel_find_best_image ? window.__md_tel_find_best_image(activeContainer || mediaContainer) : null;
+                    const currentImg = currentBestImg || activeContainer.querySelector("img:not(.thumbnail)") || activeContainer.querySelector("img");
+
+                    if (currentVideoPlayer && (currentVideoPlayer.tagName === "VIDEO" || currentVideoPlayer.querySelector("video"))) {
+                        const vidEl = currentVideoPlayer.tagName === "VIDEO" ? currentVideoPlayer : currentVideoPlayer.querySelector("video");
+                        window.__md_tel_download_video_smart(vidEl, hint, postId);
+                    } else if (currentImg && currentImg.src) {
+                        window.__md_tel_download_image(currentImg.src, hint, postId);
+                    } else if (window.__md_tel_showToast) {
+                        window.__md_tel_showToast("No se encontró el archivo a descargar", true);
                     }
-                }, true);
+                };
+
+                ["click", "mousedown", "pointerdown"].forEach(evt => {
+                    nativeBtn.addEventListener(evt, interceptor, true);
+                });
             }
-            return;
+            return; // Don't inject our custom button if we intercepted the native one
         }
 
         // If no visible native button (Restricted Channel), inject ours
@@ -137,7 +126,8 @@
             let downloadButton = mediaViewerActions.querySelector("button.tel-download");
             if (!downloadButton) {
                 const downloadIcon = document.createElement("i");
-                downloadIcon.className = "icon icon-download";
+                downloadIcon.className = "icon";
+                downloadIcon.innerHTML = SVG_DOWNLOAD;
                 downloadButton = document.createElement("button");
                 downloadButton.className = "Button smaller translucent-white round tel-download";
                 downloadButton.appendChild(downloadIcon);
@@ -149,19 +139,27 @@
             return downloadButton;
         };
 
-        if (videoPlayer) {
-            if (!videoUrl) return;
-            
+        if (videoPlayer && videoPlayer.querySelector("video")) {
+            const video = videoPlayer.querySelector("video");
             const btn = injectOurButton();
             btn.setAttribute("data-tel-download-url", videoUrl);
             btn.onclick = () => {
-                window.__md_tel_download_video(videoUrl);
+                const getActiveContainer = (fallback) => Array.from(document.querySelectorAll("#MediaViewer")).find(el => window.getComputedStyle(el).display !== "none" && parseFloat(window.getComputedStyle(el).opacity || "1") > 0.01) || fallback;
+                const activeContainer = getActiveContainer(mediaContainer);
+                const curDateStr = window.__md_tel_extract_post_date(activeContainer);
+                const curPostId = window.__md_tel_extract_post_id(activeContainer);
+                window.__md_tel_download_video_smart(video, curDateStr || null, curPostId);
             };
         } else if (img && img.src) {
             const btn = injectOurButton();
             btn.setAttribute("data-tel-download-url", img.src);
             btn.onclick = () => {
-                window.__md_tel_download_image(img.src);
+                const getActiveContainer = (fallback) => Array.from(document.querySelectorAll("#MediaViewer")).find(el => window.getComputedStyle(el).display !== "none" && parseFloat(window.getComputedStyle(el).opacity || "1") > 0.01) || fallback;
+                const activeContainer = getActiveContainer(mediaContainer);
+                const curDateStr = window.__md_tel_extract_post_date(activeContainer);
+                const curPostId = window.__md_tel_extract_post_id(activeContainer);
+                const activeBestImg = window.__md_tel_find_best_image ? window.__md_tel_find_best_image(activeContainer) : null;
+                window.__md_tel_download_image(activeBestImg ? activeBestImg.src : img.src, curDateStr || null, curPostId);
             };
         }
     }, 500);
@@ -176,11 +174,10 @@
         // DO NOT intercept if the button is inside a standard media viewer where the native button works!
         if (btn.closest(".media-viewer-whole") || btn.closest("#MediaViewer")) return;
 
-        const DOWNLOAD_ICON = "\ue979";
+        const title = btn.title || btn.getAttribute("aria-label") || "";
         const isDownloadBtn = btn.classList.contains("tgico-download") || 
-                              btn.title === "Download" || 
-                              btn.getAttribute("aria-label") === "Download" ||
-                              btn.textContent.includes(DOWNLOAD_ICON);
+                              btn.querySelector(".icon-download") ||
+                              title === "Download" || title === "Descargar";
 
         if (isDownloadBtn) {
             // Find all visible images and videos
@@ -199,54 +196,24 @@
             });
 
             const targetMedia = allMedia[0];
-
-            // Resolve the best available source instead of blindly trusting .src,
-            // which in profile/shared-media grids is frequently a low-res thumbnail
-            // (the full-resolution file is normally only fetched once the native
-            // media viewer opens, which this interceptor intentionally bypasses).
-            const resolveBestSrc = (el) => {
-                if (el.tagName === "VIDEO") {
-                    const src = el.currentSrc || el.src || el.querySelector("source")?.src || "";
-                    if (!src || src === window.location.href) return "";
-                    return src;
-                }
-
-                const highResAttr = el.getAttribute("data-original-src") ||
-                                    el.getAttribute("data-full-src") ||
-                                    el.getAttribute("data-src");
-                if (highResAttr) return highResAttr;
-
-                if (el.srcset) {
-                    const candidates = el.srcset.split(",").map(s => s.trim());
-                    let best = null;
-                    let bestScore = -1;
-                    for (const c of candidates) {
-                        const parts = c.split(/\s+/);
-                        const url = parts[0];
-                        const descriptor = parts[1] || "1x";
-                        const score = parseFloat(descriptor) || 1;
-                        if (score > bestScore) {
-                            bestScore = score;
-                            best = url;
-                        }
-                    }
-                    if (best) return best;
-                }
-
-                return el.currentSrc || el.src || "";
-            };
-
-            const src = resolveBestSrc(targetMedia);
-
-            if (src) {
+            const msgContainer = btn.closest(".bubble, .message, .Message, .media-container, .Media, .Album, .media-viewer-whole, #MediaViewer, #StoryViewer, #stories-viewer, [role='dialog'], .Profile") || 
+                                 (targetMedia ? targetMedia.closest(".bubble, .message, .Message, .media-container, .Media, .Album, .media-viewer-whole, #MediaViewer, #StoryViewer, #stories-viewer, [role='dialog'], .Profile") : null) || 
+                                 document.body;
+            const dateStr = window.__md_tel_extract_post_date(msgContainer);
+            const postId = window.__md_tel_extract_post_id(msgContainer);
+            const hint = dateStr ? dateStr : null;
+            
+            if (targetMedia) {
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
 
-                if (targetMedia.tagName === "VIDEO") {
-                    window.__md_tel_download_video(src);
+                if (targetMedia.tagName.toLowerCase() === "video") {
+                    const bestVideo = window.__md_tel_find_best_video ? window.__md_tel_find_best_video(targetMedia) : null;
+                    window.__md_tel_download_video_smart(bestVideo || targetMedia, hint, postId);
                 } else {
-                    window.__md_tel_download_image(src);
+                    const bestImg = window.__md_tel_find_best_image ? window.__md_tel_find_best_image(targetMedia) : null;
+                    window.__md_tel_download_image(bestImg ? bestImg.src : (targetMedia.src || targetMedia.currentSrc), hint, postId);
                 }
             } else {
                 e.preventDefault();

@@ -44,6 +44,30 @@ style.textContent = `
     color: white;
     border-color: transparent;
 }
+.md-pfp-extracting {
+    position: relative;
+    overflow: hidden;
+    background: transparent !important;
+}
+.md-pfp-extracting::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0%;
+    background: rgba(16, 185, 129, 0.9);
+    z-index: 0;
+    animation: mdPfpFill 3.2s ease-in-out forwards;
+}
+.md-pfp-extracting svg {
+    position: relative;
+    z-index: 1;
+}
+@keyframes mdPfpFill {
+    0% { height: 0%; }
+    100% { height: 100%; }
+}
 /* For the floating story button */
 #md-floating-btn {
     position: fixed;
@@ -70,19 +94,15 @@ style.textContent = `
 /* Continuous Story Progress Bar */
 #md-story-progress-container {
     position: absolute;
-    top: 0;
+    top: -12px;
+    bottom: -12px;
     left: 0;
     right: 0;
-    bottom: 0;
     display: flex;
     align-items: center;
     z-index: 99999;
-    gap: 8px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-#md-story-progress-container.md-visible {
-    opacity: 1;
+    gap: 10px;
+    padding: 0 4px;
 }
 
 #md-story-slider {
@@ -92,33 +112,74 @@ style.textContent = `
     background: transparent;
     cursor: pointer;
     height: 100%;
+    min-height: 32px !important;
     margin: 0;
+    padding: 0;
 }
 #md-story-slider::-webkit-slider-runnable-track {
     width: 100%;
-    height: 5px;
-    background: linear-gradient(to right, rgba(255,255,255,0.9) var(--md-progress, 0%), rgba(255,255,255,0.2) var(--md-progress, 0%));
-    border-radius: 2px;
-    transition: height 0.2s ease;
+    height: 6px;
+    background: linear-gradient(to right, rgba(255, 255, 255, 1) var(--md-progress, 0%), rgba(255, 255, 255, 0.28) var(--md-progress, 0%));
+    border-radius: 6px;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.2s ease, box-shadow 0.2s ease;
 }
-#md-story-slider:hover::-webkit-slider-runnable-track {
-    height: 7px;
+#md-story-slider:hover::-webkit-slider-runnable-track,
+#md-story-slider:active::-webkit-slider-runnable-track {
+    height: 12px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 #md-story-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    height: 16px;
-    width: 16px;
+    height: 20px;
+    width: 20px;
     border-radius: 50%;
-    background: #ffffff;
-    margin-top: -5.5px;
-    box-shadow: 0 0 4px rgba(0,0,0,0.5);
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    margin-top: -7px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.3);
     opacity: 0;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    transform: scale(0.8);
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), margin-top 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: scale(0.5);
 }
-#md-story-slider:hover::-webkit-slider-thumb {
-    opacity: 1;
+#md-story-slider:hover::-webkit-slider-thumb,
+#md-story-slider:active::-webkit-slider-thumb {
+    opacity: 1 !important;
+    margin-top: -4px !important;
+    transform: scale(1);
+}
+#md-story-slider::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(to right, rgba(255, 255, 255, 1) var(--md-progress, 0%), rgba(255, 255, 255, 0.28) var(--md-progress, 0%));
+    border-radius: 6px;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.2s ease, box-shadow 0.2s ease;
+}
+#md-story-slider:hover::-moz-range-track,
+#md-story-slider:active::-moz-range-track {
+    height: 12px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+#md-story-slider::-moz-range-thumb {
+    height: 20px;
+    width: 20px;
+    border-radius: 50%;
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: scale(0.5);
+}
+#md-story-slider:hover::-moz-range-thumb,
+#md-story-slider:active::-moz-range-thumb {
+    opacity: 1 !important;
     transform: scale(1);
 }
 
@@ -152,6 +213,7 @@ style.textContent = `
     pointer-events: none; /* Let clicks pass through to video */
     overflow: hidden; /* Clips the inner progress bar to match border-radius */
     will-change: transform;
+    background: transparent !important;
 }
 .md-video-slider {
     -webkit-appearance: none;
@@ -170,7 +232,8 @@ style.textContent = `
     background: linear-gradient(to right, rgba(255,255,255,0.95) var(--md-vid-progress, 0%), rgba(255,255,255,0.3) var(--md-vid-progress, 0%));
     transition: height 0.2s ease, margin-top 0.2s ease;
     border-radius: 0px;
-    box-shadow: 0 -1px 3px rgba(0,0,0,0.3); /* Visibility on white videos, shadow upwards */
+    border: 1px solid rgba(0,0,0,0.15);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
 }
 .md-video-slider:hover::-webkit-slider-runnable-track {
     height: 8px;
@@ -181,6 +244,10 @@ style.textContent = `
     appearance: none;
     height: 0px;
     width: 0px;
+}
+
+#md-overlay-root, #md-overlay-root *, .md-post-btn, .md-video-progress-container, .md-video-slider {
+    overflow-anchor: none !important;
 }
 
 `;

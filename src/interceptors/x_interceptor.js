@@ -79,11 +79,13 @@
         if (event.source !== window || !event.data || event.data.action !== "GET_X_VIDEO") return;
         
         const tweetId = event.data.tweetId;
+        const tweetDate = event.data.tweetDate;
         const videoUrl = window.__X_VIDEO_CACHE__[tweetId];
         
         window.postMessage({
             action: "X_VIDEO_RESULT",
             tweetId: tweetId,
+            tweetDate: tweetDate,
             videoUrl: videoUrl
         }, "*");
     });

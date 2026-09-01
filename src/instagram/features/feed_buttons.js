@@ -34,9 +34,17 @@ function injectFeedButtons() {
 
         let clone = wrapper.cloneNode(true);
         clone.classList.add('md-post-btn');
+        if (wrapper.closest('div[role="dialog"]')) {
+            clone.classList.add('md-in-dialog');
+        }
         clone.title = "Download Media";
         clone.style.cursor = 'pointer';
         clone.style.pointerEvents = 'auto';
+        clone.tabIndex = -1; // Prevent scroll-to-focus jumps during scroll
+        clone.removeAttribute('autofocus');
+        if (clone.tagName === 'BUTTON' || clone.getAttribute('role') === 'button') {
+            clone.addEventListener('focus', (e) => e.target.blur(), false);
+        }
 
         // Find and replace the inner SVG
         let innerSvg = clone.querySelector('svg');
@@ -140,36 +148,98 @@ function injectFeedButtons() {
         clone.style.margin = '0';
         overlayRoot.appendChild(clone);
 
-        window.__md_dlButtons.set(wrapper, clone);
-        window.__md_activeDlButtons.add({ wrapper: wrapper, clone: clone, isVertical: isVertical, gapX: applyGapX, gapY: applyGapY });
-
-        // Reset download button instantly when carousel slide changes
-        if (parentArticle && !parentArticle.__md_carouselReset) {
-            parentArticle.__md_carouselReset = true;
-            parentArticle.addEventListener('click', (evt) => {
-                let target = evt.target.closest('button, [role="button"]');
-                if (!target) return;
-                let label = (target.getAttribute('aria-label') || '').toLowerCase();
-                let isArrow = ['next', 'go forward', 'siguiente', 'go back', 'volver', 'zurück', 'suivant', 'précédent', 'anterior'].some(k => label.includes(k));
-                let isDot = target.closest('[role="tablist"]') || target.getAttribute('role') === 'tab';
-                if (isArrow || isDot) {
-                    let dlBtn = parentArticle.querySelector('.md-post-btn');
-                    if (dlBtn) {
-                        dlBtn.classList.remove('md-success', 'md-loading', 'md-error', 'md-skipped');
-                        let sv = dlBtn.querySelector('svg');
-                        if (sv) {
-                            let tmp = document.createElement('div');
-                            tmp.innerHTML = SVG_DOWNLOAD;
-                            let fresh = tmp.querySelector('svg');
-                            if (sv.hasAttribute('class')) fresh.setAttribute('class', sv.getAttribute('class'));
-                            if (sv.hasAttribute('color')) fresh.setAttribute('color', sv.getAttribute('color'));
-                            fresh.setAttribute('fill', 'none');
-                            fresh.setAttribute('stroke-width', '2');
-                            sv.replaceWith(fresh);
+        // Carousel Indicator Logic
+        let carouselBadge = null;
+        let carouselContainer = null;
+        if (parentArticle) {
+            let carouselUl = parentArticle.querySelector('ul');
+            if (carouselUl && carouselUl.children.length > 1) {
+                let clipParent = carouselUl.parentElement;
+                while (clipParent && clipParent !== document.body) {
+                    try {
+                        let style = window.getComputedStyle(clipParent);
+                        if (style.overflow === 'hidden' || style.overflowX === 'hidden' || style.overflowY === 'hidden' || style.clipPath !== 'none') {
+                            break;
                         }
-                    }
+                    } catch(e) {}
+                    clipParent = clipParent.parentElement;
                 }
-            }, true);
+                carouselContainer = clipParent || carouselUl.parentElement;
+                
+                carouselBadge = document.createElement('div');
+                carouselBadge.style.position = 'absolute';
+                carouselBadge.style.background = 'rgba(0, 0, 0, 0.6)';
+                carouselBadge.style.color = '#fff';
+                carouselBadge.style.padding = '4px 10px';
+                carouselBadge.style.borderRadius = '14px';
+                carouselBadge.style.fontSize = '12px';
+                carouselBadge.style.fontWeight = '500';
+                carouselBadge.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+                carouselBadge.style.zIndex = '100';
+                carouselBadge.style.pointerEvents = 'none';
+                carouselBadge.style.backdropFilter = 'blur(4px)';
+                carouselBadge.style.display = 'none'; // hidden initially
+                
+                overlayRoot.appendChild(carouselBadge);
+
+                let lis = Array.from(carouselUl.children);
+                let total = lis.length;
+                carouselBadge.textContent = `1/${total}`; // Default, will be overridden by video_progress.js syncOverlays
+            }
+        }
+
+        window.__md_dlButtons.set(wrapper, clone);
+        window.__md_activeDlButtons.add({ 
+            wrapper: wrapper, 
+            clone: clone, 
+            isVertical: isVertical, 
+            gapX: applyGapX, 
+            gapY: applyGapY,
+            badge: carouselBadge,
+            carouselContainer: carouselContainer
+        });
+
+        // Reset download button instantly when carousel slide changes (or any interaction)
+        if (!window.__md_globalResetBound) {
+            window.__md_globalResetBound = true;
+            
+            const globalResetBtn = (evt) => {
+                let targetArticle = evt.target.closest('article, main, div[role="dialog"]');
+                if (!targetArticle) return;
+                
+                delete targetArticle.__md_download_state;
+                if (window.__md_activeDlButtons) {
+                    window.__md_activeDlButtons.forEach(btnObj => {
+                        if (!btnObj.wrapper || !btnObj.clone) return;
+                        let btnParent = btnObj.wrapper.closest('article, main, div[role="dialog"]');
+                        if (btnParent === targetArticle) {
+                            let dlBtn = btnObj.clone;
+                            let hadState = dlBtn.classList.contains('md-success') || dlBtn.classList.contains('md-loading') || dlBtn.classList.contains('md-error') || dlBtn.classList.contains('md-skipped');
+                            if (hadState) {
+                                dlBtn.classList.remove('md-success', 'md-loading', 'md-error', 'md-skipped');
+                                let sv = dlBtn.querySelector('svg');
+                                if (sv) {
+                                    let tmp = document.createElement('div');
+                                    tmp.innerHTML = typeof SVG_DOWNLOAD !== 'undefined' ? SVG_DOWNLOAD : '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
+                                    let fresh = tmp.querySelector('svg');
+                                    if (fresh) {
+                                        if (sv.hasAttribute('class')) fresh.setAttribute('class', sv.getAttribute('class'));
+                                        if (sv.hasAttribute('color')) fresh.setAttribute('color', sv.getAttribute('color'));
+                                        fresh.setAttribute('fill', 'none');
+                                        fresh.setAttribute('stroke-width', '2');
+                                        fresh.setAttribute('stroke', 'currentColor');
+                                        fresh.setAttribute('stroke-linecap', 'round');
+                                        fresh.setAttribute('stroke-linejoin', 'round');
+                                        sv.replaceWith(fresh);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            };
+            
+            document.addEventListener('pointerdown', globalResetBtn, true);
         }
 
         clone.onclick = async (e) => {
@@ -179,90 +249,230 @@ function injectFeedButtons() {
             let btnSvg = clone.querySelector('svg');
             if(btnSvg) btnSvg.style.opacity = '0.5';
 
-            let article = svg.closest('article, main, div[role="dialog"]');
+            let openDialog = document.querySelector('div[role="dialog"]');
 
-            if (!article) {
-                let parent = svg.parentElement;
+            // ===================================================================
+            // FAST PATH: Modal / Profile Grid Dialog
+            // When a dialog is open, Instagram's video is lazy (no <video> in DOM
+            // until user plays it). We bypass DOM entirely and go straight to the
+            // intercepted media dictionary using the shortcode from the modal URL
+            // or from the closest <a> link inside the dialog.
+            // ===================================================================
+            if (openDialog) {
+                let shortcode = null;
+                let imgIndex = 1; // 1-based carousel index
+
+                // 1. Try current URL (/p/CODE or /reel/CODE)
+                let urlMatch = window.location.pathname.match(/\/(?:p|reel)\/([a-zA-Z0-9_-]+)/);
+                if (urlMatch) shortcode = urlMatch[1];
+
+                // 2. Check img_index query param (carousel navigation updates this)
+                let imgIndexMatch = window.location.search.match(/img_index=(\d+)/);
+                if (imgIndexMatch) imgIndex = parseInt(imgIndexMatch[1]);
+
+                // 3. Try links inside the dialog as shortcode fallback
+                if (!shortcode) {
+                    let dialogLinks = Array.from(openDialog.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]'));
+                    for (let a of dialogLinks) {
+                        let m = a.href.match(/\/(?:p|reel)\/([a-zA-Z0-9_-]+)/);
+                        if (m) { shortcode = m[1]; break; }
+                    }
+                }
+
+                console.log('[MD Debug] Dialog | shortcode:', shortcode, '| img_index:', imgIndex, '| dict size:', window.__md_storyMediaDict ? Object.keys(window.__md_storyMediaDict).length : 0);
+
+                // For carousel slide 1 only: use dictionary (it stores the first image with the parent shortcode).
+                // For slides 2+: the dictionary entries for those slides use numeric IDs, not the parent shortcode,
+                // so we skip straight to DOM/Fiber which finds the actual visible slide in the DOM.
+                let useDictionary = imgIndex === 1 && shortcode && window.__md_storyMediaDict;
+
+                if (useDictionary) {
+                    let allItems = Object.values(window.__md_storyMediaDict);
+                    let matching = allItems.filter(m => m.shortcode === shortcode || m.code === shortcode);
+
+                    if (matching.length > 0) {
+                        let targetItem = matching[0];
+                        let bestUrl = targetItem.url || null;
+                        let bestMetadata = {
+                            shortcode: targetItem.shortcode || targetItem.code || shortcode,
+                            username: targetItem.username || null,
+                            timestamp: targetItem.timestamp || null,
+                            dash_manifest: targetItem.dash_manifest || null,
+                            is_video: !!(targetItem.dash_manifest || (bestUrl && bestUrl.includes('.mp4'))),
+                            media_id: targetItem.media_id || null,
+                            media_category: 'post'
+                        };
+                        if (bestUrl) bestMetadata.url = bestUrl;
+
+                        console.log('[MD Debug] Dictionary hit | url:', bestUrl ? bestUrl.slice(0, 60) : 'none', '| dash:', !!bestMetadata.dash_manifest);
+
+                        if (bestUrl || bestMetadata.dash_manifest) {
+                            if(btnSvg) btnSvg.style.opacity = '1';
+                            if (typeof imgIndex !== 'undefined' && imgIndex > 0) bestMetadata.index = imgIndex;
+                            sendDownloadRequest(clone, bestUrl, bestMetadata, true, wrapper);
+                            return;
+                        }
+                    }
+                }
+
+                // For carousel slides 2+ (or dictionary miss): find the currently visible
+                // img/video inside the dialog DOM and use Fiber to get the real media URL.
+                // The carousel slide being viewed IS rendered in the DOM as an img/video element.
+                console.log('[MD Debug] Using DOM/Fiber for slide', imgIndex);
+
+                let dialogArticle = wrapper.closest('article') || openDialog;
+                let fallbackMedia = null;
+                let dialogMediaEls = Array.from(openDialog.querySelectorAll('video, img'));
+                let validDialogMedia = dialogMediaEls.map(el => {
+                    let rect = el.getBoundingClientRect();
+                    let top = Math.max(0, rect.top);
+                    let left = Math.max(0, rect.left);
+                    let bottom = Math.min(window.innerHeight, rect.bottom);
+                    let right = Math.min(window.innerWidth, rect.right);
+                    let isVisible = true;
+                    let curr = el;
+                    while (curr && curr !== openDialog && curr !== document.body) {
+                        let st = window.getComputedStyle(curr);
+                        if (st.opacity === '0' || st.visibility === 'hidden' || st.display === 'none') { isVisible = false; break; }
+                        if (st.overflow === 'hidden' || st.overflowX === 'hidden' || st.overflowY === 'hidden' || st.clipPath !== 'none') {
+                            let pRect = curr.getBoundingClientRect();
+                            top = Math.max(top, pRect.top); left = Math.max(left, pRect.left);
+                            bottom = Math.min(bottom, pRect.bottom); right = Math.min(right, pRect.right);
+                        }
+                        curr = curr.parentElement;
+                    }
+                    let width = Math.max(0, right - left);
+                    let height = Math.max(0, bottom - top);
+                    let visibleArea = isVisible ? (width * height) : 0;
+                    return { el, visibleArea };
+                }).filter(item => item.visibleArea > 10000).sort((a, b) => b.visibleArea - a.visibleArea);
+                
+                if (validDialogMedia.length > 0) {
+                    fallbackMedia = validDialogMedia[0].el;
+                }
+
+                console.log('[MD Debug] Fiber target:', fallbackMedia?.tagName, fallbackMedia?.src?.slice(0, 60));
+
+                if (fallbackMedia) {
+                    let { bestUrl, bestMetadata } = await resolveMediaUrl(fallbackMedia, dialogArticle, shortcode);
+                    if (bestUrl || (bestMetadata && bestMetadata.dash_manifest)) {
+                        if(btnSvg) btnSvg.style.opacity = '1';
+                        if (typeof imgIndex !== 'undefined' && imgIndex > 0) bestMetadata.index = imgIndex;
+                        sendDownloadRequest(clone, bestUrl, bestMetadata, true, wrapper);
+                    } else {
+                        console.warn('[MD] Fiber returned nothing for modal slide', imgIndex, '| media:', fallbackMedia?.tagName);
+                        if(btnSvg) btnSvg.style.opacity = '1';
+                    }
+                } else {
+                    console.warn('[MD] No visible media element found inside dialog for slide', imgIndex);
+                    if(btnSvg) btnSvg.style.opacity = '1';
+                }
+                return;
+            }
+
+            // ===================================================================
+            // STANDARD PATH: Feed / Reel / Explore (no open dialog)
+            // ===================================================================
+            let article = wrapper.closest('article, main') || document.body;
+            if (article.tagName === 'MAIN' || article === document.body) {
+                let parent = wrapper.parentElement;
                 while (parent && parent !== document.body) {
                     let hasLargeMedia = Array.from(parent.querySelectorAll('video, img')).some(el => {
                         let r = el.getBoundingClientRect();
                         return r.width > 200 && r.height > 200;
                     });
-                    if (hasLargeMedia) {
-                        article = parent;
-                        break;
-                    }
+                    if (hasLargeMedia) { article = parent; break; }
                     parent = parent.parentElement;
                 }
+                if (!article) article = document.body;
             }
 
             let media = null;
             if (article) {
                 let mediaElements = Array.from(article.querySelectorAll('video, img'));
-
-                let validMedia = mediaElements.filter(el => {
+                let validMedia = mediaElements.map(el => {
                     let rect = el.getBoundingClientRect();
-                    if (rect.width < 200 || rect.height < 200) return false;
-
+                    let top = Math.max(0, rect.top);
+                    let left = Math.max(0, rect.left);
+                    let bottom = Math.min(window.innerHeight, rect.bottom);
+                    let right = Math.min(window.innerWidth, rect.right);
                     let isVisible = true;
                     let curr = el;
                     while (curr && curr !== article && curr !== document.body) {
                         let st = window.getComputedStyle(curr);
-                        if (st.opacity === '0' || st.visibility === 'hidden' || st.display === 'none') {
-                            isVisible = false;
-                            break;
+                        if (st.opacity === '0' || st.visibility === 'hidden' || st.display === 'none') { isVisible = false; break; }
+                        if (st.overflow === 'hidden' || st.overflowX === 'hidden' || st.overflowY === 'hidden' || st.clipPath !== 'none') {
+                            let pRect = curr.getBoundingClientRect();
+                            top = Math.max(top, pRect.top); left = Math.max(left, pRect.left);
+                            bottom = Math.min(bottom, pRect.bottom); right = Math.min(right, pRect.right);
                         }
                         curr = curr.parentElement;
                     }
-                    if (!isVisible) return false;
-
-                    let centerX = rect.left + (rect.width / 2);
-                    let centerY = rect.top + (rect.height / 2);
-
-                    if (centerX < 0) centerX = 10;
-                    if (centerX > window.innerWidth) centerX = window.innerWidth - 10;
-                    if (centerY < 0) centerY = 10;
-                    if (centerY > window.innerHeight) centerY = window.innerHeight - 10;
-
-                    let elementsAtCenter = document.elementsFromPoint(centerX, centerY);
-                    if (!elementsAtCenter || !elementsAtCenter.includes(el)) {
-                        return false;
+                    let width = Math.max(0, right - left);
+                    let height = Math.max(0, bottom - top);
+                    let visibleArea = isVisible ? (width * height) : 0;
+                    return { el, visibleArea, isVideo: el.tagName === 'VIDEO' };
+                }).filter(item => item.visibleArea > 10000).sort((a, b) => {
+                    let diff = b.visibleArea - a.visibleArea;
+                    if (Math.abs(diff) < (Math.max(a.visibleArea, b.visibleArea) * 0.1)) {
+                        if (a.isVideo && !b.isVideo) return -1;
+                        if (b.isVideo && !a.isVideo) return 1;
                     }
-
-                    return true;
-                }).sort((a, b) => {
-                    let aCenter = a.getBoundingClientRect().left + (a.getBoundingClientRect().width / 2);
-                    let aTop = a.getBoundingClientRect().top + (a.getBoundingClientRect().height / 2);
-
-                    let elementsAtPoint = document.elementsFromPoint(aCenter, aTop);
-                    let aIndex = elementsAtPoint.indexOf(a);
-                    let bIndex = elementsAtPoint.indexOf(b);
-
-                    if (aIndex !== -1 && bIndex !== -1 && aIndex !== bIndex) {
-                        return aIndex - bIndex;
-                    }
-                    if (aIndex !== -1 && bIndex === -1) return -1;
-                    if (bIndex !== -1 && aIndex === -1) return 1;
-
-                    if (a.tagName === 'VIDEO' && b.tagName !== 'VIDEO') return -1;
-                    if (b.tagName === 'VIDEO' && a.tagName !== 'VIDEO') return 1;
-
-                    let aArea = a.getBoundingClientRect().width * a.getBoundingClientRect().height;
-                    let bArea = b.getBoundingClientRect().width * b.getBoundingClientRect().height;
-                    return bArea - aArea;
+                    return diff;
                 });
-
-                media = validMedia[0] || mediaElements[0];
+                media = validMedia.length > 0 ? validMedia[0].el : mediaElements[0];
             }
 
             setTimeout(() => { if(btnSvg) btnSvg.style.opacity = '1'; }, 2000);
 
             if (media) {
-                let { bestUrl, bestMetadata } = await resolveMediaUrl(media, article);
-                if (bestUrl) {
-                    sendDownloadRequest(clone, bestUrl, bestMetadata, true, svg);
+                // 1. Infer carousel index using exact DOM order (works perfectly for non-virtualized feed carousels)
+                let idx = null;
+                let li = media.closest('li');
+                if (li && li.parentElement && li.parentElement.tagName === 'UL') {
+                    let domIdx = Array.from(li.parentElement.children).indexOf(li) + 1;
+                    if (domIdx > 0) idx = domIdx;
                 }
+
+                // 2. Fallback to Instagram's native X/Y badge if DOM order fails
+                if (!idx) {
+                    let texts = Array.from(article.querySelectorAll('div, span')).filter(el => {
+                        let txt = el.textContent ? el.textContent.trim() : '';
+                        return el.children.length === 0 && txt.match(/^\d+\/\d+$/);
+                    });
+                    if (texts.length > 0) {
+                        let m = texts[texts.length - 1].textContent.trim().match(/^(\d+)\//);
+                        if (m) idx = parseInt(m[1]);
+                    }
+                }
+
+                let { bestUrl, bestMetadata } = await resolveMediaUrl(media, article, null, idx);
+                
+                if (bestUrl || (bestMetadata && bestMetadata.dash_manifest)) {
+                    if(btnSvg) btnSvg.style.opacity = '1';
+
+                    if (idx && idx > 0) {
+                        bestMetadata.index = idx;
+                    } else {
+                        // Fallback 2: If we can't find dots or badge, at least try to see if it's the very first image
+                        let li = media.closest('li');
+                        if (li && li.parentElement && li.parentElement.tagName === 'UL') {
+                            let domIdx = Array.from(li.parentElement.children).indexOf(li) + 1;
+                            if (domIdx === 1) bestMetadata.index = 1; 
+                        }
+                    }
+
+                    sendDownloadRequest(clone, bestUrl, bestMetadata, true, svg);
+                } else {
+                    console.warn('[MD] resolveMediaUrl returned nothing for feed media.');
+                    if(btnSvg) btnSvg.style.opacity = '1';
+                }
+            } else {
+                console.warn('[MD] No media element found in article.');
+                if(btnSvg) btnSvg.style.opacity = '1';
             }
         };
     });
 }
+
+

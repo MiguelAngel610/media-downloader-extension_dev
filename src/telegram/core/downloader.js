@@ -12,6 +12,509 @@
     const logger = window.__md_tel_logger;
     const contentRangeRegex = /^bytes (\d+)-(\d+)\/(\d+)$/;
 
+    // --- Capture-based video download ---
+    // Telegram's Service Worker rejects our direct fetch() calls to its
+    // `/progressive/document...` streaming endpoint with a synthetic broken
+    // response (302 with no Location, serving the app's index.html instead of
+    // the video), even when headers/credentials exactly match what the
+    // browser's own <video> tag sends — likely because the SW keys its
+    // internal stream-session state to the requesting client/document in a
+    // way an external fetch() can't replicate. Since the *browser itself* can
+    // clearly play the video fine, we capture it directly from the live
+    // <video> element via captureStream() + MediaRecorder instead of
+    // re-requesting it over the network ourselves.
+    //
+    // Caveat (communicated to the user): this re-encodes the video through
+    // the browser's recording pipeline. Visual quality/resolution is
+    // preserved at a high bitrate. Output is native .mp4 (H.264) when the
+    // browser's MediaRecorder supports recording directly to mp4 (Chrome
+    // 105+); otherwise it falls back to .webm. Either way it's a re-encode,
+    // not a byte-perfect copy of Telegram's original source file.
+    // --- Smart video download: try a real network download first (fast),
+    // fall back to live capture (slow but always works) if that's blocked. ---
+    //
+    // The main-world fetch (window.__md_tel_fetch_video_mainworld, provided by
+    // tel_vanish_init.js) runs the request from INSIDE Telegram's own page
+    // context instead of the extension's isolated content-script world. This
+    // gives a real shot at getting past the Service Worker's rejection of
+    // "external" fetches, while still downloading at network speed (no
+    // waiting through video duration). If it's not available or fails for
+    // any reason, we transparently fall back to the capture-based method.
+    window.__md_tel_download_video_smart = async (videoElement, fileNameHint, stableIdHint) => {
+        const sources = Array.from(videoElement.querySelectorAll("source"));
+        let bestUrl = null;
+        if (sources.length > 0) {
+            const withWidth = sources.map(s => ({ s, w: parseInt(s.getAttribute("width") || "0") }));
+            withWidth.sort((a, b) => b.w - a.w);
+            bestUrl = withWidth[0].s.src;
+        } else {
+            bestUrl = videoElement.src || videoElement.currentSrc;
+        }
+
+        if (bestUrl && window.__md_tel_fetch_video_mainworld) {
+            const videoId = (Math.random() + 1).toString(36).substring(2, 10) + "_" + Date.now().toString();
+            let hashStr = stableIdHint;
+            if (!hashStr && videoElement && videoElement.duration) {
+                hashStr = window.__md_tel_hashCode(videoElement.duration + "_" + videoElement.videoWidth + "_" + videoElement.videoHeight).toString(36);
+            }
+            const hash = hashStr || window.__md_tel_hashCode(bestUrl).toString(36);
+            let fileName = window.FilenameFormatter.format(fileNameHint, hash, 'mp4');
+
+            if (window.__md_tel_createProgressBar) window.__md_tel_createProgressBar(videoId, fileName);
+
+            try {
+                logger.info("Trying main-world network download first...", fileName);
+                const { blob, mimeType } = await window.__md_tel_fetch_video_mainworld(bestUrl, (pct) => {
+                    if (window.__md_tel_updateProgress) window.__md_tel_updateProgress(videoId, fileName, String(pct));
+                });
+
+                if (mimeType) {
+                    const ext = mimeType.split(";")[0].split("/")[1];
+                    if (ext && ext !== "octet-stream") fileName = fileName.replace(/\.[a-z0-9]+$/i, "") + "." + ext;
+                }
+
+                // Telegram serves this endpoint as fragmented MP4 (fMP4/DASH
+                // style) — playable, but most players can't seek/scrub it
+                // because the duration and keyframe index aren't present in
+                // a single consolidated form. Remux it into a flat MP4 with
+                // a complete moov (same approach as `ffmpeg -movflags
+                // faststart`, zero quality loss — only the container is
+                // reorganized, audio/video bytes are untouched) so the
+                // downloaded file behaves like a normal video file.
+                let finalBlob = blob;
+                logger.info("Remux availability check: __md_tel_remux_fmp4=" + (typeof window.__md_tel_remux_fmp4) + " fileName=" + fileName + " mimeType=" + mimeType, fileName);
+                if (window.__md_tel_remux_fmp4 && (fileName.toLowerCase().endsWith(".mp4") || (mimeType && mimeType.includes("mp4")))) {
+                    try {
+                        const arrayBuffer = await blob.arrayBuffer();
+                        const remuxedBytes = window.__md_tel_remux_fmp4(arrayBuffer);
+                        finalBlob = new Blob([remuxedBytes], { type: blob.type || "video/mp4" });
+                        logger.info("Remuxed to flat MP4 for seek support", fileName);
+                    } catch (remuxErr) {
+                        // Not fatal — the input may already be a flat MP4
+                        // (not fragmented), in which case remux wasn't
+                        // needed and the file is fully seekable as-is.
+                        finalBlob = blob;
+                    }
+                }
+
+                const blobUrl = window.URL.createObjectURL(finalBlob);
+                const a = document.createElement("a");
+                document.body.appendChild(a);
+                a.href = blobUrl;
+                a.download = fileName;
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(blobUrl);
+
+                if (window.__md_tel_completeProgress) window.__md_tel_completeProgress(videoId);
+                logger.info("Main-world network download succeeded: " + fileName, fileName);
+                return;
+            } catch (e) {
+                logger.error("Main-world network download failed (" + e + "), falling back to live capture...", fileName);
+                if (window.__md_tel_AbortProgress) window.__md_tel_AbortProgress(videoId);
+                // fall through to capture below
+            }
+        }
+
+        // Fallback: capture-based download (slower — plays in real time — but
+        // does not depend on the network endpoint at all).
+        window.__md_tel_capture_video_element(videoElement, fileNameHint, stableIdHint);
+    };
+
+    window.__md_tel_capture_video_element = (videoElement, fileNameHint, stableIdHint) => {
+        if (!videoElement || typeof videoElement.captureStream !== "function") {
+            logger.error("This browser/element does not support captureStream(); cannot capture video.", fileNameHint);
+            if (window.__md_tel_showToast) window.__md_tel_showToast("No se pudo capturar el video (captureStream no soportado)", true);
+            return;
+        }
+
+        // Pick the best available mimeType. Prefer NATIVE mp4 output (Chrome
+        // 105+ supports MediaRecorder recording directly to mp4/H.264) so the
+        // result is a real .mp4 file with no extra conversion step. Falls
+        // back to webm on browsers that don't support mp4 recording yet.
+        const candidateTypes = [
+            "video/mp4;codecs=avc1,mp4a",
+            "video/mp4;codecs=h264,aac",
+            "video/mp4",
+            "video/webm;codecs=vp9,opus",
+            "video/webm;codecs=vp9",
+            "video/webm;codecs=vp8,opus",
+            "video/webm",
+        ];
+        const mimeType = candidateTypes.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "video/webm";
+        const outputExt = mimeType.startsWith("video/mp4") ? "mp4" : "webm";
+
+        const videoId = (Math.random() + 1).toString(36).substring(2, 10) + "_" + Date.now().toString();
+        
+        let hash = stableIdHint;
+        if (!hash && videoElement && videoElement.duration) {
+            hash = window.__md_tel_hashCode(videoElement.duration + "_" + videoElement.videoWidth + "_" + videoElement.videoHeight).toString(36);
+        }
+        if (!hash) {
+            hash = "video";
+            try {
+                const src = videoElement.currentSrc || videoElement.src || videoElement.querySelector("source")?.src;
+                if (src) hash = window.__md_tel_hashCode(src).toString(36);
+            } catch(e){}
+        }
+        const fileName = window.FilenameFormatter.format(fileNameHint, hash, outputExt);
+
+        if (window.__md_tel_createProgressBar) {
+            window.__md_tel_createProgressBar(videoId, fileName);
+        }
+
+        const wasPaused = videoElement.paused;
+        const originalTime = videoElement.currentTime;
+        const originalMuted = videoElement.muted;
+
+        let stream;
+        try {
+            stream = videoElement.captureStream();
+        } catch (e) {
+            logger.error("captureStream() failed: " + e, fileName);
+            if (window.__md_tel_AbortProgress) window.__md_tel_AbortProgress(videoId);
+            return;
+        }
+
+        // Scale bitrate to the actual source resolution so we never under-
+        // allocate quality for higher-res videos, nor waste size on tiny ones.
+        // ~0.1 bits per pixel per frame at 30fps is a generous/high-quality
+        // target (well above typical streaming bitrates for the same res).
+        const w = videoElement.videoWidth || 1280;
+        const h = videoElement.videoHeight || 720;
+        const pixelCount = w * h;
+        const targetBitrate = Math.min(
+            20_000_000, // hard cap to avoid pathological file sizes
+            Math.max(8_000_000, Math.round(pixelCount * 30 * 0.12))
+        );
+
+        let recorder;
+        try {
+            recorder = new MediaRecorder(stream, {
+                mimeType,
+                videoBitsPerSecond: targetBitrate,
+            });
+        } catch (e) {
+            logger.error("MediaRecorder init failed: " + e, fileName);
+            if (window.__md_tel_AbortProgress) window.__md_tel_AbortProgress(videoId);
+            return;
+        }
+
+        const chunks = [];
+        let finished = false;
+
+        const cleanupVideoState = () => {
+            try {
+                videoElement.currentTime = originalTime;
+                videoElement.muted = originalMuted;
+                if (wasPaused) videoElement.pause();
+            } catch (e) {}
+        };
+
+        recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+
+        recorder.onerror = (e) => {
+            logger.error("MediaRecorder error: " + (e.error || e), fileName);
+            if (window.__md_tel_AbortProgress) window.__md_tel_AbortProgress(videoId);
+            cleanupVideoState();
+        };
+
+        recorder.onstop = () => {
+            if (finished) return; // already handled (e.g. via timeupdate completion)
+            finished = true;
+            cleanupVideoState();
+
+            if (chunks.length === 0) {
+                logger.error("No data captured from video element.", fileName);
+                if (window.__md_tel_AbortProgress) window.__md_tel_AbortProgress(videoId);
+                return;
+            }
+
+            const blob = new Blob(chunks, { type: mimeType.split(";")[0] });
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            document.body.appendChild(a);
+            a.href = blobUrl;
+            a.download = fileName;
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(blobUrl);
+
+            if (window.__md_tel_completeProgress) window.__md_tel_completeProgress(videoId);
+            logger.info("Captured video saved as " + fileName, fileName);
+        };
+
+        const duration = videoElement.duration;
+        const hasFiniteDuration = isFinite(duration) && duration > 0;
+
+        const onTimeUpdate = () => {
+            if (hasFiniteDuration && window.__md_tel_updateProgress) {
+                const pct = Math.min(100, ((videoElement.currentTime / duration) * 100)).toFixed(0);
+                window.__md_tel_updateProgress(videoId, fileName, pct);
+            }
+            // Stop once we've played through to (approximately) the end.
+            if (hasFiniteDuration && videoElement.currentTime >= duration - 0.15) {
+                videoElement.removeEventListener("timeupdate", onTimeUpdate);
+                if (recorder.state !== "inactive") recorder.stop();
+            }
+        };
+
+        videoElement.addEventListener("timeupdate", onTimeUpdate);
+        videoElement.addEventListener("ended", () => {
+            videoElement.removeEventListener("timeupdate", onTimeUpdate);
+            if (recorder.state !== "inactive") recorder.stop();
+        }, { once: true });
+
+        // Restart from the beginning so we capture the whole clip, muted so
+        // the user isn't forced to hear it twice while it captures.
+        try {
+            videoElement.currentTime = 0;
+            videoElement.muted = true;
+            recorder.start();
+            const playPromise = videoElement.play();
+            if (playPromise && playPromise.catch) playPromise.catch(() => {});
+        } catch (e) {
+            logger.error("Failed to start capture: " + e, fileName);
+            if (window.__md_tel_AbortProgress) window.__md_tel_AbortProgress(videoId);
+            cleanupVideoState();
+            return;
+        }
+
+        // Safety timeout in case `duration` is Infinity/unavailable (e.g. some
+        // live/stream-like elements) — cap capture at 5 minutes so it can't
+        // hang forever.
+        if (!hasFiniteDuration) {
+            setTimeout(() => {
+                if (recorder.state !== "inactive") recorder.stop();
+            }, 5 * 60 * 1000);
+        }
+    };
+
+
+    // Extracts the post/story date from Telegram's UI for use in filenames
+    // (matching the {date:%Y-%m-%d}_... pattern already used in the user's
+    // gallery-dl config for other platforms).
+    //
+    // Telegram's date span text varies depending on recency (English UI):
+    //  - "today at 5:42 PM"
+    //  - "yesterday at 5:42 PM"
+    //  - "Monday at 5:42 PM"      (within the last ~6 days)
+    //  - "6/27/2026"              (absolute date, older posts)
+    // There is no ISO datetime hidden in any attribute (confirmed by
+    // inspection) — only this human-readable text is available, so we must
+    // parse it. If the text doesn't match any known pattern (e.g. the UI
+    // language changes, or Telegram changes its phrasing), we deliberately
+    // return null rather than guessing — callers should fall back to a
+    // hash-based filename instead of silently embedding a wrong date.
+    window.__md_tel_extract_post_date = (container) => {
+        if (!container) return null;
+        const pad = (n) => String(n).padStart(2, "0");
+        const formatYMD = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+        // 0. Try direct timestamp attributes first (100% exact in any language or chat type)
+        const root = container.closest(".media-viewer-whole, #MediaViewer, #StoryViewer, #stories-viewer, [role='dialog'], .Profile, .message, .Message, .bubble") || container;
+        const attrEl = root.querySelector("[data-timestamp], [data-time], [data-date], time[datetime]") || root.closest("[data-timestamp], [data-time], [data-date], time[datetime]");
+        if (attrEl) {
+            const val = attrEl.getAttribute("data-timestamp") || attrEl.getAttribute("data-time") || attrEl.getAttribute("data-date") || attrEl.getAttribute("datetime");
+            if (val) {
+                let num = Number(val);
+                if (!isNaN(num) && val.trim().length > 0) {
+                    if (val.length <= 11) num *= 1000; // unix seconds to milliseconds
+                    const d = new Date(num);
+                    if (!isNaN(d.getTime()) && d.getFullYear() > 2000) return formatYMD(d);
+                } else {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime()) && d.getFullYear() > 2000) return formatYMD(d);
+                }
+            }
+        }
+
+        // 1. Gather text candidate elements across Stories, Channels, and Private Chats (DMs)
+        let dateEl = container.querySelector("span.O6fpaxCe, .date, [class*='date'], [class*='Date'], time, [class*='time'], [class*='Time'], .media-header-subtitle, .media-viewer-subtitle, [class*='subtitle'], [class*='SubTitle'], .MessageMeta, .sub-text, .meta");
+        
+        const parseDateText = (rawText) => {
+            if (!rawText) return null;
+            const text = rawText.replace(/\u00a0/g, " ").trim();
+            if (!text) return null;
+
+            // Absolute date: YYYY-MM-DD, YYYY.MM.DD, etc.
+            const isoMatch = text.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+            if (isoMatch) return `${isoMatch[1]}-${pad(isoMatch[2])}-${pad(isoMatch[3])}`;
+
+            // Absolute date: D/M/YYYY or M/D/YYYY
+            const absMatch = text.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/);
+            if (absMatch) {
+                let p1 = parseInt(absMatch[1], 10);
+                let p2 = parseInt(absMatch[2], 10);
+                let y = parseInt(absMatch[3], 10);
+                if (y < 100) y += 2000;
+
+                let m, d;
+                if (p1 > 12) {
+                    // E.g., 25/07/2026 -> p1 must be Day, p2 is Month
+                    d = p1;
+                    m = p2;
+                } else if (p2 > 12) {
+                    // E.g., 07/25/2026 -> p1 is Month, p2 must be Day
+                    m = p1;
+                    d = p2;
+                } else {
+                    // Both p1 and p2 are <= 12 (e.g., 02/12/2026 or 2/12/26).
+                    // Determine whether it's MM/DD/YYYY (English/US UI) vs DD/MM/YYYY (Spanish/EU UI).
+                    const now = new Date();
+                    const dateAsMD = new Date(y, p1 - 1, p2); // p1 = Month, p2 = Day
+                    const dateAsDM = new Date(y, p2 - 1, p1); // p1 = Day, p2 = Month
+
+                    if (dateAsDM > now && dateAsMD <= now) {
+                        // DM would result in a future date (e.g., Dec 2 when in August), so it must be MD (Feb 12)
+                        m = p1;
+                        d = p2;
+                    } else if (dateAsMD > now && dateAsDM <= now) {
+                        m = p2;
+                        d = p1;
+                    } else {
+                        // Both interpretations are in the past (or future). Rely on language environment and delimiter.
+                        const lang = (document.documentElement.lang || navigator.language || "").toLowerCase();
+                        const pageText = document.body ? document.body.textContent : "";
+                        const isEnglish = lang.startsWith("en") || pageText.includes("Saved Messages") || pageText.includes("Search");
+
+                        if (isEnglish && text.includes("/")) {
+                            // English UI formats slash dates as MM/DD/YYYY
+                            m = p1;
+                            d = p2;
+                        } else {
+                            // Spanish / EU format is DD/MM/YYYY or DD.MM.YYYY
+                            m = p2;
+                            d = p1;
+                        }
+                    }
+                }
+                if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+                    return `${y}-${pad(m)}-${pad(d)}`;
+                }
+            }
+
+            const monthNamesEn = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+            const monthNamesEs = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+
+            // Match "15 de jul. de 2025", "15 jul 2025", "15 de julio", "15 de abril"
+            const dayMonthMatch = text.match(/(\d{1,2})\s*(?:de\s*)?([a-záéíóú]{3,10})\.?\s*(?:(?:de|,)?\s*(\d{4}))?/i);
+            if (dayMonthMatch) {
+                const mStr = dayMonthMatch[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").substring(0, 3);
+                let mIdx = monthNamesEs.indexOf(mStr);
+                if (mIdx === -1) mIdx = monthNamesEn.indexOf(mStr);
+                if (mIdx !== -1) {
+                    const day = pad(parseInt(dayMonthMatch[1], 10));
+                    const year = dayMonthMatch[3] || new Date().getFullYear();
+                    return `${year}-${pad(mIdx + 1)}-${day}`;
+                }
+            }
+
+            // Match "Jun 18, 02:28 PM" or "July 15, 2025"
+            const monthDayMatch = text.match(/([a-z]{3,9})\s+(\d{1,2})(?:,?\s*(\d{4}))?/i);
+            if (monthDayMatch) {
+                const mStr = monthDayMatch[1].toLowerCase().substring(0, 3);
+                let mIdx = monthNamesEn.indexOf(mStr);
+                if (mIdx === -1) mIdx = monthNamesEs.indexOf(mStr);
+                if (mIdx !== -1) {
+                    const day = pad(parseInt(monthDayMatch[2], 10));
+                    const year = monthDayMatch[3] || new Date().getFullYear();
+                    return `${year}-${pad(mIdx + 1)}-${day}`;
+                }
+            }
+
+            // Relative dates: "hoy a las...", "ayer...", "today at...", weekdays (long and short)
+            const relMatch = text.match(/^(today|yesterday|hoy|ayer|sunday|monday|tuesday|wednesday|thursday|friday|saturday|domingo|lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|sun|mon|tue|wed|thu|fri|sat|dom|lun|mar|mie|jue|vie|sab)\b/i);
+            if (relMatch) {
+                const kw = relMatch[1].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                const now = new Date();
+                if (kw === "today" || kw === "hoy") return formatYMD(now);
+                if (kw === "yesterday" || kw === "ayer") {
+                    const d = new Date(now);
+                    d.setDate(d.getDate() - 1);
+                    return formatYMD(d);
+                }
+                const weekdaysEn = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+                const weekdaysEs = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
+                const weekdaysEnShort = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+                const weekdaysEsShort = ["dom", "lun", "mar", "mie", "jue", "vie", "sab"];
+                
+                let targetIdx = weekdaysEn.indexOf(kw);
+                if (targetIdx === -1) targetIdx = weekdaysEs.indexOf(kw);
+                if (targetIdx === -1) targetIdx = weekdaysEnShort.indexOf(kw);
+                if (targetIdx === -1) targetIdx = weekdaysEsShort.indexOf(kw);
+                
+                if (targetIdx !== -1) {
+                    const d = new Date(now);
+                    for (let i = 1; i <= 7; i++) {
+                        d.setDate(d.getDate() - 1);
+                        if (d.getDay() === targetIdx) return formatYMD(d);
+                    }
+                }
+            }
+
+            // Time-only display in private chats and DMs (e.g., "21:45", "08:30 PM", "14:15")
+            if (/^\d{1,2}:\d{2}(?:\s*(?:AM|PM|am|pm))?$/.test(text)) {
+                return formatYMD(new Date());
+            }
+
+            return null;
+        };
+
+        if (dateEl) {
+            const parsed = parseDateText(dateEl.textContent) || parseDateText(dateEl.getAttribute("title")) || parseDateText(dateEl.getAttribute("aria-label"));
+            if (parsed) return parsed;
+        }
+
+        // 2. Structural fallback: scan all span, time, p, and subtitle div elements within the container
+        const candidates = Array.from(root.querySelectorAll("span, time, p, div[class*='date'], div[class*='time'], div[class*='subtitle']"));
+        for (const el of candidates) {
+            if (el.children.length > 2) continue;
+            const parsed = parseDateText(el.textContent) || parseDateText(el.getAttribute("title")) || parseDateText(el.getAttribute("aria-label"));
+            if (parsed) return parsed;
+        }
+
+        return null;
+    };
+
+    window.__md_tel_extract_post_id = (container) => {
+        if (!container) return null;
+        
+        const root = container.closest(".media-viewer-whole, #MediaViewer, #StoryViewer, #stories-viewer, [role='dialog'], .Profile, .message, .Message, .bubble") || container;
+
+        const msg = root.closest(".message, .Message, .bubble, [data-msg-id], [data-mid], [data-message-id], [data-post-id], [data-story-id], [data-id], [data-media-id], [id*='message'], [id*='post-']") || 
+                    root.querySelector("[data-mid], [data-msg-id], [data-message-id], [data-post-id], [data-story-id], [data-id], [data-media-id], [data-photo-id], [data-video-id], [id*='message'], [id*='post-'], .message, .Message, .bubble");
+        if (msg) {
+            if (msg.hasAttribute("data-mid")) return msg.getAttribute("data-mid");
+            if (msg.hasAttribute("data-msg-id")) return msg.getAttribute("data-msg-id");
+            if (msg.hasAttribute("data-message-id")) return msg.getAttribute("data-message-id");
+            if (msg.hasAttribute("data-id")) return msg.getAttribute("data-id");
+            if (msg.hasAttribute("data-media-id")) return msg.getAttribute("data-media-id");
+            if (msg.hasAttribute("data-photo-id")) return msg.getAttribute("data-photo-id");
+            if (msg.hasAttribute("data-video-id")) return msg.getAttribute("data-video-id");
+            if (msg.hasAttribute("data-post-id")) return msg.getAttribute("data-post-id");
+            if (msg.hasAttribute("data-story-id")) return msg.getAttribute("data-story-id");
+            if (msg.id && (msg.id.includes("message") || msg.id.includes("post") || msg.id.includes("story") || msg.id.includes("media"))) {
+                const num = msg.id.replace(/\D/g, "");
+                if (num && num.length > 0) return num;
+            }
+        }
+
+        const link = root.querySelector("a[href*='/'], a[href*='#']");
+        if (link) {
+            const m = link.getAttribute("href").match(/(?:[_/]|(?:msg_|message|post|story)(?:_id)?=)(\d{2,})(?:[?&/#]|$)/i);
+            if (m && m[1]) return m[1];
+        }
+
+        const urlStr = window.location.href;
+        const hashMatch = urlStr.match(/(?:msg_id|message|post_id|story_id)=?(\d+)/i) || urlStr.match(/(?:[_/])(\d{2,})(?:[?&/#]|$)/);
+        if (hashMatch) return hashMatch[1];
+
+        return null;
+    };
+
     window.__md_tel_hashCode = (s) => {
         var h = 0, l = s.length, i = 0;
         if (l > 0) {
@@ -22,7 +525,7 @@
         return h >>> 0;
     };
 
-    window.__md_tel_download_video = (url) => {
+    window.__md_tel_download_video = (url, fileNameHint, stableIdHint) => {
         // Keep the ORIGINAL url untouched. `url` gets reassigned on redirects,
         // and using the mutated value for a fallback full-download was producing
         // truncated/corrupted .mp4 files (fallback hit a mid-stream/partial URL).
@@ -35,7 +538,8 @@
         let _bytesWritten = false; // true once we've actually written/buffered any chunk
 
         const videoId = (Math.random() + 1).toString(36).substring(2, 10) + "_" + Date.now().toString();
-        let fileName = window.__md_tel_hashCode(url).toString(36) + "." + _file_extension;
+        const hash = stableIdHint || window.__md_tel_hashCode(url).toString(36);
+        let fileName = window.FilenameFormatter.format(fileNameHint, hash, 'mp4');
 
         try {
             const metadata = JSON.parse(decodeURIComponent(url.split("/")[url.split("/").length - 1]));
@@ -76,9 +580,18 @@
                 fetchHeaders.Range = `bytes=${_next_offset}-`;
             }
 
+            // IMPORTANT: Telegram's progressive streaming endpoint (/a/progressive/document...)
+            // expects to be called WITHOUT session cookies — confirmed by capturing the
+            // browser's own real request via DevTools "Copy as fetch", which uses
+            // `credentials: "omit"`. The URL itself is presumably signed/scoped, so it
+            // doesn't need cookie auth. Sending `credentials: "include"` here was the
+            // actual root cause of the corrupted downloads: Telegram's Service Worker
+            // was rejecting the cookie-bearing request with a synthetic broken 302
+            // (no Location header) and falling back to serving the app's index.html,
+            // which we were then saving to disk as if it were the video.
             return fetch(url, {
                 method: "GET",
-                credentials: "include",
+                credentials: "omit",
                 headers: fetchHeaders,
             })
             .then((res) => {
@@ -306,11 +819,12 @@
         }
     };
 
-    window.__md_tel_download_audio = (url) => {
+    window.__md_tel_download_audio = (url, fileNameHint, stableIdHint) => {
         let _blobs = [];
         let _next_offset = 0;
         let _total_size = null;
-        const fileName = window.__md_tel_hashCode(url).toString(36) + ".ogg";
+        const hash = stableIdHint || window.__md_tel_hashCode(url).toString(36);
+        const fileName = fileNameHint ? `${fileNameHint}_${hash}.ogg` : `${hash}.ogg`;
 
         const fetchNextPart = (_writable) => {
             fetch(url, {
@@ -367,9 +881,163 @@
         }
     };
 
-    window.__md_tel_download_image = (imageUrl) => {
-        const fileName = (Math.random() + 1).toString(36).substring(2, 10) + ".jpeg";
+    // Resolves the maximum resolution image element/source within any Telegram container or relative to any element.
+    // By sorting candidates by intrinsic pixel count (naturalWidth * naturalHeight) and rejecting compressed thumbnails,
+    // we guarantee downloading the highest quality original asset loaded by Telegram's web client.
+    window.__md_tel_find_best_image = (container) => {
+        if (!container) return null;
+
+        // If an img element was passed directly, expand search to its enclosing media viewer or bubble root
+        // so that if a low-res thumbnail was intercepted, we find its companion high-resolution image.
+        const root = (container.tagName && container.tagName.toLowerCase() === "img")
+            ? (container.closest(".media-viewer-whole, #MediaViewer, #StoryViewer, #stories-viewer, [role='dialog'], .bubble, .message, .Message, .MediaViewerContent, .media-aspect-ratio, .media-container, .Media, .Album") || container.parentElement || container)
+            : container;
+
+        let imgs = Array.from(root.querySelectorAll ? root.querySelectorAll("img") : []);
+        if (root.tagName && root.tagName.toLowerCase() === "img" && !imgs.includes(root)) {
+            imgs.push(root);
+        }
+
+        // Filter out avatars, icons, emojis, headers, and data URLs
+        imgs = imgs.filter(im => {
+            const src = im.currentSrc || im.src || "";
+            if (!src || src.startsWith("data:") || src === window.location.href) return false;
+            if (im.closest("header, [class*='Header'], [class*='avatar'], [class*='Avatar'], .avatar, [class*='ProfilePhoto-thumb'], .emoji, .reaction, .peer-title") && !root.classList?.contains("avatar") && !root.className?.toString().toLowerCase().includes("avatar")) {
+                return false;
+            }
+            
+            // Constrain to only the currently visible slide in carousels
+            const r = im.getBoundingClientRect();
+            if (r.width === 0 && r.height === 0) return false;
+            if (r.right < -50 || r.left > window.innerWidth + 50) return false; // Completely off-screen horizontally
+            if (r.bottom < -50 || r.top > window.innerHeight + 50) return false; // Completely off-screen vertically
+            
+            const webzSlide = im.closest(".MediaViewerSlide");
+            if (webzSlide && !webzSlide.classList.contains("MediaViewerSlide--active")) return false;
+
+            return true;
+        });
+
+        if (imgs.length === 0) return null;
+
+        // Resolve best possible URL for each image candidate (checking srcset, data attributes, and picture sources)
+        const candidates = imgs.map(im => {
+            let src = im.getAttribute("data-original-src") || im.getAttribute("data-full-src") || im.getAttribute("data-src");
+            if (!src) {
+                const parentPicture = im.parentElement && im.parentElement.tagName && im.parentElement.tagName.toLowerCase() === "picture" ? im.parentElement : null;
+                const sourceEl = parentPicture ? parentPicture.querySelector("source[srcset], source[src]") : null;
+                const srcset = im.srcset || (sourceEl ? sourceEl.getAttribute("srcset") : null);
+                if (srcset) {
+                    const parts = srcset.split(",").map(s => s.trim());
+                    let bestScore = -1;
+                    for (const part of parts) {
+                        const tokens = part.split(/\s+/);
+                        const url = tokens[0];
+                        const score = parseFloat(tokens[1] || "1") || 1;
+                        if (score > bestScore) {
+                            bestScore = score;
+                            src = url;
+                        }
+                    }
+                }
+            }
+            if (!src) src = im.currentSrc || im.src || "";
+
+            const isThumbnail = im.classList.contains("thumbnail") || im.className.toString().toLowerCase().includes("thumb") || im.className.toString().toLowerCase().includes("blur");
+            const pixels = (im.naturalWidth || 0) * (im.naturalHeight || 0);
+            const rect = im.getBoundingClientRect ? im.getBoundingClientRect() : { width: 0, height: 0 };
+            const area = rect.width * rect.height;
+
+            return { el: im, src, isThumbnail, pixels, area };
+        });
+
+        // Sort candidates:
+        // 1. Prefer non-thumbnail over thumbnail
+        // 2. Prefer highest natural pixel count (naturalWidth * naturalHeight)
+        // 3. Prefer largest display bounding box on screen
+        candidates.sort((a, b) => {
+            if (a.isThumbnail !== b.isThumbnail) {
+                return a.isThumbnail ? 1 : -1;
+            }
+            if (b.pixels !== a.pixels) {
+                return b.pixels - a.pixels;
+            }
+            return b.area - a.area;
+        });
+
+        const winner = candidates[0];
+        return winner ? { el: winner.el, src: winner.src, naturalWidth: winner.el.naturalWidth, naturalHeight: winner.el.naturalHeight } : null;
+    };
+
+    // Resolves the maximum resolution video element within any Telegram container or relative to any element.
+    // By sorting candidates by video dimensions (videoWidth * videoHeight), source width attributes, and display dimensions,
+    // we ensure the highest available resolution stream is selected for download.
+    window.__md_tel_find_best_video = (container) => {
+        if (!container) return null;
+
+        const root = (container.tagName && container.tagName.toLowerCase() === "video")
+            ? (container.closest(".media-viewer-whole, #MediaViewer, #StoryViewer, #stories-viewer, [role='dialog'], .bubble, .message, .Message, .MediaViewerContent, .media-aspect-ratio, .media-container, .Media, .Album") || container.parentElement || container)
+            : container;
+
+        let videos = Array.from(root.querySelectorAll ? root.querySelectorAll("video") : []);
+        if (root.tagName && root.tagName.toLowerCase() === "video" && !videos.includes(root)) {
+            videos.push(root);
+        }
+
+        videos = videos.filter(v => {
+            const src = v.currentSrc || v.src || v.querySelector("source")?.src || "";
+            if (!src || src === window.location.href) return false;
+            
+            // Constrain to only the currently visible slide in carousels
+            const r = v.getBoundingClientRect();
+            if (r.width === 0 && r.height === 0) return false;
+            if (r.right < -50 || r.left > window.innerWidth + 50) return false; // Completely off-screen horizontally
+            if (r.bottom < -50 || r.top > window.innerHeight + 50) return false; // Completely off-screen vertically
+            
+            const webzSlide = v.closest(".MediaViewerSlide");
+            if (webzSlide && !webzSlide.classList.contains("MediaViewerSlide--active")) return false;
+
+            return true;
+        });
+
+        if (videos.length === 0) return null;
+
+        const candidates = videos.map(v => {
+            const pixels = (v.videoWidth || 0) * (v.videoHeight || 0);
+            const rect = v.getBoundingClientRect ? v.getBoundingClientRect() : { width: 0, height: 0 };
+            const area = rect.width * rect.height;
+            let maxSourceWidth = 0;
+            v.querySelectorAll("source").forEach(s => {
+                const w = parseInt(s.getAttribute("width") || "0", 10);
+                if (w > maxSourceWidth) maxSourceWidth = w;
+            });
+            return { el: v, pixels, area, maxSourceWidth };
+        });
+
+        candidates.sort((a, b) => {
+            if (b.pixels !== a.pixels) return b.pixels - a.pixels;
+            if (b.maxSourceWidth !== a.maxSourceWidth) return b.maxSourceWidth - a.maxSourceWidth;
+            return b.area - a.area;
+        });
+
+        return candidates[0] ? candidates[0].el : null;
+    };
+
+    window.__md_tel_download_image = (imageUrlOrEl, fileNameHint, stableIdHint) => {
+        let imageUrl = typeof imageUrlOrEl === "string" ? imageUrlOrEl : (imageUrlOrEl?.src || imageUrlOrEl?.currentSrc || "");
+        if (!imageUrl) {
+            if (window.__md_tel_logger) window.__md_tel_logger.error("No image URL resolved for download.");
+            if (window.__md_tel_showToast) window.__md_tel_showToast("No image URL found to download", true);
+            return;
+        }
+        const defaultHash = stableIdHint || window.__md_tel_hashCode(imageUrl).toString(36);
+        const defaultFileName = fileNameHint ? `${fileNameHint}_${defaultHash}.jpeg` : `${defaultHash}.jpeg`;
         
+        const imageId = "img_" + (Math.random() + 1).toString(36).substring(2, 10) + "_" + Date.now().toString();
+        if (window.__md_tel_createProgressBar) {
+            window.__md_tel_createProgressBar(imageId, defaultFileName);
+        }
+
         fetch(imageUrl)
         .then(res => {
             if (!res.ok) {
@@ -377,10 +1045,26 @@
             }
             return res.blob();
         })
-        .then(blob => {
+        .then(async (blob) => {
             if (!blob || blob.size === 0) {
                 throw new Error("Empty image blob");
             }
+            
+            let hash = stableIdHint;
+            if (!hash) {
+                const slice = blob.slice(0, 100000); // hash up to first 100KB for speed
+                const arrayBuffer = await slice.arrayBuffer();
+                const view = new Uint8Array(arrayBuffer);
+                let h = 0;
+                for (let i = 0; i < view.length; i++) {
+                    h = ((h << 5) - h) + view[i];
+                    h |= 0;
+                }
+                hash = Math.abs(h).toString(36) + blob.size.toString(36);
+            }
+            
+            const fileName = fileNameHint ? `${fileNameHint}_${hash}.jpeg` : `${hash}.jpeg`;
+            
             const blobUrl = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
             document.body.appendChild(a);
@@ -390,31 +1074,39 @@
             document.body.removeChild(a);
             window.URL.revokeObjectURL(blobUrl);
             logger.info("Image blob download triggered", fileName);
+
+            if (window.__md_tel_updateProgress) window.__md_tel_updateProgress(imageId, fileName, "100");
+            if (window.__md_tel_completeProgress) window.__md_tel_completeProgress(imageId);
         })
         .catch(err => {
-            logger.info("CORS block or fetch failure (" + err + "), falling back to background download...", fileName);
+            logger.info("CORS block or fetch failure (" + err + "), falling back to background download...", defaultFileName);
 
             if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
-                logger.error("Extension context invalidated (chrome.runtime unavailable)", fileName);
-                if (window.__md_tel_showToast) window.__md_tel_showToast("Download failed: " + fileName, true);
+                logger.error("Extension context invalidated (chrome.runtime unavailable)", defaultFileName);
+                if (window.__md_tel_AbortProgress) window.__md_tel_AbortProgress(imageId);
+                if (window.__md_tel_showToast) window.__md_tel_showToast("Download failed: " + defaultFileName, true);
                 return;
             }
 
             chrome.runtime.sendMessage({
                 action: "browser_download",
                 url: imageUrl,
-                filename: fileName
+                filename: defaultFileName
             }, (response) => {
                 if (chrome.runtime.lastError) {
-                    logger.error("Failed background download: " + chrome.runtime.lastError.message, fileName);
-                    if (window.__md_tel_showToast) window.__md_tel_showToast("Download failed: " + fileName, true);
+                    logger.error("Failed background download: " + chrome.runtime.lastError.message, defaultFileName);
+                    if (window.__md_tel_AbortProgress) window.__md_tel_AbortProgress(imageId);
+                    if (window.__md_tel_showToast) window.__md_tel_showToast("Download failed: " + defaultFileName, true);
                     return;
                 }
                 if (response && response.success) {
-                    logger.info("Background download triggered", fileName);
+                    logger.info("Background download triggered", defaultFileName);
+                    if (window.__md_tel_updateProgress) window.__md_tel_updateProgress(imageId, defaultFileName, "100");
+                    if (window.__md_tel_completeProgress) window.__md_tel_completeProgress(imageId);
                 } else {
-                    logger.error("Failed background download: " + (response ? response.error : "Unknown"), fileName);
-                    if (window.__md_tel_showToast) window.__md_tel_showToast("Download failed: " + fileName, true);
+                    logger.error("Failed background download: " + (response ? response.error : "Unknown"), defaultFileName);
+                    if (window.__md_tel_AbortProgress) window.__md_tel_AbortProgress(imageId);
+                    if (window.__md_tel_showToast) window.__md_tel_showToast("Download failed: " + defaultFileName, true);
                 }
             });
         });

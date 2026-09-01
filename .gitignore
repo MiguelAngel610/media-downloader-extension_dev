@@ -1,0 +1,4 @@
+.trash/
+host/__pycache__/
+*.log
+host/host.log

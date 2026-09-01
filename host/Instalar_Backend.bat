@@ -1,6 +1,6 @@
 @echo off
 echo Abriendo el instalador del backend...
-py "host\install_host.py"
+py "install_host.py"
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo ----------------------------------------------------
