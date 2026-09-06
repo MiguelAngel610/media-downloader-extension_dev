@@ -56,6 +56,35 @@ class MDFilenameFormatter {
     }
 
     /**
+     * Formats a date to the full datetime standard: YYYYMMDD_HHMMSS
+     * Ideal for Google Photos and iCloud backup formats.
+     * 
+     * @param {string|Date|number} dateInput - The date to format. If null, uses current date.
+     * @returns {string} The standardized datetime string (e.g., 20221231_223239).
+     */
+    static formatDateTime(dateInput) {
+        let d;
+        try {
+            d = dateInput ? new Date(dateInput) : new Date();
+            if (isNaN(d.getTime())) {
+                d = new Date();
+            }
+        } catch (e) {
+            console.error("[FilenameFormatter] Error parsing date:", e);
+            d = new Date();
+        }
+
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const seconds = String(d.getSeconds()).padStart(2, '0');
+
+        return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+    }
+
+    /**
      * Generates a short 4-character random string for collision prevention.
      */
     static randomSuffix() {
@@ -66,4 +95,8 @@ class MDFilenameFormatter {
 // Expose globally
 if (typeof window !== 'undefined') {
     window.FilenameFormatter = MDFilenameFormatter;
+}
+if (typeof self !== 'undefined') {
+    self.FilenameFormatter = MDFilenameFormatter;
+    self.MDFilenameFormatter = MDFilenameFormatter;
 }

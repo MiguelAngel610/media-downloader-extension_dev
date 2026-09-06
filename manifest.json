@@ -20,7 +20,11 @@
     "*://webk.telegram.org/*",
     "*://webz.telegram.org/*",
     "*://*.fbcdn.net/*",
-    "*://*.cdninstagram.com/*"
+    "*://*.cdninstagram.com/*",
+    "*://*.googleusercontent.com/*",
+    "*://photos.google.com/*",
+    "*://*.icloud.com/*",
+    "*://*.icloud-content.com/*"
   ],
   "background": {
     "service_worker": "src/background/background.js"
@@ -118,6 +122,26 @@
         "src/styles/content.css"
       ],
       "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "*://photos.google.com/*"
+      ],
+      "js": [
+        "src/utils/date_parser.js",
+        "src/google_photos/main.js"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "*://*.icloud.com/*"
+      ],
+      "js": [
+        "src/utils/date_parser.js",
+        "src/icloud/main.js"
+      ],
+      "run_at": "document_end"
     }
   ],
   "action": {
@@ -145,6 +169,14 @@
       "matches": [
         "*://*.x.com/*",
         "*://*.twitter.com/*"
+      ]
+    },
+    {
+      "resources": [
+        "src/interceptors/google_photos_interceptor.js"
+      ],
+      "matches": [
+        "*://photos.google.com/*"
       ]
     },
     {

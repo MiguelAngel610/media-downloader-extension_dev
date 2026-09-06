@@ -1,3 +1,5 @@
+importScripts('../utils/filename_formatter.js');
+
 const NATIVE_HOST = "com.media.downloader";
 
 // Disable Chrome's intrusive download tray/bubble/shelf UI during downloads
@@ -54,6 +56,13 @@ function connectToNativeHost() {
             if (nativePort) {
                 nativePort.postMessage({ action: "backup_log", status: "error", message: `\n[Backup] 🛑 Stopped manually by user.` });
             }
+        } else if (message.status) {
+            // General response from host (e.g. success or error for a download)
+            chrome.tabs.query({}, (tabs) => {
+                for (let tab of tabs) {
+                    chrome.tabs.sendMessage(tab.id, { action: "host_response", response: message }).catch(() => {});
+                }
+            });
         }
     });
 
@@ -325,5 +334,60 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ isBackingUp: false });
         }
         return true;
+    }
+});
+
+// Intercept downloads from Google Photos and iCloud to format their filenames
+chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+    const url = (item.url || "").toLowerCase();
+    const referrer = (item.referrer || "").toLowerCase();
+    
+    const isGooglePhotos = url.includes('googleusercontent.com') || url.includes('photos.google.com') || referrer.includes('photos.google.com');
+    const isICloud = url.includes('icloud-content.com') || url.includes('icloud.com') || referrer.includes('icloud.com');
+
+    if (isGooglePhotos || isICloud) {
+        const extMatch = item.filename.match(/\.([^.]+)$/);
+        const ext = extMatch ? `.${extMatch[1]}` : "";
+        const baseName = item.filename.replace(/\.[^.]+$/, "");
+        const hasDateAlready = /^\d{8}_\d{6}/.test(baseName);
+         chrome.tabs.query({}, (tabs) => {
+            const targetTime = new Date(item.startTime).getTime();
+            let responded = false;
+            let pendingRequests = tabs.length;
+            
+            if (tabs.length === 0) {
+                if (!hasDateAlready) {
+                    const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(item.startTime));
+                    suggest({ filename: `${datePrefix}${ext}`, conflictAction: "uniquify" });
+                } else {
+                    suggest();
+                }
+                return;
+            }
+
+            for (let tab of tabs) {
+                chrome.tabs.sendMessage(tab.id, { action: "get_photo_date_at_time", time: targetTime }, (response) => {
+                    pendingRequests--;
+                    if (chrome.runtime.lastError) {
+                        // ignore error for tabs without our script
+                    } else if (!responded && response && response.success && response.timestamp) {
+                        responded = true;
+                        const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(response.timestamp));
+                        suggest({ filename: `${datePrefix}${ext}`, conflictAction: "uniquify" });
+                    }
+                    
+                    if (pendingRequests === 0 && !responded) {
+                        if (!hasDateAlready) {
+                            const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(item.startTime));
+                            suggest({ filename: `${datePrefix}${ext}`, conflictAction: "uniquify" });
+                        } else {
+                            suggest();
+                        }
+                    }
+                });
+            }
+        });
+        
+        return true; // Indicates suggest() is called asynchronously
     }
 });
