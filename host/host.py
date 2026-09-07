@@ -161,7 +161,13 @@ def download_media(msg, platform, account, mediaType="auto"):
             metadata = msg.get("direct_metadata") or {}
             username = metadata.get("username") or "Direct_Stories"
             timestamp = metadata.get("timestamp") or int(time.time())
-            shortcode = metadata.get("shortcode") or str(int(time.time()))
+            shortcode = metadata.get("shortcode")
+            if not shortcode:
+                media_id = metadata.get("media_id")
+                if media_id:
+                    shortcode = str(media_id).split('_')[0]
+                else:
+                    shortcode = str(int(time.time()))
             
             dash_manifest = metadata.get("dash_manifest")
             is_video = metadata.get("is_video", False)

@@ -433,6 +433,13 @@ function injectFeedButtons() {
                 if (posInset) {
                     let val = parseInt(posInset.getAttribute('aria-posinset'), 10);
                     if (!isNaN(val)) idx = val;
+                } else {
+                    let li = media.closest('li');
+                    if (li && li.parentElement) {
+                        let lis = Array.from(li.parentElement.children);
+                        let i = lis.indexOf(li);
+                        if (i >= 0) idx = i + 1;
+                    }
                 }
                 
                 let { bestUrl, bestMetadata } = await resolveMediaUrl(media, article, null, idx);

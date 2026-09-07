@@ -211,6 +211,7 @@ window.addEventListener('message', function (event) {
                     let targetIdx = event.data.carouselIndex - 1;
                     if (targetIdx >= 0 && targetIdx < carouselArray.length) {
                         posterSig = null; 
+                        foundIndex = event.data.carouselIndex;
                         searchProps(carouselArray[targetIdx], depth + 1, visited, myCode);
                         return; 
                     }

@@ -45,7 +45,7 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
         let foundShortcode = null;
 
         // 1. Try closest anchor (e.g. Grid thumbnails)
-        let aTag = btn.closest('a');
+        let aTag = (originalElement || btn).closest('a');
         if (aTag && aTag.href) {
             let m1 = aTag.href.match(/\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/);
             if (m1) {
@@ -57,7 +57,7 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
 
         // 2. Try any anchor inside the post (e.g. Timestamp or Comments link)
         if (!foundShortcode) {
-            let article = btn.closest('article, main, div[role="dialog"]');
+            let article = (originalElement || btn).closest('article, main, div[role="dialog"]');
             if (article) {
                 let links = article.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"]');
                 for (let a of links) {
