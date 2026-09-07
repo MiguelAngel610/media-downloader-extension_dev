@@ -28,7 +28,7 @@
 **Solución:**
 1. Se eliminó por completo el fallback del DOM de `feed_buttons.js`. Ahora, si `aria-posinset` no está presente, pasamos `carouselIndex = null`. 
 2. Se modificó el bucle `while` en `ig_interceptor.js` para que **no se detenga** apenas encuentre la URL del video. Ahora exige encontrar `foundUser` y `foundTime` antes de detenerse, obligando al script a subir hasta el nodo raíz del post. Ahí, el script recorre el array completo de diapositivas (`carousel_media`).
-3. Se añadió un tercer `fallback` de emparejamiento absoluto dentro de `ig_interceptor.js`. Si `posterSig` falla (porque el `<img>` fue eliminado del DOM), el script ahora compara directamente el `video_dash_manifest` de la diapositiva en el array contra el manifiesto extraído inicialmente del DOM (`foundDash`). Esto garantiza que el video sea emparejado al 100% y obtenga su índice absoluto, incluso sin imagen miniatura.
+3. Se añadió el fallback definitivo en `ig_interceptor.js` (Fase 1.5): Si el video está superpuesto o en un Portal (aislado de los datos del post), el script primero extrae el `video_dash_manifest` del árbol del video, y luego realiza una **segunda búsqueda independiente** subiendo por el árbol Fiber del elemento `<article>` padre. Al encontrar allí el array `carousel_media` (a menudo oculto dentro de `queryReference`), utiliza el manifiesto DASH extraído previamente para emparejar la diapositiva exacta matemáticamente y descubrir el `index` real, incluso si Instagram elimina por completo los atributos `aria-posinset` del DOM visual.
 
 ## Problema: Barra de progreso desbordada en carruseles
 **Fecha:** 27 de Junio 2026
