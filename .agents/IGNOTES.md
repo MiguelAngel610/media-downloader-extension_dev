@@ -15,8 +15,15 @@
 3. El script host de Python usaba el `time.time()` como fallback primario en lugar de usar el `media_id` para derivar el shortcode.
 **Solución:**
 1. Se modificó `button_state.js` para usar `(originalElement || btn).closest(...)` y así garantizar el recorrido correcto del DOM desde el contenedor original del post.
-2. Se añadió un fallback en `feed_buttons.js` para iterar sobre `li.parentElement.children` si no hay `aria-posinset`, y se modificó `ig_interceptor.js` para asignar `foundIndex = event.data.carouselIndex`.
-3. Se actualizó `host.py` para usar `media_id` como fallback secundario antes del `time.time()`.
+2. Se modificó `ig_interceptor.js` para asignar `foundIndex` desde `carouselIndex` o desde el Fiber tree.
+3. Se actualizó `host.py` para usar `media_id` como fallback secundario.
+
+## Problema: Índices incorrectos en carruseles del feed debido a virtualización del DOM
+**Fecha:** 06 de Septiembre 2026
+**Causa:**
+Se había añadido un fallback en `feed_buttons.js` que contaba los hermanos del elemento `<li>` (`lis.indexOf(li)`). Dado que el DOM de Instagram virtualiza las listas de los carruseles (sólo renderiza la diapositiva actual, la anterior y la siguiente), el elemento visible siempre aparecía en el índice 1 (el segundo nodo), independientemente de si era la 5ta o la 8va diapositiva. Esto causaba que todos los archivos se descargaran con `_3` (2 + 1) o similares en lugar de su índice real.
+**Solución:**
+Se eliminó por completo el fallback del DOM de `feed_buttons.js`. Ahora, si `aria-posinset` no está presente, simplemente pasamos `carouselIndex = null`. Esto obliga a `ig_interceptor.js` a recorrer todo el array de diapositivas (`carousel_media`) desde el Fiber node raíz y utilizar su robusta lógica de matching (`STRICT SLIDE GUARD`) para comparar la URL del media visible contra los objetos del array, obteniendo su índice absoluto correcto de la respuesta de GraphQL.
 
 ## Problema: Barra de progreso desbordada en carruseles
 **Fecha:** 27 de Junio 2026

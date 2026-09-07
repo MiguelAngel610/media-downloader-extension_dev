@@ -331,19 +331,21 @@ window.addEventListener('message', function (event) {
             // Walk up the fiber tree from the video element
             let fiber = getFiber(el);
             let fiberSteps = 0;
-            while (fiber && fiberSteps < 200 && !foundDash) {
+            while (fiber && fiberSteps < 200) {
                 fiberSteps++;
 
                 // Search memoizedProps (the actual data passed to this component)
                 if (fiber.memoizedProps && typeof fiber.memoizedProps === 'object') {
                     searchProps(fiber.memoizedProps, 0, new Set());
-                    if (foundDash && foundUser && foundTime) break;
                 }
 
                 // Search pendingProps as fallback
                 if (fiber.pendingProps && typeof fiber.pendingProps === 'object' && fiber.pendingProps !== fiber.memoizedProps) {
                     searchProps(fiber.pendingProps, 0, new Set());
-                    if (foundDash && foundUser && foundTime) break;
+                }
+
+                if ((foundDash || foundUrl) && foundUser && foundTime) {
+                    break;
                 }
 
                 fiber = fiber.return; // Walk up to parent fiber
