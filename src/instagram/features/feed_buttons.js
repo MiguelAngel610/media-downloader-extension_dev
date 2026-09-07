@@ -354,7 +354,7 @@ function injectFeedButtons() {
                 console.log('[MD Debug] Fiber target:', fallbackMedia?.tagName, fallbackMedia?.src?.slice(0, 60));
 
                 if (fallbackMedia) {
-                    let { bestUrl, bestMetadata } = await resolveMediaUrl(fallbackMedia, dialogArticle, shortcode);
+                    let { bestUrl, bestMetadata } = await resolveMediaUrl(fallbackMedia, dialogArticle, shortcode, imgIndex);
                     if (bestUrl || (bestMetadata && bestMetadata.dash_manifest)) {
                         if(btnSvg) btnSvg.style.opacity = '1';
                         if (typeof imgIndex !== 'undefined' && imgIndex > 0) bestMetadata.index = imgIndex;
@@ -362,6 +362,7 @@ function injectFeedButtons() {
                     } else {
                         console.warn('[MD] Fiber returned nothing for modal slide', imgIndex, '| media:', fallbackMedia?.tagName);
                         if(btnSvg) btnSvg.style.opacity = '1';
+                        if (window.MDToastManager) window.MDToastManager.showError("Error: No se pudo identificar el video (Modal).");
                     }
                 } else {
                     console.warn('[MD] No visible media element found inside dialog for slide', imgIndex);
@@ -426,46 +427,24 @@ function injectFeedButtons() {
             setTimeout(() => { if(btnSvg) btnSvg.style.opacity = '1'; }, 2000);
 
             if (media) {
-                // 1. Infer carousel index using exact DOM order (works perfectly for non-virtualized feed carousels)
+                // Attempt to get exact index from aria-posinset (flawless for virtualized lists)
                 let idx = null;
-                let li = media.closest('li');
-                if (li && li.parentElement && li.parentElement.tagName === 'UL') {
-                    let domIdx = Array.from(li.parentElement.children).indexOf(li) + 1;
-                    if (domIdx > 0) idx = domIdx;
+                let posInset = media.closest('[aria-posinset]');
+                if (posInset) {
+                    let val = parseInt(posInset.getAttribute('aria-posinset'), 10);
+                    if (!isNaN(val)) idx = val;
                 }
-
-                // 2. Fallback to Instagram's native X/Y badge if DOM order fails
-                if (!idx) {
-                    let texts = Array.from(article.querySelectorAll('div, span')).filter(el => {
-                        let txt = el.textContent ? el.textContent.trim() : '';
-                        return el.children.length === 0 && txt.match(/^\d+\/\d+$/);
-                    });
-                    if (texts.length > 0) {
-                        let m = texts[texts.length - 1].textContent.trim().match(/^(\d+)\//);
-                        if (m) idx = parseInt(m[1]);
-                    }
-                }
-
+                
                 let { bestUrl, bestMetadata } = await resolveMediaUrl(media, article, null, idx);
                 
                 if (bestUrl || (bestMetadata && bestMetadata.dash_manifest)) {
                     if(btnSvg) btnSvg.style.opacity = '1';
 
-                    if (idx && idx > 0) {
-                        bestMetadata.index = idx;
-                    } else {
-                        // Fallback 2: If we can't find dots or badge, at least try to see if it's the very first image
-                        let li = media.closest('li');
-                        if (li && li.parentElement && li.parentElement.tagName === 'UL') {
-                            let domIdx = Array.from(li.parentElement.children).indexOf(li) + 1;
-                            if (domIdx === 1) bestMetadata.index = 1; 
-                        }
-                    }
-
                     sendDownloadRequest(clone, bestUrl, bestMetadata, true, svg);
                 } else {
                     console.warn('[MD] resolveMediaUrl returned nothing for feed media.');
                     if(btnSvg) btnSvg.style.opacity = '1';
+                    if (window.MDToastManager) window.MDToastManager.showError("Error: No se pudo resolver la URL del video.");
                 }
             } else {
                 console.warn('[MD] No media element found in article.');

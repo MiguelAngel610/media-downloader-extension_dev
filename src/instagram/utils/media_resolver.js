@@ -88,6 +88,7 @@ async function resolveMediaUrl(media, article, knownShortcode = null, carouselIn
         bestMetadata.username = result.user || null;
         bestMetadata.timestamp = result.timestamp || null;
         bestMetadata.media_id = result.media_id || null;
+        if (result.index) bestMetadata.index = result.index;
         // Determine is_video from result URL or dash manifest, not from the DOM element type
         // (the media element might be an IMG thumbnail for a lazy-loaded video post)
         bestMetadata.is_video = !!(result.dash_manifest || (bestUrl && bestUrl.includes('.mp4')));

@@ -16,18 +16,17 @@ window.addEventListener("message", (event) => {
         const url = event.data.url;
         const type = event.data.type; // "video" or "image"
         
-        // Ensure metadata exists and fallback properly
         let md = event.data.metadata || {};
         const username = md.username || "fb_user";
         const shortcode = md.shortcode || "story";
         const timestamp = md.timestamp || Math.floor(Date.now() / 1000);
 
         if (url) {
-            if (window.MDToastManager) window.MDToastManager.showInfo("⏳ Descargando medio...");
+            if (window.MDToastManager) window.MDToastManager.showInfo("⏳ Downloading media...");
 
             chrome.runtime.sendMessage({
                 action: "queue_download",
-                url: url, // Pass the raw MP4/JPG URL directly to Python
+                url: url,
                 mediaType: "direct_story",
                 platform: "facebook",
                 direct_metadata: {
@@ -35,21 +34,22 @@ window.addEventListener("message", (event) => {
                     shortcode: shortcode,
                     is_video: type === "video",
                     is_direct: true,
-                    timestamp: timestamp
+                    timestamp: timestamp,
+                    dash_manifest: md.dash_manifest,
+                    story_url: md.story_url
                 }
             }, (response) => {
                 if (response && response.status === "queued") {
                     console.log("[FB-MD] Download queued in background:", shortcode);
                 } else if (response && response.status === "error") {
                     console.error("[FB-MD] Queue error:", response);
-                    if (window.MDToastManager) window.MDToastManager.showError("❌ Error al procesar descarga");
+                    if (window.MDToastManager) window.MDToastManager.showError("❌ Error queuing download");
                 }
             });
         } else {
+            console.warn("[FB-MD] No direct URL found after retries.");
             if (window.MDToastManager) {
-                window.MDToastManager.showError("Content URL not found. Try playing it first.");
-            } else {
-                alert("Content URL not found. Try playing it first.");
+                window.MDToastManager.showError("❌ Could not extract URL. Navigate to the next story and come back, then try again.");
             }
         }
     }
@@ -57,13 +57,17 @@ window.addEventListener("message", (event) => {
 
 // Listen for actual results from Python host
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "host_response") {
-        if (request.data && request.data.status === "success") {
-            if (window.MDToastManager) window.MDToastManager.showInfo("✅ Descarga completada");
-        } else if (request.data && request.data.status === "error") {
-            if (window.MDToastManager) window.MDToastManager.showError("❌ Fallo en Python: " + (request.data.message || "Error desconocido"));
-        } else if (request.data && request.data.status === "skipped") {
-            if (window.MDToastManager) window.MDToastManager.showInfo("⏭️ Archivo ya existía");
+    if (request.action === "host_response" && request.response) {
+        let msg = request.response;
+        if (msg.status === "success") {
+            if (window.MDToastManager) window.MDToastManager.showSuccess("✅ Download completed!");
+        } else if (msg.status === "error") {
+            let errorText = msg.message || "Unknown error";
+            if (msg.log) errorText += " | Log: " + msg.log.substring(0, 50);
+            if (window.MDToastManager) window.MDToastManager.showError("❌ Python Host Error: " + errorText);
+            console.error("[FB-MD] Python Error:", msg);
+        } else if (msg.status === "skipped") {
+            if (window.MDToastManager) window.MDToastManager.showInfo("⏭️ File already exists");
         }
     }
 });

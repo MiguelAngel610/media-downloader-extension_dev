@@ -52,14 +52,16 @@ class FBMetadataParser {
                 for (let el of textElements) {
                     let text = el.innerText || el.textContent;
                     if (text && text.trim().length > 0 && text.trim().length < 50) {
+                        if (!/[a-zA-Z]/.test(text)) continue;
+                        
                         let lower = text.toLowerCase().trim();
-                        // Extended blocklist to prevent picking up UI buttons
+                        // Extended blocklist to prevent picking up UI buttons and view counts
                         let blocklist = [
-                            'like', 'comment', 'share', 'me gusta', 'comentar', 'compartir',
-                            'view post', 'ver publicación', 'ver foto', 'view photo',
-                            'close', 'cerrar', 'next', 'siguiente', 'previous', 'anterior',
-                            'send message', 'enviar mensaje', 'follow', 'seguir',
-                            'message', 'mensaje', 'reply', 'responder'
+                            'like', 'comment', 'share', 'view post', 'view photo',
+                            'close', 'next', 'previous', 'send message', 'follow',
+                            'message', 'reply', 'new', 'create', 'join', 'chat', 'history', 'missing',
+                            'reproducciones', 'views', 'mil', 'plays', 'reproducir',
+                            'earlier', 'yesterday', 'today', 'ayer', 'hoy', 'mañana', 'hace'
                         ];
                         
                         let isBlocked = false;
@@ -70,6 +72,8 @@ class FBMetadataParser {
                             }
                         }
                         
+                        if (isBlocked) continue;
+
                         // Try to extract the real username (handle) from the link URL instead of the display name
                         let aTag = el.tagName === 'A' ? el : el.querySelector('a');
                         let foundHandle = null;
@@ -133,7 +137,7 @@ class FBMetadataParser {
                         metadata.shortcode = vidMatch[1];
                     } else {
                         // Check for reel id
-                        const reelMatch = url.match(/\/reel\/(\d+)/);
+                        const reelMatch = url.match(/reel\/(\d+)/);
                         if (reelMatch) {
                             metadata.shortcode = reelMatch[1];
                         } else {
@@ -146,7 +150,27 @@ class FBMetadataParser {
                     }
                 }
             }
-            // 3. Extract Timestamp
+
+            // 3. Extract Permanent User ID
+            let userId = null;
+            if (window.location.search.includes('id=')) {
+                let idMatch = window.location.search.match(/id=(\d+)/);
+                if (idMatch) userId = idMatch[1];
+            }
+            if (!userId) {
+                // Scan the raw HTML for Facebook's entity_id or userID definitions
+                let allHtml = document.documentElement.innerHTML;
+                // Often found in the GraphQL or profile data
+                let uidMatch = allHtml.match(/"userID":"(\d+)"/) || allHtml.match(/"entity_id":"(\d+)"/) || allHtml.match(/"actorID":"(\d+)"/);
+                if (uidMatch && uidMatch[1] !== "0") {
+                    userId = uidMatch[1];
+                }
+            }
+            if (userId) {
+                metadata.user_id = userId;
+            }
+
+            // 4. Extract Timestamp
             // Facebook renders dates dynamically, but the raw UNIX timestamp is often embedded 
             // inside the JSON state in <script> tags alongside the post/photo ID.
             if (metadata.shortcode && metadata.shortcode !== "story") {
@@ -175,6 +199,15 @@ class FBMetadataParser {
             }
         } catch (err) {
             console.error("[FB-MD] Metadata parsing error:", err);
+        }
+
+        // Global safeguard: if we ended up with a base64 ID, decode it now
+        if (metadata.shortcode && metadata.shortcode.startsWith('Uzpf')) {
+            try {
+                let decoded = atob(metadata.shortcode);
+                let numMatch = decoded.match(/\d+/);
+                if (numMatch) metadata.shortcode = numMatch[0];
+            } catch(e) {}
         }
 
         return metadata;

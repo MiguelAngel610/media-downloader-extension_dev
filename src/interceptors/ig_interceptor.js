@@ -24,6 +24,38 @@ if (window.location.search.includes('__md_extract_hd=1')) {
     } catch(e) {}
 }
 
+// --- Ghost Online: WebSocket Interceptor ---
+let OriginalWebSocket = window.WebSocket;
+window.WebSocket = function(url, protocols) {
+    let ws = new OriginalWebSocket(url, protocols);
+    let originalSend = ws.send;
+    
+    ws.send = function(data) {
+        if (window.__md_ghostOnline) {
+            try {
+                let dataStr = "";
+                if (typeof data === 'string') {
+                    dataStr = data;
+                } else if (data instanceof ArrayBuffer) {
+                    dataStr = new TextDecoder("utf-8").decode(new Uint8Array(data));
+                } else if (data instanceof Uint8Array) {
+                    dataStr = new TextDecoder("utf-8").decode(data);
+                }
+                
+                let lowerData = dataStr.toLowerCase();
+                if (lowerData.includes('update_presence') || 
+                    lowerData.includes('presence_subscribe') || 
+                    lowerData.includes('foreground_state')) {
+                    mdLog("🟢 Ghost Online", "Intercepted WebSocket presence packet", "#10b981");
+                    return; // Drop packet
+                }
+            } catch (e) {}
+        }
+        return originalSend.apply(this, arguments);
+    };
+    return ws;
+};
+
 
 window.__md_vanishMode = false;
 window.__md_ghostOnline = false;
@@ -99,7 +131,7 @@ window.addEventListener('message', function (event) {
             let id = event.data.id;
             let el = document.querySelector('[data-md-id="' + id + '"]');
 
-            let foundUrl = ""; let foundDash = ""; let foundId = ""; let foundCode = ""; let foundUser = ""; let foundTime = null;
+            let foundUrl = ""; let foundDash = ""; let foundId = ""; let foundCode = ""; let foundUser = ""; let foundTime = null; let foundIndex = null;
 
             // === PHASE 1: Walk the React FIBER tree (not DOM tree) ===
             // This is the key innovation: the fiber tree follows React's component
@@ -117,8 +149,8 @@ window.addEventListener('message', function (event) {
                 return null;
             }
 
-            // Search an object for media data, but NEVER enter Arrays.
-            function searchProps(obj, depth, visited, inheritedCode = null) {
+            // Search an object for media data. Now safely enters arrays to find the true index.
+            function searchProps(obj, depth, visited, inheritedCode = null, possibleIndex = -1) {
                 if (depth > 15 || !obj || typeof obj !== 'object') return;
                 
                 // We now safely enter arrays because posterSig and expectedShortcode act as strict guards
@@ -182,48 +214,86 @@ window.addEventListener('message', function (event) {
                         searchProps(carouselArray[targetIdx], depth + 1, visited, myCode);
                         return; 
                     }
+                } else if (carouselArray) {
+                    // This object is a carousel container. We already extracted its user/time/id.
+                    // We MUST NOT extract media URLs from this root object, because we need to enter 
+                    // the carousel_media array to capture the true array index for the filename (_1, _2, etc).
+                    for (let i = 0; i < carouselArray.length; i++) {
+                        try {
+                            if (carouselArray[i] && typeof carouselArray[i] === 'object') {
+                                searchProps(carouselArray[i], depth + 1, visited, myCode, i);
+                                if (foundDash && foundUser && foundTime) return;
+                            }
+                        } catch (e) { }
+                    }
+                    // Continue recursing other properties to ensure we don't miss deeply nested user/time
+                    for (let k of Object.keys(obj)) {
+                        try {
+                            if (k !== 'carousel_media' && k !== 'edge_sidecar_to_children') {
+                                if (obj[k] && typeof obj[k] === 'object') {
+                                    searchProps(obj[k], depth + 1, visited, myCode, -1);
+                                    if (foundDash && foundUser && foundTime) return;
+                                }
+                            }
+                        } catch (e) { }
+                    }
+                    return; // Skip media extraction for the container itself
                 }
 
-                // STRICT POSTER GUARD (For Carousels):
-                // If we are looking for a specific slide (posterSig) and this object is a media item,
-                // we MUST verify its image or video URL matches the poster.
-                if (posterSig && (obj.image_versions2 || obj.video_versions || obj.display_url || obj.video_url)) {
-                    let hasMatch = false;
-                    if (obj.image_versions2 && obj.image_versions2.candidates && Array.isArray(obj.image_versions2.candidates)) {
-                        hasMatch = hasMatch || obj.image_versions2.candidates.some(c => c.url && c.url.includes(posterSig));
+                // STRICT SLIDE GUARD (For Carousels):
+                // If we are looking for a specific slide inside a carousel array (possibleIndex >= 0),
+                // we MUST verify we are on the correct slide.
+                if (possibleIndex >= 0 && (obj.image_versions2 || obj.video_versions || obj.display_url || obj.video_url || obj.video_dash_manifest)) {
+                    let isMatch = false;
+
+                    // 1. Try matching by unique ID (Flawless for Blob videos)
+                    let objId = obj.pk || obj.media_id || obj.item_id || obj.id;
+                    if (foundId && objId && String(objId) === foundId) {
+                        isMatch = true;
                     }
-                    if (obj.video_versions && Array.isArray(obj.video_versions)) {
-                        hasMatch = hasMatch || obj.video_versions.some(v => v.url && v.url.includes(posterSig));
+
+                    // 2. Fallback to matching by posterSig
+                    if (!isMatch && posterSig && !posterSig.startsWith('blob:')) {
+                        if (obj.image_versions2 && obj.image_versions2.candidates && Array.isArray(obj.image_versions2.candidates)) {
+                            isMatch = isMatch || obj.image_versions2.candidates.some(c => c.url && c.url.includes(posterSig));
+                        }
+                        if (obj.video_versions && Array.isArray(obj.video_versions)) {
+                            isMatch = isMatch || obj.video_versions.some(v => v.url && v.url.includes(posterSig));
+                        }
+                        if (obj.display_url && typeof obj.display_url === 'string') {
+                            isMatch = isMatch || obj.display_url.includes(posterSig);
+                        }
+                        if (obj.video_url && typeof obj.video_url === 'string') {
+                            isMatch = isMatch || obj.video_url.includes(posterSig);
+                        }
                     }
-                    if (obj.display_url && typeof obj.display_url === 'string') {
-                        hasMatch = hasMatch || obj.display_url.includes(posterSig);
-                    }
-                    if (obj.video_url && typeof obj.video_url === 'string') {
-                        hasMatch = hasMatch || obj.video_url.includes(posterSig);
-                    }
-                    if (!hasMatch) return; // Wrong slide! Skip this entire object.
+                    if (!isMatch) return; // Wrong slide! Skip this entire object.
                 }
 
                 // Extract DASH manifest (validate it looks like real MPD XML)
-                if (!foundDash && obj.video_dash_manifest && typeof obj.video_dash_manifest === 'string' && obj.video_dash_manifest.length > 50 && (obj.video_dash_manifest.includes('<MPD') || obj.video_dash_manifest.includes('<Period'))) {
-                    foundDash = obj.video_dash_manifest;
+                if ((!foundDash || (possibleIndex >= 0 && !foundIndex)) && obj.video_dash_manifest && typeof obj.video_dash_manifest === 'string' && obj.video_dash_manifest.length > 50 && (obj.video_dash_manifest.includes('<MPD') || obj.video_dash_manifest.includes('<Period'))) {
+                    if (!foundDash) foundDash = obj.video_dash_manifest;
+                    if (possibleIndex >= 0) foundIndex = possibleIndex + 1;
                 }
-                if (!foundDash && obj.dash_manifest && typeof obj.dash_manifest === 'string' && obj.dash_manifest.length > 50 && (obj.dash_manifest.includes('<MPD') || obj.dash_manifest.includes('<Period'))) {
-                    foundDash = obj.dash_manifest;
+                if ((!foundDash || (possibleIndex >= 0 && !foundIndex)) && obj.dash_manifest && typeof obj.dash_manifest === 'string' && obj.dash_manifest.length > 50 && (obj.dash_manifest.includes('<MPD') || obj.dash_manifest.includes('<Period'))) {
+                    if (!foundDash) foundDash = obj.dash_manifest;
+                    if (possibleIndex >= 0) foundIndex = possibleIndex + 1;
                 }
 
                 // Extract video URL
-                if (!foundUrl && obj.video_versions && Array.isArray(obj.video_versions) && obj.video_versions.length > 0 && obj.video_versions[0].url) {
-                    foundUrl = obj.video_versions[0].url;
+                if ((!foundUrl || (possibleIndex >= 0 && !foundIndex)) && obj.video_versions && Array.isArray(obj.video_versions) && obj.video_versions.length > 0 && obj.video_versions[0].url) {
+                    if (!foundUrl) foundUrl = obj.video_versions[0].url;
+                    if (possibleIndex >= 0) foundIndex = possibleIndex + 1;
                 }
-                if (!foundUrl && obj.video_url && typeof obj.video_url === 'string' && obj.video_url.startsWith('http')) {
-                    foundUrl = obj.video_url;
+                if ((!foundUrl || (possibleIndex >= 0 && !foundIndex)) && obj.video_url && typeof obj.video_url === 'string' && obj.video_url.startsWith('http')) {
+                    if (!foundUrl) foundUrl = obj.video_url;
+                    if (possibleIndex >= 0) foundIndex = possibleIndex + 1;
                 }
 
                 // Extract image URL (carousel image slides or image-only posts).
                 // CRITICAL: filter by posterSig so carousel slide 2+ picks the right image,
                 // not slide 1 which appears first in the array.
-                if (!foundUrl && obj.image_versions2 && obj.image_versions2.candidates && Array.isArray(obj.image_versions2.candidates) && obj.image_versions2.candidates.length > 0) {
+                if ((!foundUrl || (possibleIndex >= 0 && !foundIndex)) && obj.image_versions2 && obj.image_versions2.candidates && Array.isArray(obj.image_versions2.candidates) && obj.image_versions2.candidates.length > 0) {
                     let candidates = obj.image_versions2.candidates;
                     let picked = null;
                     if (posterSig) {
@@ -233,11 +303,15 @@ window.addEventListener('message', function (event) {
                     } else {
                         picked = candidates.reduce((best, c) => ((c.width || 0) * (c.height || 0)) > ((best.width || 0) * (best.height || 0)) ? c : best, candidates[0]);
                     }
-                    if (picked && picked.url) foundUrl = picked.url;
+                    if (picked && picked.url) {
+                        if (!foundUrl) foundUrl = picked.url;
+                        if (possibleIndex >= 0) foundIndex = possibleIndex + 1;
+                    }
                 }
 
-                if (!foundUrl && obj.display_url && typeof obj.display_url === 'string' && obj.display_url.startsWith('http')) {
-                    foundUrl = obj.display_url;
+                if ((!foundUrl || (possibleIndex >= 0 && !foundIndex)) && obj.display_url && typeof obj.display_url === 'string' && obj.display_url.startsWith('http')) {
+                    if (!foundUrl) foundUrl = obj.display_url;
+                    if (possibleIndex >= 0) foundIndex = possibleIndex + 1;
                 }
 
                 // Got what we need (video: need dash+user+time; image: need url+user+time)
@@ -246,7 +320,7 @@ window.addEventListener('message', function (event) {
                 for (let k of Object.keys(obj)) {
                     try {
                         if (obj[k] && typeof obj[k] === 'object') {
-                            searchProps(obj[k], depth + 1, visited, myCode);
+                            searchProps(obj[k], depth + 1, visited, myCode, possibleIndex);
                             if (foundDash && foundUser && foundTime) return;
                         }
                     } catch (e) { }
@@ -256,20 +330,18 @@ window.addEventListener('message', function (event) {
             // Walk up the fiber tree from the video element
             let fiber = getFiber(el);
             let fiberSteps = 0;
-            let visited = new Set();
-
             while (fiber && fiberSteps < 200 && !foundDash) {
                 fiberSteps++;
 
                 // Search memoizedProps (the actual data passed to this component)
                 if (fiber.memoizedProps && typeof fiber.memoizedProps === 'object') {
-                    searchProps(fiber.memoizedProps, 0, visited);
+                    searchProps(fiber.memoizedProps, 0, new Set());
                     if (foundDash && foundUser && foundTime) break;
                 }
 
                 // Search pendingProps as fallback
                 if (fiber.pendingProps && typeof fiber.pendingProps === 'object' && fiber.pendingProps !== fiber.memoizedProps) {
-                    searchProps(fiber.pendingProps, 0, visited);
+                    searchProps(fiber.pendingProps, 0, new Set());
                     if (foundDash && foundUser && foundTime) break;
                 }
 
@@ -391,7 +463,7 @@ window.addEventListener('message', function (event) {
             }
 
             if (foundUrl || foundDash) {
-                window.postMessage({ type: 'MD_FIBER_RESULT', id: id, url: foundUrl, dash: foundDash, media_id: foundId, shortcode: foundCode }, '*');
+                window.postMessage({ type: 'MD_FIBER_RESULT', id: id, url: foundUrl, dash: foundDash, media_id: foundId, shortcode: foundCode, index: foundIndex }, '*');
             } else {
                 window.postMessage({ type: 'MD_FIBER_RESULT', id: id, error: true, media_id: foundId, shortcode: foundCode }, '*');
             }

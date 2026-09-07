@@ -33,6 +33,11 @@ chrome.runtime.onMessage.addListener((msg) => {
         if (msg.ghostOnline !== undefined) window.postMessage({ type: 'MD_GHOST_ONLINE_TOGGLE', enabled: !!msg.ghostOnline }, '*');
         if (msg.ghostSeen !== undefined) window.postMessage({ type: 'MD_GHOST_SEEN_TOGGLE', enabled: !!msg.ghostSeen }, '*');
     }
+    if (msg.action === 'host_response' && msg.response) {
+        if (msg.response.status === 'error' && window.MDToastManager) {
+            window.MDToastManager.showError("Host Error: " + (msg.response.message || "Unknown error"));
+        }
+    }
 });
 
 window.addEventListener('message', function(event) {
@@ -43,7 +48,7 @@ window.addEventListener('message', function(event) {
     }
     if (event.data.type === 'MD_FIBER_RESULT') {
         window.__md_fiberResults = window.__md_fiberResults || {};
-        window.__md_fiberResults[event.data.id] = { url: event.data.url, dash: event.data.dash, media_id: event.data.media_id };
+        window.__md_fiberResults[event.data.id] = { url: event.data.url, dash_manifest: event.data.dash, media_id: event.data.media_id, index: event.data.index, shortcode: event.data.shortcode, user: event.data.user, time: event.data.time };
     }
     if (event.data.type === 'MD_PFP_RESULT') {
         window.__md_pfpResults = window.__md_pfpResults || {};

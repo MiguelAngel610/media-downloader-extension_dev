@@ -256,6 +256,12 @@
 
 Como conclusiA3n tAccnica definitiva y 100% confiable, **eliminamos las bsquedas globales** y exportamos la misma estrategia probada en nuestra funciA3n de descargas (`getActiveStoryMedias`): la extensiA3n **asciende por el árbol DOM exclusivamente desde el contenedor del encabezado de la historia activa hacia su ancestro directo** hasta encontrar los elementos visuales de esa diapositiva en concreto (priorizando por proximidad al centro de pantalla `window.innerWidth / 2`). Al llegar a una historia que únicamente contiene una foto (`<img>`), esta bsqueda jerárquica retorna 0 videos y jamás inspecciona las diapositivas anteriores o vecinas del carrusel, logrando que el arrastre en fotos responda siempre de manera perfecta e instantánea.
 
+## SoluciA3n de Offset de Index en Carruseles Virtualizados de Feed (Nombres de Archivo)
+**Fecha:** 7 de Septiembre 2026
+**Problema:** Al descargar imágenes de un carrusel avanzado (tercera, cuarta imagen, etc), los nombres de archivo recibA-an un índice incorrecto o arrastraban un desfase (la primera era `_2`).
+**Causa Raíz:** Intentar inferir el A-ndice basado en el orden del DOM (`indexOf(li)`) falla fatalmente en carruseles virtualizados de React (SPA). Al hacer scroll, Instagram "desmonta" las imágenes previas para ahorrar memoria eliminando por completo el `<li>` del DOM. Así que calcular la posición visual es matemáticamente imposible desde los elementos HTML.
+**SoluciA3n Definitiva:** Se eliminA3 por completo cualquier intento de leer el DOM o buscar "Puntos de Paginación" (los cuales también fallan en Modo Oscuro o layouts raros). Ahora, la extensión delega la responsabilidad 100% al interceptor de React Fiber (`ig_interceptor.js`). Cuando Vanish busca la imagen dentro del arreglo interno `carousel_media` de React, rastrea recursivamente la llave del arreglo (`k`). Si encuentra la imagen correcta dentro de ese arreglo, envía ese índice exacto de regreso a la interfaz como la "Verdad Absoluta", garantizando una numeración perfecta sin importar qué haya en pantalla.
+
 ## Fix: Falla Aleatoria del Atajo de Teclado en Historias (Animaciones SPA)
 **Fecha:** 14 de Agosto 2026
 **Sintoma:** En las historias de Instagram, el atajo de descarga funcionaba a veces sA- y a veces no. Sin embargo, al recargar la pgina (F5) el atajo volvA-a a funcionar siempre. No habA-a textboxes bloqueando.
@@ -355,3 +361,7 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 **Causa 2 (video_progress.js):** Si la lgica no encontraba instantneamente la barra de progreso de los segmentos, haca un fallback a 'document.querySelectorAll("div")' y forzaba reclculo de estilos en TODOS los divs de la pgina... 60 veces por segundo (va requestAnimationFrame)!
 **Solucin:** Se elimin el selector ', svg' genrico y se implement una cach ('window.__md_cachedSegmentsContainer') para la barra de segmentos. Ahora, una vez detectada, se recicla en las siguientes 60 iteraciones/segundo sin tocar el DOM entero.
 
+
+## Fix (Septiembre 2026): Ghost Online y WebSockets (MQTT)
+**Problema:** El modo 'Quitar Online' dejA3 de funcionar porque Instagram migrA3 su estado de presencia en la web a un protocolo MQTT sobre WebSockets (wss://edge-chat.instagram.com/chat), el cual no era interceptado por nuestro proxy de etch/XHR.
+**SoluciA3n QuirArgica:** En lugar de bloquear el dominio completo con declarativeNetRequest (lo cual romperA-a los Mensajes Directos en tiempo real), inyectamos un Proxy alrededor de window.WebSocket en ig_interceptor.js. El proxy sobrescribe el mAAtodo .send(), decodifica el payload y, si la opciA3n estAA activa, descarta silenciosamente AAnicamente los paquetes que contienen firmas de presencia MQTT (update_presence, presence_subscribe, oreground_state), permitiendo que el chat bidireccional siga operando 100% normal.

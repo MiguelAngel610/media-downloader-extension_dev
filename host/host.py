@@ -108,13 +108,18 @@ def download_media(msg, platform, account, mediaType="auto"):
     global downloaded_urls_cache
     
     url = msg.get("url")
-    if not url:
+    metadata = msg.get("direct_metadata") or msg.get("metadata") or {}
+    dash_manifest = metadata.get("dash_manifest")
+    
+    if not url and not dash_manifest:
         return {"status": "error", "message": "No URL provided"}
         
     # Generate a unique cache key
-    metadata = msg.get("metadata", {})
     shortcode = metadata.get("shortcode", "")
-    cache_key = f"blob_fallback_{shortcode}" if url.startswith("blob:") and shortcode else url
+    if url:
+        cache_key = f"blob_fallback_{shortcode}" if url.startswith("blob:") and shortcode else url
+    else:
+        cache_key = f"dash_{shortcode}_{metadata.get('index', '0')}"
         
     # ANTI-DUPLICATION CACHE
     if cache_key in downloaded_urls_cache:
@@ -143,12 +148,16 @@ def download_media(msg, platform, account, mediaType="auto"):
                         if "filename" in platform_conf:
                             val = platform_conf["filename"]
                             if isinstance(val, dict):
-                                filename_template = val.get("", "{date:%Y-%m-%d}_{shortcode}.{extension}")
+                                # If it's a carousel (has index), try to use sidecar_shortcode template first
+                                idx_val = metadata.get("index")
+                                if idx_val:
+                                    filename_template = val.get("sidecar_shortcode", val.get("", "{date:%Y-%m-%d}_{shortcode}.{extension}"))
+                                else:
+                                    filename_template = val.get("", "{date:%Y-%m-%d}_{shortcode}.{extension}")
                             elif isinstance(val, str):
                                 filename_template = val
                 except Exception as e:
                     broadcast_log(f"Failed to read config: {e}")
-
             metadata = msg.get("direct_metadata") or {}
             username = metadata.get("username") or "Direct_Stories"
             timestamp = metadata.get("timestamp") or int(time.time())
@@ -188,6 +197,7 @@ def download_media(msg, platform, account, mediaType="auto"):
                     if var_name == "shortcode" or var_name == "sidecar_shortcode": val = shortcode
                     elif var_name == "extension": val = ext
                     elif var_name == "id": val = safe_id
+                    elif var_name == "num": val = str(metadata.get("index", ""))
                     
                     if slice_str:
                         try:
@@ -198,14 +208,16 @@ def download_media(msg, platform, account, mediaType="auto"):
                             pass
                     return val
 
-                filename = re.sub(r'\{(shortcode|extension|id)(\[:\d+\])?\}', format_var, filename)
+                filename = re.sub(r'\{(shortcode|extension|id|num)(\[:\d+\])?\}', format_var, filename)
                 
                 filename = re.sub(r'\{(sidecar_shortcode)(\[:\d+\])?\}', format_var, filename)
                 
                 idx = metadata.get("index")
                 if idx is not None and str(idx).isdigit() and int(idx) > 0:
-                    name, dot_ext = os.path.splitext(filename)
-                    filename = f"{name}_{idx}{dot_ext}"
+                    # Only append _idx if {num} wasn't already evaluated in the template
+                    if "{num}" not in filename_template:
+                        name, dot_ext = os.path.splitext(filename)
+                        filename = f"{name}_{idx}{dot_ext}"
             
             # Ensure safe filename
             for char in ['<', '>', ':', '"', '/', '\\', '|', '?', '*']:
@@ -237,6 +249,21 @@ def download_media(msg, platform, account, mediaType="auto"):
             if not os.path.exists(out_dir):
                 os.makedirs(out_dir)
                 
+            # Create Notepad with Permanent ID if available
+            user_id = metadata.get("user_id")
+            if user_id:
+                # Always put the notepad in the root user directory, not inside Videos/Pictures
+                user_root_dir = os.path.dirname(out_dir) if (out_dir.endswith("Videos") or out_dir.endswith("Pictures")) else out_dir
+                id_file_path = os.path.join(user_root_dir, f"ID_{user_id}.txt")
+                if not os.path.exists(id_file_path):
+                    try:
+                        with open(id_file_path, "w", encoding="utf-8") as f:
+                            f.write(f"Username: {username}\n")
+                            f.write(f"Permanent ID: {user_id}\n")
+                            f.write(f"Profile URL: https://www.facebook.com/profile.php?id={user_id}\n")
+                    except Exception as e:
+                        broadcast_log(f"Failed to create ID notepad: {e}")
+
             filepath = os.path.join(out_dir, filename)
             
             broadcast_log(f"--- NEW DIRECT DOWNLOAD REQUEST ---")
@@ -336,7 +363,7 @@ def download_media(msg, platform, account, mediaType="auto"):
                     try: os.remove(manifest_path)
                     except: pass
             
-            if url.startswith('blob:'):
+            if not url or url.startswith('blob:'):
                 # Last resort: use gallery-dl / yt-dlp with the post URL
                 fallback_url = None
                 if platform == "instagram":
@@ -346,7 +373,9 @@ def download_media(msg, platform, account, mediaType="auto"):
                         mid = str(metadata["media_id"]).split("_")[0]
                         fallback_url = f"https://www.instagram.com/stories/{username}/{mid}/"
                 elif platform == "facebook":
-                    if shortcode:
+                    if metadata.get("story_url"):
+                        fallback_url = metadata.get("story_url")
+                    elif shortcode:
                         fallback_url = f"https://www.facebook.com/reel/{shortcode}"
                         
                 if fallback_url:
@@ -440,8 +469,25 @@ def download_media(msg, platform, account, mediaType="auto"):
             is_backup = metadata.get("is_backup", False)
             username = metadata.get("username", "Unknown")
             
-            # If the extension intercepted the raw MP4 URL, we use it directly!
-            actual_url = metadata.get("url") if metadata.get("is_direct") and metadata.get("url") else url
+            # If the extension intercepted the raw MP4 URL or DASH manifest, we use it!
+            actual_url = url
+            temp_manifest = None
+            if metadata.get("is_direct"):
+                if metadata.get("url"):
+                    actual_url = metadata.get("url")
+                elif metadata.get("dash_manifest"):
+                    import tempfile
+                    # Write dash manifest to temp file so yt-dlp can parse it
+                    temp_manifest = tempfile.NamedTemporaryFile(delete=False, suffix=".mpd")
+                    temp_manifest.write(metadata.get("dash_manifest").encode('utf-8'))
+                    temp_manifest.close()
+                    actual_url = temp_manifest.name
+            
+            # Fix: If the extension sent the raw ID as the url (fallback), use the full story_url for yt-dlp instead
+            if "facebook.com" not in actual_url and "fbcdn.net" not in actual_url and not actual_url.startswith("http"):
+                if metadata.get("story_url"):
+                    actual_url = metadata.get("story_url")
+            
             cmd = ["yt-dlp", actual_url]
             
             if metadata.get("is_direct") and metadata.get("tweet_id"):
@@ -470,7 +516,7 @@ def download_media(msg, platform, account, mediaType="auto"):
                 # Do NOT use cookies for facebook by default because yt-dlp will hang due to Chrome SQLite lock.
                 # Only use a custom cookie file if the user exported it manually.
                 cookie_path = os.path.join(gallery_dir, "www.facebook.com_cookies.txt")
-                if os.path.exists(cookie_path) and not metadata.get("is_direct"):
+                if os.path.exists(cookie_path):
                     cmd.extend(["--cookies", cookie_path])
             
             # Si es backup, forzar a Bandeja_Favoritos
@@ -517,10 +563,23 @@ def download_media(msg, platform, account, mediaType="auto"):
                 broadcast_log("STATUS: SKIPPED")
                 return {"status": "skipped", "message": "Already downloaded", "log": stdout}
             
+            # Clean up temporary manifest
+            if temp_manifest and os.path.exists(temp_manifest.name):
+                try:
+                    os.remove(temp_manifest.name)
+                except:
+                    pass
+                
             broadcast_log("STATUS: SUCCESS")
-            return {"status": "success", "message": "Downloaded successfully", "log": stdout}
+            return {"status": "success", "message": f"{platform.capitalize()} downloaded successfully (using yt-dlp)", "log": stdout}
         else:
             broadcast_log("STATUS: ERROR")
+            # Clean up temporary manifest
+            if temp_manifest and os.path.exists(temp_manifest.name):
+                try:
+                    os.remove(temp_manifest.name)
+                except:
+                    pass
             return {"status": "error", "message": "Download failed", "log": stderr}
             
     except Exception as e:
