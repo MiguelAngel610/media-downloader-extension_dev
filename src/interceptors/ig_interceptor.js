@@ -268,6 +268,20 @@ window.addEventListener('message', function (event) {
                             isMatch = isMatch || obj.video_url.includes(posterSig);
                         }
                     }
+
+                    // 3. Fallback to matching by video manifest or URL
+                    if (!isMatch) {
+                        if (foundDash && (obj.video_dash_manifest === foundDash || obj.dash_manifest === foundDash)) {
+                            isMatch = true;
+                        } else if (foundUrl) {
+                            if (obj.video_versions && Array.isArray(obj.video_versions) && obj.video_versions.some(v => v.url === foundUrl)) {
+                                isMatch = true;
+                            } else if (obj.video_url === foundUrl) {
+                                isMatch = true;
+                            }
+                        }
+                    }
+
                     if (!isMatch) return; // Wrong slide! Skip this entire object.
                 }
 
