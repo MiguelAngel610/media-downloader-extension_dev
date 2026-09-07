@@ -434,8 +434,8 @@ function injectFeedButtons() {
                     let val = parseInt(posInset.getAttribute('aria-posinset'), 10);
                     if (!isNaN(val)) idx = val;
                 } else if (article) {
-                    // Fallback for absolutely positioned videos (which are outside the <li>)
-                    let lis = Array.from(article.querySelectorAll('li[aria-posinset]'));
+                    // Fallback for absolutely positioned videos (which are outside the list item)
+                    let lis = Array.from(article.querySelectorAll('[aria-posinset]'));
                     if (lis.length > 0) {
                         let articleRect = article.getBoundingClientRect();
                         let articleCenter = articleRect.left + (articleRect.width / 2);

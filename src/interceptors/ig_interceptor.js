@@ -362,7 +362,30 @@ window.addEventListener('message', function (event) {
                     break;
                 }
 
-                fiber = fiber.return; // Walk up to parent fiber
+                fiber = fiber.return; 
+            }
+
+            // Fallback: For absolutely positioned videos or portals where the element's 
+            // Fiber tree doesn't connect to the Post's data, search the parent article's Fiber tree.
+            // This is crucial because we ALREADY extracted foundDash/foundUrl from the video, 
+            // and now we use it to match the exact index inside the article's carouselArray.
+            if (!(foundUser && foundTime)) {
+                let article = el.closest('article, [role="dialog"]');
+                if (article) {
+                    let articleFiber = getFiber(article);
+                    let articleSteps = 0;
+                    while (articleFiber && articleSteps < 200) {
+                        articleSteps++;
+                        if (articleFiber.memoizedProps && typeof articleFiber.memoizedProps === 'object') {
+                            searchProps(articleFiber.memoizedProps, 0, new Set());
+                        }
+                        // We do not break on foundDash/foundUrl alone, we need user and time.
+                        if (foundUser && foundTime) {
+                            break;
+                        }
+                        articleFiber = articleFiber.return;
+                    }
+                }
             }
 
             // === PHASE 2: If fiber walk failed, try DOM walk but with strict shortcode guard ===
