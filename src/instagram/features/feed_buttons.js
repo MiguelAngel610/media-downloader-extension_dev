@@ -433,6 +433,29 @@ function injectFeedButtons() {
                 if (posInset) {
                     let val = parseInt(posInset.getAttribute('aria-posinset'), 10);
                     if (!isNaN(val)) idx = val;
+                } else if (article) {
+                    // Fallback for absolutely positioned videos (which are outside the <li>)
+                    let lis = Array.from(article.querySelectorAll('li[aria-posinset]'));
+                    if (lis.length > 0) {
+                        let articleRect = article.getBoundingClientRect();
+                        let articleCenter = articleRect.left + (articleRect.width / 2);
+                        let bestLi = null;
+                        let minDistance = Infinity;
+                        
+                        for (let li of lis) {
+                            let rect = li.getBoundingClientRect();
+                            let liCenter = rect.left + (rect.width / 2);
+                            let distance = Math.abs(articleCenter - liCenter);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                bestLi = li;
+                            }
+                        }
+                        if (bestLi) {
+                            let val = parseInt(bestLi.getAttribute('aria-posinset'), 10);
+                            if (!isNaN(val)) idx = val;
+                        }
+                    }
                 }
                 
                 let { bestUrl, bestMetadata } = await resolveMediaUrl(media, article, null, idx);
