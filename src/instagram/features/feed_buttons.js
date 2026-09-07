@@ -455,6 +455,33 @@ function injectFeedButtons() {
                             let val = parseInt(bestLi.getAttribute('aria-posinset'), 10);
                             if (!isNaN(val)) idx = val;
                         }
+                    } else {
+                        // Instagram removed aria-posinset in many carousels! Try visual fallback.
+                        let uls = Array.from(article.querySelectorAll('ul'));
+                        for (let ul of uls) {
+                            let slideLis = Array.from(ul.querySelectorAll('li'));
+                            if (slideLis.length > 1) {
+                                let rect = ul.getBoundingClientRect();
+                                let ulCenter = rect.left + rect.width / 2;
+                                let minDistance = Infinity;
+                                let activeIndex = -1;
+                                
+                                for (let i = 0; i < slideLis.length; i++) {
+                                    let liRect = slideLis[i].getBoundingClientRect();
+                                    let liCenter = liRect.left + liRect.width / 2;
+                                    let distance = Math.abs(ulCenter - liCenter);
+                                    if (distance < minDistance) {
+                                        minDistance = distance;
+                                        activeIndex = i;
+                                    }
+                                }
+                                
+                                if (activeIndex !== -1) {
+                                    idx = activeIndex + 1; // 1-based index
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
                 

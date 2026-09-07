@@ -102,7 +102,8 @@ def log_info(msg):
     except:
         pass
 
-downloaded_urls_cache = set()
+# Keep track of recently downloaded URLs to avoid double-processing within a short timeframe
+downloaded_urls_cache = {}
 
 def download_media(msg, platform, account, mediaType="auto"):
     global downloaded_urls_cache
@@ -119,13 +120,16 @@ def download_media(msg, platform, account, mediaType="auto"):
     if url:
         cache_key = f"blob_fallback_{shortcode}" if url.startswith("blob:") and shortcode else url
     else:
-        cache_key = f"dash_{shortcode}_{metadata.get('index', '0')}"
+        shortcode = msg.get("direct_metadata", {}).get("shortcode")
+        cache_key = f"dash_{shortcode}_{msg.get('direct_metadata', {}).get('index', '0')}"
         
-    # ANTI-DUPLICATION CACHE
+    # ANTI-DUPLICATION CACHE (3-second timeout)
     if cache_key in downloaded_urls_cache:
-        broadcast_log("STATUS: SKIPPED (URL already downloaded in this session)")
-        return {"status": "skipped", "message": "Already downloaded in RAM cache", "log": "Duplicated URL ignored"}
-    downloaded_urls_cache.add(cache_key)
+        last_time = downloaded_urls_cache[cache_key]
+        if time.time() - last_time < 3:
+            broadcast_log("STATUS: SKIPPED (URL duplicated within 3s)")
+            return {"status": "skipped", "message": "Already downloaded in RAM cache", "log": "Duplicated URL ignored"}
+    downloaded_urls_cache[cache_key] = time.time()
     
     try:
         home = os.path.expanduser("~")
