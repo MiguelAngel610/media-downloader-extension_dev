@@ -1,11 +1,22 @@
 # Notas TAccnicas - Instagram
 
 ## Estructura de mA3dulos
-- `src/instagram/core/` Ã¢â‚¬â€ state.js, styles.js, vanish_init.js
-- `src/instagram/utils/` Ã¢â‚¬â€ platform.js, username_resolver.js, media_resolver.js
-- `src/instagram/ui/` Ã¢â‚¬â€ svgs.js, overlay_root.js, button_state.js
-- `src/instagram/features/` Ã¢â‚¬â€ pfp_button.js, story_button.js, feed_buttons.js, video_progress.js
-- `src/instagram/main.js` Ã¢â‚¬â€ Orquestador principal + MutationObserver + click interceptor
+- `src/instagram/core/` Ã¢â‚¬â€  state.js, styles.js, vanish_init.js
+- `src/instagram/utils/` Ã¢â‚¬â€  platform.js, username_resolver.js, media_resolver.js
+- `src/instagram/ui/` Ã¢â‚¬â€  svgs.js, overlay_root.js, button_state.js
+- `src/instagram/features/` Ã¢â‚¬â€  pfp_button.js, story_button.js, feed_buttons.js, video_progress.js
+- `src/instagram/main.js` Ã¢â‚¬â€  Orquestador principal + MutationObserver + click interceptor
+
+## Problema: Falla silenciosa al descargar carruseles y nombres incorrectos (timestamp en lugar de shortcode)
+**Fecha:** 06 de Septiembre 2026
+**Causa:**
+1. Al hacer clic en el botón flotante desprendido del DOM, `btn.closest('a')` y `btn.closest('article')` devolvían null, impidiendo la extracción del shortcode de los enlaces de tiempo de IG.
+2. Los videos en carrusel de feed no tenían un `aria-posinset` directo en la etiqueta `<video>`, lo que causaba que el índice (`_1`, `_2`) se perdiera y resultara en colisiones de nombres o nombres basados en el `timestamp` fallback.
+3. El script host de Python usaba el `time.time()` como fallback primario en lugar de usar el `media_id` para derivar el shortcode.
+**Solución:**
+1. Se modificó `button_state.js` para usar `(originalElement || btn).closest(...)` y así garantizar el recorrido correcto del DOM desde el contenedor original del post.
+2. Se añadió un fallback en `feed_buttons.js` para iterar sobre `li.parentElement.children` si no hay `aria-posinset`, y se modificó `ig_interceptor.js` para asignar `foundIndex = event.data.carouselIndex`.
+3. Se actualizó `host.py` para usar `media_id` como fallback secundario antes del `time.time()`.
 
 ## Problema: Barra de progreso desbordada en carruseles
 **Fecha:** 27 de Junio 2026
