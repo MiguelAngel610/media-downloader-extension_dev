@@ -1,10 +1,35 @@
 /* Media Downloader - IG Interceptor Init: Loads ig_interceptor.js and wires settings listeners */
 
-// Inject IG Interceptor Script (for GraphQL interception, which can be async)
-const interceptorScript = document.createElement('script');
-interceptorScript.src = chrome.runtime.getURL('src/interceptors/ig_interceptor.js');
-interceptorScript.onload = function() { this.remove(); };
-(document.head || document.documentElement).appendChild(interceptorScript);
+// Inject IG Interceptor Scripts sequentially to maintain dependency order
+const scriptsToInject = [
+    'src/interceptors/ig/ig_logger_ui.js',
+    'src/interceptors/ig/ig_device_spoof.js',
+    'src/interceptors/ig/ig_ghost_mode.js',
+    'src/interceptors/ig/ig_fiber_search.js',
+    'src/interceptors/ig/ig_network_interceptor.js'
+];
+
+function injectNextScript(index) {
+    if (index >= scriptsToInject.length) {
+        // Once all scripts are injected, fetch settings and broadcast them
+        // This prevents a race condition where settings are sent before ghost mode listeners are ready
+        chrome.storage.local.get(['vanishMode', 'ghostOnline', 'ghostSeen'], function(result) {
+            if (result.vanishMode !== undefined) window.postMessage({ type: 'MD_VANISH_TOGGLE', enabled: !!result.vanishMode }, '*');
+            if (result.ghostOnline !== undefined) window.postMessage({ type: 'MD_GHOST_ONLINE_TOGGLE', enabled: !!result.ghostOnline }, '*');
+            if (result.ghostSeen !== undefined) window.postMessage({ type: 'MD_GHOST_SEEN_TOGGLE', enabled: !!result.ghostSeen }, '*');
+        });
+        return;
+    }
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL(scriptsToInject[index]);
+    script.onload = function() {
+        this.remove();
+        injectNextScript(index + 1);
+    };
+    (document.head || document.documentElement).appendChild(script);
+}
+
+injectNextScript(0);
 
 chrome.storage.onChanged.addListener(function(changes, namespace) {
     if (namespace === 'local') {
@@ -20,13 +45,7 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
     }
 });
 
-chrome.storage.local.get(['vanishMode', 'ghostOnline', 'ghostSeen'], function(result) {
-    setTimeout(() => {
-        if (result.vanishMode !== undefined) window.postMessage({ type: 'MD_VANISH_TOGGLE', enabled: !!result.vanishMode }, '*');
-        if (result.ghostOnline !== undefined) window.postMessage({ type: 'MD_GHOST_ONLINE_TOGGLE', enabled: !!result.ghostOnline }, '*');
-        if (result.ghostSeen !== undefined) window.postMessage({ type: 'MD_GHOST_SEEN_TOGGLE', enabled: !!result.ghostSeen }, '*');
-    }, 100);
-});
+// Initial settings are now broadcasted at the end of injectNextScript() to avoid race conditions.
 
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'MD_UPDATE_SETTINGS') {
