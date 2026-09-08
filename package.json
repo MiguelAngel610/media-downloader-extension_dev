@@ -1,0 +1,27 @@
+{
+  "name": "media_downloader_extension_dev",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build:ig": "esbuild src/instagram/interceptors/index.js --bundle --format=iife --outfile=dist/ig_interceptor.bundle.js --minify",
+    "watch:ig": "esbuild src/instagram/interceptors/index.js --bundle --format=iife --outfile=dist/ig_interceptor.bundle.js --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MiguelAngel610/media-downloader-extension_dev.git"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/MiguelAngel610/media-downloader-extension_dev/issues"
+  },
+  "homepage": "https://github.com/MiguelAngel610/media-downloader-extension_dev#readme",
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

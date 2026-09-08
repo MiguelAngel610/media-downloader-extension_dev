@@ -156,7 +156,7 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "src/instagram/interceptors/ig_interceptor.js"
+        "dist/ig_interceptor.bundle.js"
       ],
       "matches": [
         "*://*.instagram.com/*"

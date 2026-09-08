@@ -2,7 +2,7 @@
 
 // Inject IG Interceptor Scripts sequentially to maintain dependency order
 const scriptsToInject = [
-    'src/instagram/interceptors/ig_interceptor.js'
+    'dist/ig_interceptor.bundle.js'
 ];
 
 function injectNextScript(index) {
