@@ -246,6 +246,8 @@ function injectFeedButtons() {
             e.preventDefault();
             e.stopPropagation();
 
+            let isShiftKey = e.shiftKey;
+            
             let btnSvg = clone.querySelector('svg');
             if(btnSvg) btnSvg.style.opacity = '0.5';
 
@@ -285,6 +287,23 @@ function injectFeedButtons() {
                 // For slides 2+: the dictionary entries for those slides use numeric IDs, not the parent shortcode,
                 // so we skip straight to DOM/Fiber which finds the actual visible slide in the DOM.
                 let useDictionary = imgIndex === 1 && shortcode && window.__md_storyMediaDict;
+                
+                let uls = Array.from(openDialog.querySelectorAll('ul'));
+                let isDialogCarousel = uls.length > 0 && uls[0].querySelectorAll('li').length > 1;
+
+                if (isDialogCarousel && shortcode && isShiftKey) {
+                    // USER PREFERENCE: Delegate entire carousel to gallery-dl!
+                    console.log('[MD Debug] Delegating Dialog Carousel to gallery-dl');
+                    let postUrl = `https://www.instagram.com/p/${shortcode}/`;
+                    let bestMetadata = {
+                        shortcode: shortcode,
+                        media_category: 'post',
+                        mediaType: 'auto' // Forces host.py to use gallery-dl natively
+                    };
+                    if(btnSvg) btnSvg.style.opacity = '1';
+                    sendDownloadRequest(clone, postUrl, bestMetadata, true, wrapper);
+                    return;
+                }
 
                 if (useDictionary) {
                     let allItems = Object.values(window.__md_storyMediaDict);
@@ -388,98 +407,173 @@ function injectFeedButtons() {
                 if (!article) article = document.body;
             }
 
+            let idx = null;
             let media = null;
+            let isCarousel = false;
+            
             if (article) {
-                let mediaElements = Array.from(article.querySelectorAll('video, img'));
-                let validMedia = mediaElements.map(el => {
-                    let rect = el.getBoundingClientRect();
-                    let top = Math.max(0, rect.top);
-                    let left = Math.max(0, rect.left);
-                    let bottom = Math.min(window.innerHeight, rect.bottom);
-                    let right = Math.min(window.innerWidth, rect.right);
-                    let isVisible = true;
-                    let curr = el;
-                    while (curr && curr !== article && curr !== document.body) {
-                        let st = window.getComputedStyle(curr);
-                        if (st.opacity === '0' || st.visibility === 'hidden' || st.display === 'none') { isVisible = false; break; }
-                        if (st.overflow === 'hidden' || st.overflowX === 'hidden' || st.overflowY === 'hidden' || st.clipPath !== 'none') {
-                            let pRect = curr.getBoundingClientRect();
-                            top = Math.max(top, pRect.top); left = Math.max(left, pRect.left);
-                            bottom = Math.min(bottom, pRect.bottom); right = Math.min(right, pRect.right);
+                let articleRect = article.getBoundingClientRect();
+                let articleCenterX = articleRect.left + articleRect.width / 2;
+                let uls = Array.from(article.querySelectorAll('ul'));
+                isCarousel = uls.length > 0 && uls[0].querySelectorAll('li').length > 1;
+
+                if (isCarousel) {
+                    if (isShiftKey) {
+                        console.log('[MD Debug] Delegating Feed Carousel to gallery-dl');
+                        let timeLink = article.querySelector('a[href*="/p/"], a[href*="/reel/"]');
+                        let shortcode = timeLink ? timeLink.href.match(/\/(?:p|reel)\/([a-zA-Z0-9_-]+)/)[1] : null;
+                        
+                        if (!shortcode) {
+                            let m = window.location.pathname.match(/\/(?:p|reel)\/([a-zA-Z0-9_-]+)/);
+                            if (m) shortcode = m[1];
                         }
-                        curr = curr.parentElement;
+
+                        if (shortcode) {
+                            let postUrl = `https://www.instagram.com/p/${shortcode}/`;
+                            let bestMetadata = {
+                                shortcode: shortcode,
+                                media_category: 'post',
+                                mediaType: 'auto' // Forces host.py to use gallery-dl natively
+                            };
+                            
+                            if(btnSvg) btnSvg.style.opacity = '1';
+                            sendDownloadRequest(clone, postUrl, bestMetadata, true, svg);
+                            return; // Bypass all Fiber and DOM selection
+                        }
+                    } else {
+                        // Normal Click: Download EXACT slide natively
+                        let ul = uls[0];
+                        let lis = Array.from(ul.querySelectorAll('li'));
+                        let bestLi = null;
+                        let minDistance = Infinity;
+                        
+                        // 1. Find the `li` that is currently in the center of the article
+                        for (let li of lis) {
+                            let rect = li.getBoundingClientRect();
+                            let liCenterX = rect.left + rect.width / 2;
+                            let dist = Math.abs(liCenterX - articleCenterX);
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                bestLi = li;
+                            }
+                        }
+                        
+                        // 2. Extract the media ONLY from inside that specific `li`
+                        // This mathematically ignores ANY absolutely positioned stray video thumbnails
+                        if (bestLi) {
+                            let elements = Array.from(bestLi.querySelectorAll('video, img')).filter(el => {
+                                let r = el.getBoundingClientRect();
+                                return r.width > 150 && r.height > 150;
+                            });
+                            
+                            let vid = elements.find(el => el.tagName.toLowerCase() === 'video');
+                            if (vid) {
+                                media = vid;
+                            } else if (elements.length > 0) {
+                                media = elements[0];
+                            }
+                            
+                            let posInset = bestLi.getAttribute('aria-posinset');
+                            if (posInset && !isNaN(parseInt(posInset, 10))) {
+                                idx = parseInt(posInset, 10);
+                            }
+                        }
+
+                        // Robust mathematical override: Scroll Position (The ultimate truth for large carousels)
+                        // Instagram wraps the UL in a DIV that actually handles the scrolling. The UL itself is often 1px wide.
+                        let scrollers = Array.from(article.querySelectorAll('div, ul')).filter(el => {
+                            // Find the container that actually scrolls horizontally and is large enough to be the carousel
+                            return el.scrollWidth > el.clientWidth && el.clientWidth > 150 && el.scrollWidth >= (el.clientWidth * 1.5);
+                        });
+                        
+                        if (scrollers.length > 0) {
+                            let scroller = scrollers[0]; // The outermost scrollable container
+                            let slideWidth = scroller.clientWidth;
+                            let scrollX = scroller.scrollLeft;
+                            
+                            if (scrollX === 0 && scroller.scrollLeft === 0) {
+                                // Fallback for transform: translateX if they use an inner wrapper
+                                let inner = scroller.querySelector('div');
+                                if (inner) {
+                                    let transform = window.getComputedStyle(inner).transform;
+                                    if (transform && transform !== 'none') {
+                                        let match = transform.match(/matrix\((.+)\)/);
+                                        if (match) {
+                                            let values = match[1].split(',').map(v => parseFloat(v.trim()));
+                                            if (values.length === 6) scrollX = Math.abs(values[4]);
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if (slideWidth > 0 && scrollX >= 0) {
+                                let calculatedIdx = Math.round(scrollX / slideWidth) + 1;
+                                if (calculatedIdx > 0) {
+                                    idx = calculatedIdx;
+                                    console.log('[MD] Overrode carousel index via Scroll Position to:', idx);
+                                }
+                            }
+                        }
                     }
-                    let width = Math.max(0, right - left);
-                    let height = Math.max(0, bottom - top);
-                    let visibleArea = isVisible ? (width * height) : 0;
-                    return { el, visibleArea, isVideo: el.tagName === 'VIDEO' };
-                }).filter(item => item.visibleArea > 10000).sort((a, b) => {
-                    let diff = b.visibleArea - a.visibleArea;
-                    if (Math.abs(diff) < (Math.max(a.visibleArea, b.visibleArea) * 0.1)) {
+                }
+                
+                if (!media) {
+                    // Fallback for single posts
+                    let mediaElements = Array.from(article.querySelectorAll('video, img'));
+                    let validMedia = mediaElements.map(el => {
+                        let rect = el.getBoundingClientRect();
+                        let isVisible = true;
+                        let curr = el;
+                        while (curr && curr !== article && curr !== document.body) {
+                            let st = window.getComputedStyle(curr);
+                            if (st.opacity === '0' || st.visibility === 'hidden' || st.display === 'none') { isVisible = false; break; }
+                            curr = curr.parentElement;
+                        }
+                        let visibleArea = isVisible ? (rect.width * rect.height) : 0;
+                        return { el, visibleArea, isVideo: el.tagName === 'VIDEO' };
+                    }).filter(item => item.visibleArea > 10000).sort((a, b) => {
+                        let areaDiff = b.visibleArea - a.visibleArea;
+                        if (Math.abs(areaDiff) > (Math.max(a.visibleArea, b.visibleArea) * 0.1)) {
+                            return areaDiff;
+                        }
                         if (a.isVideo && !b.isVideo) return -1;
                         if (b.isVideo && !a.isVideo) return 1;
-                    }
-                    return diff;
-                });
-                media = validMedia.length > 0 ? validMedia[0].el : mediaElements[0];
+                        return 0;
+                    });
+                    media = validMedia.length > 0 ? validMedia[0].el : mediaElements[0];
+                }
             }
 
             setTimeout(() => { if(btnSvg) btnSvg.style.opacity = '1'; }, 2000);
 
             if (media) {
                 // Attempt to get exact index from aria-posinset (flawless for virtualized lists)
-                let idx = null;
-                let posInset = media.closest('[aria-posinset]');
-                if (posInset) {
-                    let val = parseInt(posInset.getAttribute('aria-posinset'), 10);
-                    if (!isNaN(val)) idx = val;
-                } else if (article) {
-                    // Fallback for absolutely positioned videos (which are outside the list item)
-                    let lis = Array.from(article.querySelectorAll('[aria-posinset]'));
-                    if (lis.length > 0) {
-                        let articleRect = article.getBoundingClientRect();
-                        let articleCenter = articleRect.left + (articleRect.width / 2);
-                        let bestLi = null;
-                        let minDistance = Infinity;
-                        
-                        for (let li of lis) {
-                            let rect = li.getBoundingClientRect();
-                            let liCenter = rect.left + (rect.width / 2);
-                            let distance = Math.abs(articleCenter - liCenter);
-                            if (distance < minDistance) {
-                                minDistance = distance;
-                                bestLi = li;
+                if (idx === null) {
+                    let posInset = media.closest('[aria-posinset]');
+                    if (posInset) {
+                        let val = parseInt(posInset.getAttribute('aria-posinset'), 10);
+                        if (!isNaN(val)) idx = val;
+                    } else if (article) {
+                        // Fallback for absolutely positioned videos (which are outside the list item)
+                        let lis = Array.from(article.querySelectorAll('[aria-posinset]'));
+                        if (lis.length > 0) {
+                            let articleRect = article.getBoundingClientRect();
+                            let articleCenter = articleRect.left + (articleRect.width / 2);
+                            let bestLi = null;
+                            let minDistance = Infinity;
+                            
+                            for (let li of lis) {
+                                let rect = li.getBoundingClientRect();
+                                let liCenter = rect.left + (rect.width / 2);
+                                let distance = Math.abs(articleCenter - liCenter);
+                                if (distance < minDistance) {
+                                    minDistance = distance;
+                                    bestLi = li;
+                                }
                             }
-                        }
-                        if (bestLi) {
-                            let val = parseInt(bestLi.getAttribute('aria-posinset'), 10);
-                            if (!isNaN(val)) idx = val;
-                        }
-                    } else {
-                        // Instagram removed aria-posinset in many carousels! Try visual fallback.
-                        let uls = Array.from(article.querySelectorAll('ul'));
-                        for (let ul of uls) {
-                            let slideLis = Array.from(ul.querySelectorAll('li'));
-                            if (slideLis.length > 1) {
-                                let rect = ul.getBoundingClientRect();
-                                let ulCenter = rect.left + rect.width / 2;
-                                let minDistance = Infinity;
-                                let activeIndex = -1;
-                                
-                                for (let i = 0; i < slideLis.length; i++) {
-                                    let liRect = slideLis[i].getBoundingClientRect();
-                                    let liCenter = liRect.left + liRect.width / 2;
-                                    let distance = Math.abs(ulCenter - liCenter);
-                                    if (distance < minDistance) {
-                                        minDistance = distance;
-                                        activeIndex = i;
-                                    }
-                                }
-                                
-                                if (activeIndex !== -1) {
-                                    idx = activeIndex + 1; // 1-based index
-                                    break;
-                                }
+                            if (bestLi) {
+                                let val = parseInt(bestLi.getAttribute('aria-posinset'), 10);
+                                if (!isNaN(val)) idx = val;
                             }
                         }
                     }
@@ -490,7 +584,16 @@ function injectFeedButtons() {
                 if (bestUrl || (bestMetadata && bestMetadata.dash_manifest)) {
                     if(btnSvg) btnSvg.style.opacity = '1';
 
-                    sendDownloadRequest(clone, bestUrl, bestMetadata, true, svg);
+                    if (isCarousel && bestMetadata && bestMetadata.index) {
+                        // USER PREFERENCE: Force gallery-dl for single carousel slides!
+                        console.log('[MD Debug] Delegating Single Carousel Slide to gallery-dl (Index: ' + bestMetadata.index + ')');
+                        let postUrl = `https://www.instagram.com/p/${bestMetadata.shortcode}/`;
+                        bestMetadata.mediaType = 'auto'; // Force gallery-dl in host.py
+                        sendDownloadRequest(clone, postUrl, bestMetadata, true, svg);
+                    } else {
+                        // Single posts still use native download
+                        sendDownloadRequest(clone, bestUrl, bestMetadata, true, svg);
+                    }
                 } else {
                     console.warn('[MD] resolveMediaUrl returned nothing for feed media.');
                     if(btnSvg) btnSvg.style.opacity = '1';
