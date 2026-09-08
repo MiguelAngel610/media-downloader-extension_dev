@@ -3,7 +3,7 @@ window.__md_vanishMode = false;
 window.__md_ghostOnline = false;
 window.__md_ghostSeen = false;
 
-function mdLog(badge, message, badgeColor = "#3b82f6") {
+export function mdLog(badge, message, badgeColor = "#3b82f6") {
     console.log(
         `%c ${badge} %c ${message} `,
         `background: ${badgeColor}; color: #ffffff; font-weight: 700; font-size: 11px; border-radius: 4px 0 0 4px; padding: 2px 6px; font-family: 'Inter', system-ui, -apple-system, sans-serif;`,

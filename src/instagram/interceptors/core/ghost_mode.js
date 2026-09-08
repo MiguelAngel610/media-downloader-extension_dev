@@ -1,3 +1,4 @@
+import { mdLog } from './logger.js';
 // --- Ghost Online: WebSocket Interceptor ---
 let OriginalWebSocket = window.WebSocket;
 window.WebSocket = function(url, protocols) {

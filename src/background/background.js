@@ -1,4 +1,4 @@
-importScripts('../utils/filename_formatter.js');
+importScripts('/src/shared/utils/filename_formatter.js');
 
 const NATIVE_HOST = "com.media.downloader";
 

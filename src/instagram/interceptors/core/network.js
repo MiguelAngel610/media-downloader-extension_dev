@@ -1,3 +1,5 @@
+import { mdLog } from './logger.js';
+import { showGhostToast, isPresenceRequest, isSeenRequest, extractSignatureFromUrl, processAndPostData } from './fiber_search.js';
 const originalFetch = window.fetch;
 window.fetch = async function (...args) {
     let url = args[0];

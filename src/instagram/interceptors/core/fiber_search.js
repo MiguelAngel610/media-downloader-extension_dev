@@ -1,3 +1,4 @@
+import { mdLog } from './logger.js';
 window.addEventListener('message', function(event) {
 if (event.data.type === 'MD_REQUEST_FIBER') {
         try {
@@ -384,7 +385,7 @@ if (event.data.type === 'MD_REQUEST_FIBER') {
     }
 });
 
-function showGhostToast(icon, color) {
+export function showGhostToast(icon, color) {
     let btn = document.getElementById('md-floating-btn');
     if (btn) {
         let oldHtml = btn.innerHTML;
@@ -398,7 +399,7 @@ function showGhostToast(icon, color) {
     }
 }
 
-function isPresenceRequest(url, body) {
+export function isPresenceRequest(url, body) {
     if (!window.__md_ghostOnline) return false;
     let urlStr = (url || "").toString().toLowerCase();
     let bodyStr = (body || "").toString().toLowerCase();
@@ -411,7 +412,7 @@ function isPresenceRequest(url, body) {
     return false;
 }
 
-function isSeenRequest(url, body) {
+export function isSeenRequest(url, body) {
     let urlStr = (url || "").toString().toLowerCase();
     let bodyStr = (body || "").toString().toLowerCase();
 
@@ -641,7 +642,7 @@ if (originalSendBeacon) {
 // ==========================================
 window.__md_storyMedia = {};
 
-function extractSignatureFromUrl(url) {
+export function extractSignatureFromUrl(url) {
     if (!url) return null;
     try {
         let parts = new URL(url).pathname.split('/');
@@ -655,7 +656,7 @@ function extractSignatureFromUrl(url) {
 let globalFoundUsername = "";
 let globalFoundTimestamp = null;
 
-function findStoryMedia(obj, parentUsername = "", parentTimestamp = null, checkResetFn = null) {
+export function findStoryMedia(obj, parentUsername = "", parentTimestamp = null, checkResetFn = null) {
     if (!obj || typeof obj !== 'object') return;
 
     let currentUsername = parentUsername;
@@ -747,7 +748,7 @@ function findStoryMedia(obj, parentUsername = "", parentTimestamp = null, checkR
     }
 }
 
-function processAndPostData(data) {
+export function processAndPostData(data) {
     if (!data) return;
     
     let seenUsers = {};
