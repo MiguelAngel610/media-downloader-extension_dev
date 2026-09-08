@@ -1,4 +1,4 @@
-// src/utils/dom_observer.js
+// src/shared/utils/dom_observer.js
 
 class MDObserverManager {
     constructor() {

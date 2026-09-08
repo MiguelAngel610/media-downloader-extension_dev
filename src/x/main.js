@@ -4,7 +4,7 @@ console.log("Media Downloader for X Loaded");
 
 // Inject the interceptor script to access window.fetch and window.XMLHttpRequest
 const script = document.createElement('script');
-script.src = chrome.runtime.getURL('src/interceptors/x_interceptor.js');
+script.src = chrome.runtime.getURL('src/x/interceptors/x_interceptor.js');
 script.onload = function() { this.remove(); };
 (document.head || document.documentElement).appendChild(script);
 

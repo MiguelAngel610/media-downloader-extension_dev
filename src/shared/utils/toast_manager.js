@@ -1,4 +1,4 @@
-// src/utils/toast_manager.js
+// src/shared/utils/toast_manager.js
 
 class MDToastManager {
     constructor() {

@@ -4,7 +4,7 @@ console.log("Media Downloader for Facebook Loaded");
 
 // Inject interceptor into main world to capture video URLs and GraphQL responses
 const script = document.createElement('script');
-script.src = chrome.runtime.getURL('src/interceptors/fb_interceptor.js');
+script.src = chrome.runtime.getURL('src/facebook/interceptors/fb_interceptor.js');
 script.onload = function() { this.remove(); };
 (document.head || document.documentElement).appendChild(script);
 

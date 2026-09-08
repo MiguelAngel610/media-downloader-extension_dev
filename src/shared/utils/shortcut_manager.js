@@ -1,4 +1,4 @@
-// src/utils/shortcut_manager.js
+// src/shared/utils/shortcut_manager.js
 
 class MDShortcutManager {
     constructor() {

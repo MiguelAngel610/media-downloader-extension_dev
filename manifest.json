@@ -35,10 +35,10 @@
         "*://*.instagram.com/*"
       ],
       "js": [
-        "src/utils/toast_manager.js",
-        "src/utils/dom_observer.js",
-        "src/utils/shortcut_manager.js",
-        "src/utils/filename_formatter.js",
+        "src/shared/utils/toast_manager.js",
+        "src/shared/utils/dom_observer.js",
+        "src/shared/utils/shortcut_manager.js",
+        "src/shared/utils/filename_formatter.js",
         "src/instagram/core/state.js",
         "src/instagram/core/styles.js",
         "src/instagram/core/ig_interceptor_init.js",
@@ -56,7 +56,7 @@
         "src/instagram/main.js"
       ],
       "css": [
-        "src/styles/content.css"
+        "src/shared/styles/content.css"
       ],
       "run_at": "document_start",
       "all_frames": true
@@ -67,15 +67,15 @@
         "*://*.twitter.com/*"
       ],
       "js": [
-        "src/utils/toast_manager.js",
-        "src/utils/dom_observer.js",
-        "src/utils/shortcut_manager.js",
-        "src/utils/filename_formatter.js",
+        "src/shared/utils/toast_manager.js",
+        "src/shared/utils/dom_observer.js",
+        "src/shared/utils/shortcut_manager.js",
+        "src/shared/utils/filename_formatter.js",
         "src/x/x_buttons.js",
         "src/x/main.js"
       ],
       "css": [
-        "src/styles/content.css"
+        "src/shared/styles/content.css"
       ],
       "run_at": "document_end"
     },
@@ -84,10 +84,10 @@
         "*://*.facebook.com/*"
       ],
       "js": [
-        "src/utils/toast_manager.js",
-        "src/utils/dom_observer.js",
-        "src/utils/shortcut_manager.js",
-        "src/utils/filename_formatter.js",
+        "src/shared/utils/toast_manager.js",
+        "src/shared/utils/dom_observer.js",
+        "src/shared/utils/shortcut_manager.js",
+        "src/shared/utils/filename_formatter.js",
         "src/facebook/utils/metadata_parser.js",
         "src/facebook/features/ghost_mode.js",
         "src/facebook/features/story_buttons.js",
@@ -95,7 +95,7 @@
         "src/facebook/main.js"
       ],
       "css": [
-        "src/styles/content.css"
+        "src/shared/styles/content.css"
       ],
       "run_at": "document_end"
     },
@@ -106,10 +106,10 @@
         "*://webz.telegram.org/*"
       ],
       "js": [
-        "src/utils/toast_manager.js",
-        "src/utils/dom_observer.js",
-        "src/utils/shortcut_manager.js",
-        "src/utils/filename_formatter.js",
+        "src/shared/utils/toast_manager.js",
+        "src/shared/utils/dom_observer.js",
+        "src/shared/utils/shortcut_manager.js",
+        "src/shared/utils/filename_formatter.js",
         "src/telegram/core/tg_interceptor_init.js",
         "src/telegram/utils/mp4_remux.js",
         "src/telegram/core/downloader.js",
@@ -119,7 +119,7 @@
         "src/telegram/main.js"
       ],
       "css": [
-        "src/styles/content.css"
+        "src/shared/styles/content.css"
       ],
       "run_at": "document_end"
     },
@@ -128,7 +128,7 @@
         "*://photos.google.com/*"
       ],
       "js": [
-        "src/utils/date_parser.js",
+        "src/shared/utils/date_parser.js",
         "src/google_photos/main.js"
       ],
       "run_at": "document_end"
@@ -138,7 +138,7 @@
         "*://*.icloud.com/*"
       ],
       "js": [
-        "src/utils/date_parser.js",
+        "src/shared/utils/date_parser.js",
         "src/icloud/main.js"
       ],
       "run_at": "document_end"
@@ -156,7 +156,7 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "src/interceptors/ig_interceptor.js"
+        "src/instagram/interceptors/ig_interceptor.js"
       ],
       "matches": [
         "*://*.instagram.com/*"
@@ -164,7 +164,7 @@
     },
     {
       "resources": [
-        "src/interceptors/x_interceptor.js"
+        "src/x/interceptors/x_interceptor.js"
       ],
       "matches": [
         "*://*.x.com/*",
@@ -173,7 +173,7 @@
     },
     {
       "resources": [
-        "src/interceptors/google_photos_interceptor.js"
+        "src/google_photos/interceptors/google_photos_interceptor.js"
       ],
       "matches": [
         "*://photos.google.com/*"
@@ -181,7 +181,7 @@
     },
     {
       "resources": [
-        "src/interceptors/fb_interceptor.js"
+        "src/facebook/interceptors/fb_interceptor.js"
       ],
       "matches": [
         "*://*.facebook.com/*"
@@ -189,7 +189,7 @@
     },
     {
       "resources": [
-        "src/interceptors/tg_interceptor.js"
+        "src/telegram/interceptors/tg_interceptor.js"
       ],
       "matches": [
         "*://web.telegram.org/*",

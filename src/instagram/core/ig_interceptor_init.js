@@ -2,11 +2,7 @@
 
 // Inject IG Interceptor Scripts sequentially to maintain dependency order
 const scriptsToInject = [
-    'src/interceptors/ig/ig_logger_ui.js',
-    'src/interceptors/ig/ig_device_spoof.js',
-    'src/interceptors/ig/ig_ghost_mode.js',
-    'src/interceptors/ig/ig_fiber_search.js',
-    'src/interceptors/ig/ig_network_interceptor.js'
+    'src/instagram/interceptors/ig_interceptor.js'
 ];
 
 function injectNextScript(index) {

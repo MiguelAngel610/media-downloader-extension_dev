@@ -2,7 +2,7 @@
 
 (function () {
     const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('src/interceptors/tg_interceptor.js');
+    script.src = chrome.runtime.getURL('src/telegram/interceptors/tg_interceptor.js');
     script.onload = function () { this.remove(); };
     (document.head || document.documentElement).appendChild(script);
 

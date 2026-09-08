@@ -1,6 +1,6 @@
 // Inject the network interceptor
 const script = document.createElement('script');
-script.src = chrome.runtime.getURL('src/interceptors/google_photos_interceptor.js');
+script.src = chrome.runtime.getURL('src/google_photos/interceptors/google_photos_interceptor.js');
 script.onload = function() { this.remove(); };
 (document.head || document.documentElement).appendChild(script);
 
