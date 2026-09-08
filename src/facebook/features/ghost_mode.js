@@ -83,16 +83,16 @@ function injectGhostModeToggles() {
             return btn;
         };
 
-        const seenToggle = createToggle(GHOST_SVG, "Ghost Mode (Ocultar Visto en Stories y Mensajes)", isGhostSeen, (newState) => {
+        const seenToggle = createToggle(GHOST_SVG, "Ghost Mode (Hide Seen in Stories & DMs)", isGhostSeen, (newState) => {
             chrome.storage.local.set({ fb_ghost_seen: newState });
             window.postMessage({ type: 'FB_GHOST_SEEN_TOGGLE', enabled: newState }, '*');
-            if (window.MDToastManager) window.MDToastManager.showInfo(newState ? "👻 Ghost Mode Activado" : "👻 Ghost Mode Desactivado");
+            if (window.MDToastManager) window.MDToastManager.showInfo(newState ? "👻 Ghost Mode Enabled" : "👻 Ghost Mode Disabled");
         });
 
-        const presenceToggle = createToggle(ONLINE_SVG, "Ocultar Estado 'En Línea'", isGhostPresence, (newState) => {
+        const presenceToggle = createToggle(ONLINE_SVG, "Hide 'Online' Status", isGhostPresence, (newState) => {
             chrome.storage.local.set({ fb_ghost_presence: newState });
             window.postMessage({ type: 'FB_GHOST_PRESENCE_TOGGLE', enabled: newState }, '*');
-            if (window.MDToastManager) window.MDToastManager.showInfo(newState ? "🛡️ Estado 'En línea' oculto" : "🛡️ Estado 'En línea' visible");
+            if (window.MDToastManager) window.MDToastManager.showInfo(newState ? "🛡️ 'Online' status hidden" : "🛡️ 'Online' status visible");
         });
 
         ghostContainer.appendChild(seenToggle);

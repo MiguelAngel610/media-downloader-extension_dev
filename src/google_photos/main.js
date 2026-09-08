@@ -70,7 +70,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const targetTime = request.time;
         
         if (dateTimeline.length === 0) {
-            if (window.MDToastManager) window.MDToastManager.showError("⚠️ Timeline vacío. ¿Está el panel abierto?");
+            if (window.MDToastManager) window.MDToastManager.showError("⚠️ Timeline empty. Is the info panel open?");
             sendResponse({ success: false });
             return true;
         }
@@ -88,13 +88,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         if (!bestMatch) {
-            if (window.MDToastManager) window.MDToastManager.showError("⚠️ No se encontró bestMatch en el timeline.");
+            if (window.MDToastManager) window.MDToastManager.showError("⚠️ bestMatch not found in timeline.");
             sendResponse({ success: false });
             return true;
         }
 
         if (!window.MDDateParser) {
-            if (window.MDToastManager) window.MDToastManager.showError("⚠️ MDDateParser no está definido en el content script.");
+            if (window.MDToastManager) window.MDToastManager.showError("⚠️ MDDateParser is not defined in content script.");
             sendResponse({ success: false });
             return true;
         }
@@ -134,15 +134,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
             if (exactTimestamp) {
                 parsed = new Date(exactTimestamp);
-                if (window.MDToastManager) window.MDToastManager.showSuccess(`✅ Fecha EXACTA extraída (con segundos)`);
+                if (window.MDToastManager) window.MDToastManager.showSuccess(`✅ EXACT date extracted (with seconds)`);
             } else {
-                if (window.MDToastManager) window.MDToastManager.showSuccess(`✅ Fecha original extraída (sin segundos)`);
+                if (window.MDToastManager) window.MDToastManager.showSuccess(`✅ Original date extracted (no seconds)`);
             }
 
             sendResponse({ success: true, timestamp: parsed.getTime() });
             return true;
         } else {
-            if (window.MDToastManager) window.MDToastManager.showError(`⚠️ Parseo falló para: ${bestMatch.dateStr} / ${bestMatch.timeStr}`);
+            if (window.MDToastManager) window.MDToastManager.showError(`⚠️ Parsing failed for: ${bestMatch.dateStr} / ${bestMatch.timeStr}`);
             sendResponse({ success: false });
             return true;
         }

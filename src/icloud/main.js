@@ -40,13 +40,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (bestMatch && window.MDDateParser) {
             const parsed = window.MDDateParser.parseLocalizedDate(bestMatch.dateStr);
             if (parsed) {
-                if (window.MDToastManager) window.MDToastManager.showSuccess("✅ Fecha de original extraída de iCloud");
+                if (window.MDToastManager) window.MDToastManager.showSuccess("✅ Original date extracted from iCloud");
                 sendResponse({ success: true, timestamp: parsed.getTime() });
                 return true;
             }
         }
         
-        if (window.MDToastManager) window.MDToastManager.showError("⚠️ No se pudo extraer la fecha de iCloud.");
+        if (window.MDToastManager) window.MDToastManager.showError("⚠️ Could not extract iCloud date.");
         sendResponse({ success: false });
         return true;
     }

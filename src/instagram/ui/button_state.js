@@ -172,7 +172,7 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
                 mediaType = "auto";
             } else {
                 // We have a direct CDN url (or a dash manifest). We can download natively!
-                mediaType = "direct_story";
+                mediaType = metadata && metadata.mediaType ? metadata.mediaType : "direct_story";
             }
         }
 
@@ -196,7 +196,7 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
             if (parentArticle) parentArticle.__md_download_state = { time: Date.now(), class: 'md-success', html: SVG_CHECK, isFloating: isFloating };
 
             if (window.MDToastManager) {
-                window.MDToastManager.showSuccess("¡Descarga exitosa! (Enviado al gestor)", 3000);
+                window.MDToastManager.showSuccess("Download successful! (Sent to manager)", 3000);
             }
 
             setTimeout(() => {

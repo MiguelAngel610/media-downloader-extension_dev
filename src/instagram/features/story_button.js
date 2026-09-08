@@ -186,7 +186,7 @@ function injectStoryButton() {
                 e.stopPropagation();
 
                 try {
-                    if (window.MDToastManager) window.MDToastManager.showInfo("Iniciando descarga...");
+                    if (window.MDToastManager) window.MDToastManager.showInfo("Starting download...");
                     dlBtn.style.background = 'rgba(255, 255, 255, 0.3)'; // Visual feedback immediately
                     dlBtn.classList.add('md-loading');
                     dlBtn.style.opacity = '0.5';

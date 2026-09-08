@@ -381,7 +381,7 @@ function injectFeedButtons() {
                     } else {
                         console.warn('[MD] Fiber returned nothing for modal slide', imgIndex, '| media:', fallbackMedia?.tagName);
                         if(btnSvg) btnSvg.style.opacity = '1';
-                        if (window.MDToastManager) window.MDToastManager.showError("Error: No se pudo identificar el video (Modal).");
+                        if (window.MDToastManager) window.MDToastManager.showError("Error: Could not identify video (Modal).");
                     }
                 } else {
                     console.warn('[MD] No visible media element found inside dialog for slide', imgIndex);
@@ -597,7 +597,7 @@ function injectFeedButtons() {
                 } else {
                     console.warn('[MD] resolveMediaUrl returned nothing for feed media.');
                     if(btnSvg) btnSvg.style.opacity = '1';
-                    if (window.MDToastManager) window.MDToastManager.showError("Error: No se pudo resolver la URL del video.");
+                    if (window.MDToastManager) window.MDToastManager.showError("Error: Could not resolve video URL.");
                 }
             } else {
                 console.warn('[MD] No media element found in article.');
