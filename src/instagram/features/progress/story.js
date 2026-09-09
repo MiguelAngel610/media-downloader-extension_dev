@@ -259,7 +259,7 @@ export function syncStoryProgressBar() {
             if (totalSegments === 0) totalSegments = 1;
 
             let activeIndex = totalSegments;
-            let activePct = 0;
+            let activePct = 100;
 
             for (let i = 0; i < segmentElements.length; i++) {
                 let seg = segmentElements[i];
@@ -288,7 +288,7 @@ export function syncStoryProgressBar() {
                     activeIndex = i + 1;
                     activePct = 0;
                     break;
-                } else if (val < 99.5) {
+                } else if (val < 96.5) {
                     activeIndex = i + 1;
                     activePct = val;
                     break;
@@ -315,6 +315,16 @@ export function syncStoryProgressBar() {
                     }
                     if (m.tagName.toLowerCase() === 'video') break;
                 }
+                
+                // If it's a photo-only story (no videos or audio), make the slider read-only to prevent ghost manipulation
+                if (medias.length === 0) {
+                    slider.style.pointerEvents = 'none';
+                    slider.style.cursor = 'default';
+                } else {
+                    slider.style.pointerEvents = 'auto';
+                    slider.style.cursor = 'pointer';
+                }
+
                 slider.value = pct;
                 slider.style.setProperty('--md-progress', `${pct}%`);
             }
