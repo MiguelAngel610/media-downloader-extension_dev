@@ -1,6 +1,9 @@
 import { syncStoryProgressBar } from './story.js';
 import { syncModalScrollLock } from './utils.js';
 
+let mdLastUrl = window.location.href;
+let mdSuspendUntil = 0;
+
 export function syncOverlays() {
         let openDialog = document.querySelector('div[role="dialog"]');
 
