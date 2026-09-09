@@ -317,16 +317,18 @@ export function syncStoryProgressBar() {
 
             let slider = customContainer.querySelector('#md-story-slider');
             
-            // Only update read-only state when necessary to avoid layout thrashing (60fps stutter)
-            let medias = getActiveStoryMedias();
-            let isPhotoOnly = medias.length === 0;
-            if (slider && slider.__md_isPhotoOnly !== isPhotoOnly) {
-                slider.__md_isPhotoOnly = isPhotoOnly;
-                // We do NOT use pointer-events: none here, because it disables CSS :hover expanding the track!
+            // Only update read-only state and medias array periodically to avoid layout thrashing (60fps stutter)
+            let now = Date.now();
+            if (!slider.__md_lastMediaCheck || now - slider.__md_lastMediaCheck > 250 || slider.__md_lastSegmentIndex !== activeIndex) {
+                slider.__md_lastMediaCheck = now;
+                slider.__md_lastSegmentIndex = activeIndex;
+                slider.__md_cachedMedias = getActiveStoryMedias();
+                slider.__md_isPhotoOnly = slider.__md_cachedMedias.length === 0;
             }
 
             if (slider && !slider.__md_isDragging) {
                 let pct = activePct;
+                let medias = slider.__md_cachedMedias || [];
                 for (let m of medias) {
                     if (!isNaN(m.duration) && m.duration > 0) {
                         pct = (m.currentTime / m.duration) * 100;
