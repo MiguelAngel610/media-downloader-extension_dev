@@ -392,7 +392,4 @@ export function syncOverlays() {
         } catch (err) {
             console.error("Progress bar sync error:", err);
         }
-
-        requestAnimationFrame(syncOverlays);
-
 }
