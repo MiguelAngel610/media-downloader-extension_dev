@@ -118,13 +118,16 @@ export function syncStoryProgressBar() {
                 }
             });
 
-            // Instant universal structural detection at frame 0 (before Instagram applies inline width/transform animations during buffering or on static photo stories)
+            // Instant universal structural detection at frame 0
             if (possibleSegmentRows.length === 0) {
-                let allDivs = document.querySelectorAll('div');
-                for (let d of allDivs) {
-                    if (d.children.length === 0 || d.children.length > 150) continue;
-                    if (isValidSegmentRow(d) && !possibleSegmentRows.includes(d)) {
-                        possibleSegmentRows.push(d);
+                if (!window.__md_lastHeavySearch || Date.now() - window.__md_lastHeavySearch > 250) {
+                    window.__md_lastHeavySearch = Date.now();
+                    let allDivs = document.querySelectorAll('section div, div[role="dialog"] div, main div');
+                    for (let d of allDivs) {
+                        if (d.children.length === 0 || d.children.length > 150) continue;
+                        if (isValidSegmentRow(d) && !possibleSegmentRows.includes(d)) {
+                            possibleSegmentRows.push(d);
+                        }
                     }
                 }
             }
