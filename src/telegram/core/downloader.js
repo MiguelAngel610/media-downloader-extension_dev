@@ -331,8 +331,8 @@
             }
         }
 
-        // 1. Gather text candidate elements across Stories, Channels, and Private Chats (DMs)
-        let dateEl = container.querySelector("span.O6fpaxCe, .date, [class*='date'], [class*='Date'], time, [class*='time'], [class*='Time'], .media-header-subtitle, .media-viewer-subtitle, [class*='subtitle'], [class*='SubTitle'], .MessageMeta, .sub-text, .meta");
+        // 1. Gather text candidate elements in PRIORITY ORDER, avoiding off-screen elements (hidden sidebars, pre-rendered slides)
+        let foundTimeOnly = false;
         
         const parseDateText = (rawText) => {
             if (!rawText) return null;
@@ -353,41 +353,26 @@
 
                 let m, d;
                 if (p1 > 12) {
-                    // E.g., 25/07/2026 -> p1 must be Day, p2 is Month
-                    d = p1;
-                    m = p2;
+                    d = p1; m = p2;
                 } else if (p2 > 12) {
-                    // E.g., 07/25/2026 -> p1 is Month, p2 must be Day
-                    m = p1;
-                    d = p2;
+                    m = p1; d = p2;
                 } else {
-                    // Both p1 and p2 are <= 12 (e.g., 02/12/2026 or 2/12/26).
-                    // Determine whether it's MM/DD/YYYY (English/US UI) vs DD/MM/YYYY (Spanish/EU UI).
                     const now = new Date();
-                    const dateAsMD = new Date(y, p1 - 1, p2); // p1 = Month, p2 = Day
-                    const dateAsDM = new Date(y, p2 - 1, p1); // p1 = Day, p2 = Month
+                    const dateAsMD = new Date(y, p1 - 1, p2);
+                    const dateAsDM = new Date(y, p2 - 1, p1);
 
                     if (dateAsDM > now && dateAsMD <= now) {
-                        // DM would result in a future date (e.g., Dec 2 when in August), so it must be MD (Feb 12)
-                        m = p1;
-                        d = p2;
+                        m = p1; d = p2;
                     } else if (dateAsMD > now && dateAsDM <= now) {
-                        m = p2;
-                        d = p1;
+                        m = p2; d = p1;
                     } else {
-                        // Both interpretations are in the past (or future). Rely on language environment and delimiter.
                         const lang = (document.documentElement.lang || navigator.language || "").toLowerCase();
                         const pageText = document.body ? document.body.textContent : "";
                         const isEnglish = lang.startsWith("en") || pageText.includes("Saved Messages") || pageText.includes("Search");
-
                         if (isEnglish && text.includes("/")) {
-                            // English UI formats slash dates as MM/DD/YYYY
-                            m = p1;
-                            d = p2;
+                            m = p1; d = p2;
                         } else {
-                            // Spanish / EU format is DD/MM/YYYY or DD.MM.YYYY
-                            m = p2;
-                            d = p1;
+                            m = p2; d = p1;
                         }
                     }
                 }
@@ -399,7 +384,7 @@
             const monthNamesEn = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
             const monthNamesEs = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 
-            // Match "15 de jul. de 2025", "15 jul 2025", "15 de julio", "15 de abril"
+            // Match "15 de jul. de 2025", "15 jul 2025", "15 de julio"
             const dayMonthMatch = text.match(/(\d{1,2})\s*(?:de\s*)?([a-záéíóú]{3,10})\.?\s*(?:(?:de|,)?\s*(\d{4}))?/i);
             if (dayMonthMatch) {
                 const mStr = dayMonthMatch[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").substring(0, 3);
@@ -425,7 +410,7 @@
                 }
             }
 
-            // Relative dates: "hoy a las...", "ayer...", "today at...", weekdays (long and short)
+            // Relative dates: "hoy a las...", "ayer..."
             const relMatch = text.match(/^(today|yesterday|hoy|ayer|sunday|monday|tuesday|wednesday|thursday|friday|saturday|domingo|lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|sun|mon|tue|wed|thu|fri|sat|dom|lun|mar|mie|jue|vie|sab)\b/i);
             if (relMatch) {
                 const kw = relMatch[1].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -455,7 +440,7 @@
                 }
             }
 
-            // Time-only display in private chats and DMs (e.g., "21:45", "08:30 PM", "14:15")
+            // Time-only display in private chats and DMs
             if (/^\d{1,2}:\d{2}(?:\s*(?:AM|PM|am|pm))?$/.test(text)) {
                 return "TIME_ONLY";
             }
@@ -463,21 +448,26 @@
             return null;
         };
 
-        let foundTimeOnly = false;
+        const prioritySelectors = [
+            ".media-viewer-subtitle, .media-header-subtitle, .StoryViewer-subtitle, div[class*='subtitle'], div[class*='SubTitle']",
+            "time, [class*='time'], [class*='Time'], .date, [class*='date'], [class*='Date']",
+            ".MessageMeta, .sub-text, .meta, span.O6fpaxCe, span, p"
+        ];
 
-        if (dateEl) {
-            const parsed = parseDateText(dateEl.getAttribute("title")) || parseDateText(dateEl.getAttribute("aria-label")) || parseDateText(dateEl.textContent);
-            if (parsed === "TIME_ONLY") foundTimeOnly = true;
-            else if (parsed) return parsed;
-        }
+        for (let sel of prioritySelectors) {
+            const els = Array.from(root.querySelectorAll(sel));
+            for (let el of els) {
+                // Strict Spatial Filter: Ensure the element is actually visible on screen right now!
+                // This prevents stealing dates from hidden sidebars, previous days' dividers, or off-screen pre-rendered slides.
+                let r = el.getBoundingClientRect();
+                if (r.width === 0 || r.height === 0 || r.top > window.innerHeight || r.bottom < 0 || r.left > window.innerWidth || r.right < 0) {
+                    continue;
+                }
 
-        // 2. Structural fallback: scan all span, time, p, and subtitle div elements within the container
-        const candidates = Array.from(root.querySelectorAll("span, time, p, div[class*='date'], div[class*='time'], div[class*='subtitle']"));
-        for (const el of candidates) {
-            if (el.children.length > 2) continue;
-            const parsed = parseDateText(el.getAttribute("title")) || parseDateText(el.getAttribute("aria-label")) || parseDateText(el.textContent);
-            if (parsed === "TIME_ONLY") foundTimeOnly = true;
-            else if (parsed) return parsed;
+                const parsed = parseDateText(el.getAttribute("title")) || parseDateText(el.getAttribute("aria-label")) || parseDateText(el.textContent);
+                if (parsed === "TIME_ONLY") foundTimeOnly = true;
+                else if (parsed) return parsed;
+            }
         }
 
         // 3. Date Divider Fallback: If we only found a time string (e.g. "21:45") and no full date in titles, 
