@@ -102,6 +102,9 @@ export function syncStoryProgressBar() {
             if (rect.width > 0) {
                 possibleSegmentRows = [window.__md_cachedSegmentsContainer];
             }
+        } else if (window.__md_cachedSegmentsContainer) {
+            window.__md_cachedSegmentsContainer = null;
+            window.__md_lastHeavySearch = 0; // Force an immediate structural scan without 250ms delay to eliminate visual stutter
         }
 
         if (possibleSegmentRows.length === 0) {
@@ -175,7 +178,14 @@ export function syncStoryProgressBar() {
                 }
                 segmentsContainer.appendChild(customContainer);
 
-                const startDrag = (e) => { slider.__md_isDragging = true; e.stopPropagation(); };
+                const startDrag = (e) => { 
+                    if (slider.__md_isPhotoOnly) {
+                        e.preventDefault(); // Disables dragging mathematically without breaking CSS :hover state
+                        return;
+                    }
+                    slider.__md_isDragging = true; 
+                    e.stopPropagation(); 
+                };
                 slider.addEventListener('mousedown', startDrag, false);
                 slider.addEventListener('pointerdown', startDrag, false);
                 slider.addEventListener('touchstart', startDrag, {passive: false, capture: false});
@@ -306,27 +316,25 @@ export function syncStoryProgressBar() {
             }
 
             let slider = customContainer.querySelector('#md-story-slider');
+            
+            // Only update read-only state when necessary to avoid layout thrashing (60fps stutter)
+            let medias = getActiveStoryMedias();
+            let isPhotoOnly = medias.length === 0;
+            if (slider && slider.__md_isPhotoOnly !== isPhotoOnly) {
+                slider.__md_isPhotoOnly = isPhotoOnly;
+                // We do NOT use pointer-events: none here, because it disables CSS :hover expanding the track!
+            }
+
             if (slider && !slider.__md_isDragging) {
                 let pct = activePct;
-                let medias = getActiveStoryMedias();
                 for (let m of medias) {
                     if (!isNaN(m.duration) && m.duration > 0) {
                         pct = (m.currentTime / m.duration) * 100;
                     }
                     if (m.tagName.toLowerCase() === 'video') break;
                 }
-                
-                // If it's a photo-only story (no videos or audio), make the slider read-only to prevent ghost manipulation
-                if (medias.length === 0) {
-                    slider.style.pointerEvents = 'none';
-                    slider.style.cursor = 'default';
-                } else {
-                    slider.style.pointerEvents = 'auto';
-                    slider.style.cursor = 'pointer';
-                }
 
                 // Smoothly boost the visual percentage by 1.5% so it reaches 100% naturally right as Instagram pauses at ~98.5%
-                // This hides the background track "ear" without causing a sudden glitchy jump.
                 let visualPct = pct * 1.015;
                 if (visualPct > 100) visualPct = 100;
 
