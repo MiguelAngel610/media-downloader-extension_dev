@@ -7,5 +7,13 @@ export function startSyncLoop() {
     if (window.__md_overlaySyncLoopStarted) return;
     window.__md_overlaySyncLoopStarted = true;
 
-    syncOverlays();
+    function frame() {
+        if (!document.body || Date.now() < mdSuspendUntil) {
+            requestAnimationFrame(frame);
+            return;
+        }
+        syncOverlays();
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
 }
