@@ -259,7 +259,7 @@ export function syncStoryProgressBar() {
             if (totalSegments === 0) totalSegments = 1;
 
             let activeIndex = totalSegments;
-            let activePct = 100;
+            let activePct = 0; // Restore to 0
 
             for (let i = 0; i < segmentElements.length; i++) {
                 let seg = segmentElements[i];
@@ -288,7 +288,7 @@ export function syncStoryProgressBar() {
                     activeIndex = i + 1;
                     activePct = 0;
                     break;
-                } else if (val < 96.5) {
+                } else if (val < 99.5) { // Restore to 99.5 to prevent the 'salto horrible'
                     activeIndex = i + 1;
                     activePct = val;
                     break;
@@ -325,8 +325,13 @@ export function syncStoryProgressBar() {
                     slider.style.cursor = 'pointer';
                 }
 
-                slider.value = pct;
-                slider.style.setProperty('--md-progress', `${pct}%`);
+                // Smoothly boost the visual percentage by 1.5% so it reaches 100% naturally right as Instagram pauses at ~98.5%
+                // This hides the background track "ear" without causing a sudden glitchy jump.
+                let visualPct = pct * 1.015;
+                if (visualPct > 100) visualPct = 100;
+
+                slider.value = visualPct;
+                slider.style.setProperty('--md-progress', `${visualPct}%`);
             }
         }
     } catch (err) {
