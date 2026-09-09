@@ -51,7 +51,7 @@
         "src/instagram/features/pfp_button.js",
         "src/instagram/features/story_button.js",
         "src/instagram/features/feed_buttons.js",
-        "src/instagram/features/video_progress.js",
+        "dist/video_progress.bundle.js",
         "src/instagram/features/auto_backup.js",
         "src/instagram/main.js"
       ],

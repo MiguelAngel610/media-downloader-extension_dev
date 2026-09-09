@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build:ig": "esbuild src/instagram/interceptors/index.js --bundle --format=iife --outfile=dist/ig_interceptor.bundle.js --minify",
+    "build:features": "esbuild src/instagram/features/progress/index.js --bundle --format=iife --outfile=dist/video_progress.bundle.js --minify",
+    "build": "npm run build:ig && npm run build:features",
     "watch:ig": "esbuild src/instagram/interceptors/index.js --bundle --format=iife --outfile=dist/ig_interceptor.bundle.js --watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
