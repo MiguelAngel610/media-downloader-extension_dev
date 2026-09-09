@@ -457,23 +457,57 @@
 
             // Time-only display in private chats and DMs (e.g., "21:45", "08:30 PM", "14:15")
             if (/^\d{1,2}:\d{2}(?:\s*(?:AM|PM|am|pm))?$/.test(text)) {
-                return formatYMD(new Date());
+                return "TIME_ONLY";
             }
 
             return null;
         };
 
+        let foundTimeOnly = false;
+
         if (dateEl) {
-            const parsed = parseDateText(dateEl.textContent) || parseDateText(dateEl.getAttribute("title")) || parseDateText(dateEl.getAttribute("aria-label"));
-            if (parsed) return parsed;
+            const parsed = parseDateText(dateEl.getAttribute("title")) || parseDateText(dateEl.getAttribute("aria-label")) || parseDateText(dateEl.textContent);
+            if (parsed === "TIME_ONLY") foundTimeOnly = true;
+            else if (parsed) return parsed;
         }
 
         // 2. Structural fallback: scan all span, time, p, and subtitle div elements within the container
         const candidates = Array.from(root.querySelectorAll("span, time, p, div[class*='date'], div[class*='time'], div[class*='subtitle']"));
         for (const el of candidates) {
             if (el.children.length > 2) continue;
-            const parsed = parseDateText(el.textContent) || parseDateText(el.getAttribute("title")) || parseDateText(el.getAttribute("aria-label"));
-            if (parsed) return parsed;
+            const parsed = parseDateText(el.getAttribute("title")) || parseDateText(el.getAttribute("aria-label")) || parseDateText(el.textContent);
+            if (parsed === "TIME_ONLY") foundTimeOnly = true;
+            else if (parsed) return parsed;
+        }
+
+        // 3. Date Divider Fallback: If we only found a time string (e.g. "21:45") and no full date in titles, 
+        // traverse up the DOM to find the preceding Date Separator in the chat feed.
+        if (foundTimeOnly) {
+            const messageNode = container.closest('.message, .Message, .bubble');
+            if (messageNode) {
+                let current = messageNode;
+                let climbs = 0;
+                while (current && climbs < 25) {
+                    let prev = current.previousElementSibling;
+                    while (prev) {
+                        if (prev.classList.contains('date-divider') || 
+                            prev.classList.contains('is-date-divider') || 
+                            prev.classList.contains('MessageList-date-separator') ||
+                            prev.classList.contains('ActionMessage') ||
+                            prev.querySelector('.date-divider, .is-date-divider, .MessageList-date-separator, .ActionMessage') ||
+                            (prev.classList.contains('service') && prev.textContent.trim().length > 0 && prev.textContent.trim().length < 30)) {
+                            
+                            let divText = prev.textContent;
+                            let parsed = parseDateText(divText);
+                            if (parsed && parsed !== "TIME_ONLY") return parsed;
+                        }
+                        prev = prev.previousElementSibling;
+                    }
+                    current = current.parentElement;
+                    climbs++;
+                }
+            }
+            return formatYMD(new Date()); // Absolute fallback to today if no separator is found
         }
 
         return null;
