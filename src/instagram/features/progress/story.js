@@ -178,12 +178,8 @@ export function syncStoryProgressBar() {
                 }
                 segmentsContainer.appendChild(customContainer);
 
-                const startDrag = (e) => { 
-                    if (slider.__md_isPhotoOnly) {
-                        e.preventDefault(); // Disables dragging mathematically without breaking CSS :hover state
-                        return;
-                    }
-                    slider.__md_isDragging = true; 
+                let startDrag = (e) => { 
+                    slider.__md_isDragging = true;
                     e.stopPropagation(); 
                 };
                 slider.addEventListener('mousedown', startDrag, false);

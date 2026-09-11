@@ -1,0 +1,185 @@
+/* src/telegram/ui/styles.css */
+
+/* Contenedor principal de la barra de progreso */
+#tel-downloader-progress-bar-container {
+    position: fixed !important;
+    bottom: 24px !important;
+    right: 24px !important;
+    z-index: 2147483647 !important;
+    pointer-events: none !important;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Tarjeta individual de progreso */
+.tel-downloader-progress-toast {
+    width: 320px;
+    padding: 16px;
+    background: rgba(24, 24, 27, 0.85); /* Slate 900 con opacidad */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5), 0 0 20px -5px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    pointer-events: auto !important;
+    
+    /* Animación de entrada inicial suave */
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tel-downloader-progress-toast.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+/* Modo claro (Telegram Web suele ser claro por defecto a menos que se cambie a night) */
+html:not(.night):not(.theme-dark) .tel-downloader-progress-toast {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15), 0 0 20px -5px rgba(0, 0, 0, 0.05);
+}
+
+/* Encabezado (título + botón cerrar) */
+.tel-downloader-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.tel-downloader-progress-title {
+    margin: 0;
+    color: #f4f4f5; /* Zinc 100 */
+    font-size: 13px;
+    font-weight: 600;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 250px;
+    letter-spacing: -0.01em;
+}
+
+html:not(.night):not(.theme-dark) .tel-downloader-progress-title {
+    color: #18181b; /* Zinc 900 */
+}
+
+.tel-downloader-progress-close {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    color: #a1a1aa; /* Zinc 400 */
+    transition: all 0.2s ease;
+    background: transparent;
+}
+
+.tel-downloader-progress-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+html:not(.night):not(.theme-dark) .tel-downloader-progress-close {
+    color: #71717a;
+}
+html:not(.night):not(.theme-dark) .tel-downloader-progress-close:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #000;
+}
+
+.tel-downloader-progress-close svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Pista de la barra de progreso */
+.tel-downloader-progress-track {
+    position: relative;
+    width: 100%;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    overflow: hidden;
+    /* Sombras internas sutiles */
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+}
+
+html:not(.night):not(.theme-dark) .tel-downloader-progress-track {
+    background: rgba(0, 0, 0, 0.06);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* Relleno de la barra de progreso */
+.tel-downloader-progress-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    /* Gradiente moderno dinámico */
+    background: linear-gradient(90deg, #38bdf8, #818cf8);
+    border-radius: 999px;
+    transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), background 0.4s ease;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+/* Animación de shimmer (brillo pasivo) */
+.tel-downloader-progress-fill::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    animation: telShimmer 2s infinite linear;
+    border-radius: 999px;
+}
+
+@keyframes telShimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Texto de porcentaje superpuesto */
+.tel-downloader-progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 700;
+    font-family: monospace;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    z-index: 5;
+}
+
+/* Estados */
+.tel-downloader-progress-toast.success .tel-downloader-progress-fill {
+    background: linear-gradient(90deg, #10b981, #34d399); /* Emerald */
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+}
+.tel-downloader-progress-toast.success .tel-downloader-progress-fill::after {
+    display: none; /* Apagar shimmer en completado */
+}
+
+.tel-downloader-progress-toast.error .tel-downloader-progress-fill {
+    background: linear-gradient(90deg, #ef4444, #f87171); /* Red */
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+}
+.tel-downloader-progress-toast.error .tel-downloader-progress-fill::after {
+    display: none;
+}

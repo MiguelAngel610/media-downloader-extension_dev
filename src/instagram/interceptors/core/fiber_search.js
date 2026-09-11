@@ -495,14 +495,12 @@ window.__md_applyGhostVisuals = function() {
         let alt1 = `[alt$=" ${u}"]`;
         let alt2 = `[alt^="${u}'s "]`;
         return `
-        li:has(a[href^="/stories/${u}/"]):has(canvas) canvas,
-        li:has(img${alt1}):has(canvas) canvas,
-        li:has(img${alt2}):has(canvas) canvas,
-        div[role="button"]:has(img${alt1}):has(canvas) canvas,
-        div[role="button"]:has(img${alt2}):has(canvas) canvas,
-        a:has(img${alt1}):has(canvas) canvas,
-        a:has(img${alt2}):has(canvas) canvas { 
+        a[href^="/stories/${u}/"] canvas,
+        header :has(img[alt*="${u}"]) canvas,
+        [role="button"]:has(img[alt*="${u}"]):not(:has(video)) canvas,
+        button:has(img[alt*="${u}"]):not(:has(video)) canvas { 
             filter: grayscale(100%) contrast(0) brightness(1.6) !important; 
+            opacity: 0.15 !important;
             transition: all 0.5s ease;
         }
     `}).join('\n');

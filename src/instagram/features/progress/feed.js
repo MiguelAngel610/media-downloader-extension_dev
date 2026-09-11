@@ -88,6 +88,7 @@ export function syncOverlays() {
                 });
             }
 
+            // First pass: Calculate all positions (READ)
             for (let { item, clone, rect } of candidates) {
                 let wrapper = item.wrapper;
                 let baseW = wrapper.offsetWidth || rect.width;
@@ -96,24 +97,26 @@ export function syncOverlays() {
                 let cy = rect.top + rect.height / 2;
                 let uLeft = cx - baseW / 2;
                 let uTop = cy - baseH / 2;
+                
+                item.__md_calc = {
+                    baseW, baseH,
+                    left: item.isVertical ? (uLeft + window.scrollX) : (uLeft - baseW - item.gapX + window.scrollX),
+                    top: item.isVertical ? (uTop - baseH - 16 + window.scrollY) : (uTop + window.scrollY)
+                };
+            }
 
+            // Second pass: Apply styles (WRITE)
+            for (let { item, clone } of candidates) {
+                let calc = item.__md_calc;
                 clone.style.display = 'flex';
                 clone.style.alignItems = 'center';
                 clone.style.justifyContent = 'center';
-                clone.style.width = baseW + 'px';
-                clone.style.height = baseH + 'px';
+                clone.style.width = calc.baseW + 'px';
+                clone.style.height = calc.baseH + 'px';
                 clone.style.opacity = '1';
                 clone.style.pointerEvents = 'auto';
-
-                if (item.isVertical) {
-                    // Arriba del bookmark para Reels (formato vertical)
-                    clone.style.left = (uLeft + window.scrollX) + 'px';
-                    clone.style.top = (uTop - baseH - 16 + window.scrollY) + 'px';
-                } else {
-                    // A la izquierda del bookmark para el Feed (formato horizontal)
-                    clone.style.left = (uLeft - baseW - item.gapX + window.scrollX) + 'px';
-                    clone.style.top = (uTop + window.scrollY) + 'px';
-                }
+                clone.style.left = calc.left + 'px';
+                clone.style.top = calc.top + 'px';
             }
         }
 

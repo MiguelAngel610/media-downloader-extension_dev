@@ -400,3 +400,12 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 ## Fix (9 de Septiembre 2026): Eliminación de Cuello de Botella (Fork Bomb) y Throttle en Stories
 **Causa Raíz:** Al refactorizar `video_progress.js` en módulos, se dejó accidentalmente un `requestAnimationFrame` duplicado al final de `feed.js` que generó un fork bomb exponencial. Además, la búsqueda global de `document.querySelectorAll('div')` se estaba ejecutando 60 veces por segundo en historias nuevas.
 **Solución:** Se eliminó el `requestAnimationFrame` sobrante de `feed.js`. En `story.js`, la búsqueda del contenedor de segmentos se limitó a `section div, main div, div[role="dialog"] div` y se le aplicó un *throttle* de 250ms para permitir a la UI respirar, restaurando el rendimiento al 100% sin lags al entrar o cambiar de historia.
+
+## Fix (9 de Septiembre 2026, pt 2): Optimizacion de getActiveStoryMedias y Hover
+**Problema:** El slider perdio su expansion de :hover en historias de solo foto por culpa de pointer-events:none. Ademas, getActiveStoryMedias (que usa getComputedStyle y trepa el DOM) corria a 60fps en cada frame, causando Layout Thrashing masivo (lag a 30fps) y el throttle de 250ms causaba que la barra tardara un cuarto de segundo en aparecer al cambiar de historia.
+**Solucion:** Se cambio pointer-events:none por e.preventDefault() en mousedown, lo cual bloquea el dragging sin romper el hover de CSS. Para el rendimiento, se implemento una cache para getActiveStoryMedias que se invalida cada 250ms o cuando cambia de historia, recuperando la fluidez absoluta. Ademas, si el contenedor de la historia es destruido, el throttle de 250ms se pone a 0 para asegurar busqueda instantanea en el siguiente frame.
+
+
+## Fix (10 de Septiembre 2026): Anillo Gris del Modo Fantasma desaparece en Historias
+**Causa RaÃ­z:** Instagram implementÃ³ un A/B test (o cambio definitivo) en la interfaz web donde el botÃ³n del anillo de las historias en la barra superior (Stories Tray) cambiÃ³ su etiqueta HTML de `<button>` a `<div role="button">`. Como nuestro selector CSS de Ghost Mode esperaba un `button:has(...)`, dejÃ³ de coincidir y el anillo gris ya no se mostraba a pesar de estar guardado en memoria.
+**SoluciÃ³n:** Se actualizÃ³ el selector en `fiber_search.js` para incluir `[role="button"]:has(img[alt*="${u}"]):not(:has(video)) canvas`, garantizando que coincida tanto con el diseÃ±o antiguo como con el nuevo, y filtrando cualquier falso positivo en carruseles de video.

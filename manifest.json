@@ -112,14 +112,19 @@
         "src/shared/utils/filename_formatter.js",
         "src/telegram/core/tg_interceptor_init.js",
         "src/telegram/utils/mp4_remux.js",
-        "src/telegram/core/downloader.js",
-        "src/telegram/ui/progress_bar.js",
+        "src/telegram/utils/metadata_parser.js",
+        "src/telegram/utils/media_resolver.js",
+        "src/telegram/core/media_capture.js",
+        "src/telegram/core/network_downloader.js",
+        "src/telegram/ui/progress_toast.js",
+        "src/telegram/features/universal_interceptor.js",
         "src/telegram/features/webz_buttons.js",
         "src/telegram/features/webk_buttons.js",
         "src/telegram/main.js"
       ],
       "css": [
-        "src/shared/styles/content.css"
+        "src/shared/styles/content.css",
+        "src/telegram/ui/styles.css"
       ],
       "run_at": "document_end"
     },
