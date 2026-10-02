@@ -7,629 +7,594 @@ import time
 import datetime
 import re
 import urllib.request
-
-# Automatically inject Python Scripts folder into PATH to find yt-dlp and gallery-dl
-_scripts_dir = os.path.join(os.path.dirname(sys.executable), "Scripts")
-if os.path.exists(_scripts_dir) and _scripts_dir not in os.environ.get("PATH", ""):
-    os.environ["PATH"] = _scripts_dir + os.pathsep + os.environ.get("PATH", "")
-
-# Automatically discover FFmpeg from WinGet packages and inject into PATH
-_winget_dir = os.path.join(os.path.expanduser("~"), "AppData", "Local", "Microsoft", "WinGet", "Packages")
-if os.path.exists(_winget_dir):
-    for entry in os.listdir(_winget_dir):
-        if "ffmpeg" in entry.lower():
-            pkg_path = os.path.join(_winget_dir, entry)
-            for root, dirs, files in os.walk(pkg_path):
-                if "ffmpeg.exe" in files:
-                    if root not in os.environ.get("PATH", ""):
-                        os.environ["PATH"] = root + os.pathsep + os.environ.get("PATH", "")
-                    break
-
-# Chrome Native Messaging requires reading a 32-bit integer for message length
-def get_message():
-    raw_length = sys.stdin.buffer.read(4)
-    if len(raw_length) == 0:
-        sys.exit(0)
-    message_length = struct.unpack('@I', raw_length)[0]
-    message = sys.stdin.buffer.read(message_length).decode('utf-8')
-    return json.loads(message)
-
-# Encode message to send back to Chrome
-def send_message(message_content):
-    encoded_content = json.dumps(message_content).encode('utf-8')
-    encoded_length = struct.pack('@I', len(encoded_content))
-    sys.stdout.buffer.write(encoded_length)
-    sys.stdout.buffer.write(encoded_content)
-    sys.stdout.buffer.flush()
-
-import socket
 import threading
+import socket
+import tempfile
 
-active_tcp_clients = []
+try:
+    import yt_dlp
+    HAS_YTDLP = True
+except ImportError:
+    HAS_YTDLP = False
 
-def tcp_server_thread():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try:
-        server.bind(('127.0.0.1', 65432))
-        server.listen(5)
-        log_info("TCP Server started on port 65432")
-    except Exception as e:
-        log_info(f"Failed to start TCP Server: {e}")
-        return
-        
-    while True:
+class EnvironmentSetup:
+    @staticmethod
+    def inject_paths():
+        _scripts_dir = os.path.join(os.path.dirname(sys.executable), "Scripts")
+        if os.path.exists(_scripts_dir) and _scripts_dir not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = _scripts_dir + os.pathsep + os.environ.get("PATH", "")
+            
+        _winget_dir = os.path.join(os.path.expanduser("~"), "AppData", "Local", "Microsoft", "WinGet", "Packages")
+        if os.path.exists(_winget_dir):
+            for entry in os.listdir(_winget_dir):
+                if "ffmpeg" in entry.lower():
+                    pkg_path = os.path.join(_winget_dir, entry)
+                    for root, dirs, files in os.walk(pkg_path):
+                        if "ffmpeg.exe" in files:
+                            if root not in os.environ.get("PATH", ""):
+                                os.environ["PATH"] = root + os.pathsep + os.environ.get("PATH", "")
+                            break
+
+class NativeMessaging:
+    @staticmethod
+    def get_message():
+        raw_length = sys.stdin.buffer.read(4)
+        if len(raw_length) == 0:
+            sys.exit(0)
+        message_length = struct.unpack('@I', raw_length)[0]
+        message = sys.stdin.buffer.read(message_length).decode('utf-8')
+        return json.loads(message)
+
+    @staticmethod
+    def send_message(message_content):
+        encoded_content = json.dumps(message_content).encode('utf-8')
+        encoded_length = struct.pack('@I', len(encoded_content))
+        sys.stdout.buffer.write(encoded_length)
+        sys.stdout.buffer.write(encoded_content)
+        sys.stdout.buffer.flush()
+
+class Logger:
+    active_tcp_clients = []
+    
+    @classmethod
+    def broadcast_log(cls, msg):
+        cls.log_info(msg)
+        for client in list(cls.active_tcp_clients):
+            try:
+                client.sendall((str(msg) + "\n").encode('utf-8', errors='replace'))
+            except:
+                pass
+
+    @staticmethod
+    def log_info(msg):
         try:
-            client, addr = server.accept()
-            threading.Thread(target=handle_tcp_client, args=(client,), daemon=True).start()
-        except Exception as e:
-            log_info(f"TCP Accept Error: {e}")
-
-def handle_tcp_client(client):
-    active_tcp_clients.append(client)
-    try:
-        while True:
-            data = client.recv(4096)
-            if not data:
-                break
-            message = data.decode('utf-8').strip()
-            if message:
-                try:
-                    msg_json = json.loads(message)
-                    send_message(msg_json) # Send command from Python GUI directly to Chrome Extension
-                except Exception as e:
-                    log_info(f"TCP JSON parse error: {e}")
-    except Exception as e:
-        log_info(f"TCP Client Error: {e}")
-    finally:
-        if client in active_tcp_clients:
-            active_tcp_clients.remove(client)
-        client.close()
-
-def broadcast_log(msg):
-    log_info(msg)
-    for client in list(active_tcp_clients):
-        try:
-            client.sendall((str(msg) + "\n").encode('utf-8', errors='replace'))
+            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "host.log")
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(str(msg) + "\n")
         except:
             pass
 
-def log_info(msg):
-    try:
-        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "host.log")
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(str(msg) + "\n")
-    except:
-        pass
-
-# Keep track of recently downloaded URLs to avoid double-processing within a short timeframe
-downloaded_urls_cache = {}
-
-def download_media(msg, platform, account, mediaType="auto"):
-    global downloaded_urls_cache
-    
-    url = msg.get("url")
-    metadata = msg.get("direct_metadata") or msg.get("metadata") or {}
-    dash_manifest = metadata.get("dash_manifest")
-    
-    if not url and not dash_manifest:
-        return {"status": "error", "message": "No URL provided"}
+class TCPServer:
+    def __init__(self, host='127.0.0.1', port=65432):
+        self.host = host
+        self.port = port
         
-    # Generate a unique cache key
-    shortcode = metadata.get("shortcode", "")
-    if url:
-        cache_key = f"blob_fallback_{shortcode}" if url.startswith("blob:") and shortcode else url
-    else:
-        shortcode = msg.get("direct_metadata", {}).get("shortcode")
-        cache_key = f"dash_{shortcode}_{msg.get('direct_metadata', {}).get('index', '0')}"
+    def start(self):
+        threading.Thread(target=self._server_thread, daemon=True).start()
         
-    # ANTI-DUPLICATION CACHE (3-second timeout)
-    if cache_key in downloaded_urls_cache:
-        last_time = downloaded_urls_cache[cache_key]
-        if time.time() - last_time < 3:
-            broadcast_log("STATUS: SKIPPED (URL duplicated within 3s)")
-            return {"status": "skipped", "message": "Already downloaded in RAM cache", "log": "Duplicated URL ignored"}
-    downloaded_urls_cache[cache_key] = time.time()
-    
-    try:
-        home = os.path.expanduser("~")
-        
-        if mediaType == "direct_story":
-            # Default gallery-dl folder structure
-            gallery_dir = os.path.join(home, "gallery-dl")
-            config_path = os.path.join(gallery_dir, "config.json")
-            filename_template = "{date:%Y-%m-%d}_{shortcode}.{extension}"
+    def _server_thread(self):
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            server.bind((self.host, self.port))
+            server.listen(5)
+            Logger.log_info(f"TCP Server started on port {self.port}")
+        except Exception as e:
+            Logger.log_info(f"Failed to start TCP Server: {e}")
+            return
             
-            if os.path.exists(config_path):
-                try:
-                    with open(config_path, "r", encoding="utf-8") as f:
-                        conf = json.load(f)
-                        extractor_conf = conf.get("extractor", {})
-                        
-                        # Use platform-specific config if available, fallback to instagram
-                        platform_conf = extractor_conf.get(platform, extractor_conf.get("instagram", {}))
-                        
-                        if "filename" in platform_conf:
-                            val = platform_conf["filename"]
-                            if isinstance(val, dict):
-                                # If it's a carousel (has index), try to use sidecar_shortcode template first
-                                idx_val = metadata.get("index")
-                                if idx_val:
-                                    filename_template = val.get("sidecar_shortcode", val.get("", "{date:%Y-%m-%d}_{shortcode}.{extension}"))
-                                else:
-                                    filename_template = val.get("", "{date:%Y-%m-%d}_{shortcode}.{extension}")
-                            elif isinstance(val, str):
-                                filename_template = val
-                except Exception as e:
-                    broadcast_log(f"Failed to read config: {e}")
-            metadata = msg.get("direct_metadata") or {}
-            username = metadata.get("username") or "Direct_Stories"
-            timestamp = metadata.get("timestamp") or int(time.time())
-            shortcode = metadata.get("shortcode")
-            if not shortcode:
-                media_id = metadata.get("media_id")
-                if media_id:
-                    shortcode = str(media_id).split('_')[0]
-                else:
-                    shortcode = str(int(time.time()))
-            
-            dash_manifest = metadata.get("dash_manifest")
-            is_video = metadata.get("is_video", False)
-            
-            if dash_manifest or is_video or ".mp4" in url or "video" in url:
-                ext = "mp4"
-            else:
-                ext = "jpg"
-            
-            # Format filename matching gallery-dl syntax
-            dt = datetime.datetime.fromtimestamp(timestamp)
-            
-            # ENFORCE SPECIAL FORMAT FOR PROFILE PICS
-            if shortcode == "profile_pic":
-                filename = f"{username}_profile_pic_{dt.strftime('%Y-%m-%d_%H%M%S')}.{ext}"
-            else:
-                filename = filename_template
-                if "{date:" in filename:
-                    def date_repl(match):
-                        fmt = match.group(1)
-                        return dt.strftime(fmt)
-                    filename = re.sub(r'\{date:([^}]+)\}', date_repl, filename)
-                
-                media_id = metadata.get("media_id")
-                safe_id = str(media_id).split('_')[0] if (media_id and str(media_id).isdigit()) else str(media_id) if media_id else shortcode
-                
-                # Support gallery-dl variable slicing, e.g. {shortcode[:11]} or {id[:15]}
-                def format_var(match):
-                    var_name = match.group(1)
-                    slice_str = match.group(2)
-                    
-                    val = ""
-                    if var_name == "shortcode" or var_name == "sidecar_shortcode": val = shortcode
-                    elif var_name == "extension": val = ext
-                    elif var_name == "id": val = safe_id
-                    elif var_name == "num": val = str(metadata.get("index", ""))
-                    
-                    if slice_str:
-                        try:
-                            # slice_str is something like "[:11]"
-                            length = int(slice_str.strip("[:]"))
-                            val = val[:length]
-                        except:
-                            pass
-                    return val
+        while True:
+            try:
+                client, addr = server.accept()
+                threading.Thread(target=self._handle_client, args=(client,), daemon=True).start()
+            except Exception as e:
+                Logger.log_info(f"TCP Accept Error: {e}")
 
-                filename = re.sub(r'\{(shortcode|extension|id|num)(\[:\d+\])?\}', format_var, filename)
-                
-                filename = re.sub(r'\{(sidecar_shortcode)(\[:\d+\])?\}', format_var, filename)
-                
-                idx = metadata.get("index")
-                if idx is not None and str(idx).isdigit() and int(idx) > 0:
-                    # Only append _idx if {num} wasn't already evaluated in the template
-                    if "{num}" not in filename_template:
-                        name, dot_ext = os.path.splitext(filename)
-                        filename = f"{name}_{idx}{dot_ext}"
-            
-            # Ensure safe filename
-            for char in ['<', '>', ':', '"', '/', '\\', '|', '?', '*']:
-                filename = filename.replace(char, '_')
-                
-            is_backup = metadata.get("is_backup", False)
-            media_category = metadata.get("media_category", "post") # Default to post if not provided
-            
-            # Sub-folder is usually just the category (post or story)
-            if media_category == "pfp":
-                subfolder = "" # PFP goes directly in user folder
-            else:
-                subfolder = media_category
-
-            if is_backup:
-                # BACKUP ROUTING: Segregate into post/story inside Bandeja_Favoritos
-                if subfolder:
-                    out_dir = os.path.join(gallery_dir, "Bandeja_Favoritos", platform, subfolder, username)
-                else:
-                    out_dir = os.path.join(gallery_dir, "Bandeja_Favoritos", platform, username)
-            else:
-                # MANUAL ROUTING (Extension)
-                if platform == "facebook":
-                    media_type_folder = "Videos" if (is_video or ext == "mp4") else "Pictures"
-                    out_dir = os.path.join(gallery_dir, platform, username, media_type_folder)
-                else:
-                    out_dir = os.path.join(gallery_dir, platform, username)
-                
-            if not os.path.exists(out_dir):
-                os.makedirs(out_dir)
-                
-            # Create Notepad with Permanent ID if available
-            user_id = metadata.get("user_id")
-            if user_id:
-                # Always put the notepad in the root user directory, not inside Videos/Pictures
-                user_root_dir = os.path.dirname(out_dir) if (out_dir.endswith("Videos") or out_dir.endswith("Pictures")) else out_dir
-                id_file_path = os.path.join(user_root_dir, f"ID_{user_id}.txt")
-                if not os.path.exists(id_file_path):
+    def _handle_client(self, client):
+        Logger.active_tcp_clients.append(client)
+        try:
+            while True:
+                data = client.recv(4096)
+                if not data:
+                    break
+                message = data.decode('utf-8').strip()
+                if message:
                     try:
-                        with open(id_file_path, "w", encoding="utf-8") as f:
-                            f.write(f"Username: {username}\n")
-                            f.write(f"Permanent ID: {user_id}\n")
-                            f.write(f"Profile URL: https://www.facebook.com/profile.php?id={user_id}\n")
+                        msg_json = json.loads(message)
+                        NativeMessaging.send_message(msg_json)
                     except Exception as e:
-                        broadcast_log(f"Failed to create ID notepad: {e}")
+                        Logger.log_info(f"TCP JSON parse error: {e}")
+        except Exception as e:
+            Logger.log_info(f"TCP Client Error: {e}")
+        finally:
+            if client in Logger.active_tcp_clients:
+                Logger.active_tcp_clients.remove(client)
+            client.close()
 
-            filepath = os.path.join(out_dir, filename)
-            
-            broadcast_log(f"--- NEW DIRECT DOWNLOAD REQUEST ---")
-            broadcast_log(f"URL: {url}")
-            broadcast_log(f"Target filepath: {filepath}")
-            
-            # Function to get remote file size
-            def get_remote_size(check_url):
-                if not check_url or check_url.startswith('blob:'): return -1
-                try:
-                    req = urllib.request.Request(check_url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0'})
-                    with urllib.request.urlopen(req, timeout=3) as resp:
-                        return int(resp.getheader('Content-Length', -1))
-                except: return -1
-            
-            # Check collisions
-            if os.path.exists(filepath):
-                if is_backup:
-                    broadcast_log("STATUS: SKIPPED (File exists, skipping size check for Backup)")
-                    return {"status": "skipped", "message": "Already downloaded", "log": f"File exists: {filepath}"}
-                
-                remote_size = get_remote_size(url)
-                name, dot_ext = os.path.splitext(filename)
-                counter = 1
-                
-                # Check the base file first
-                if remote_size > 0 and os.path.getsize(filepath) == remote_size:
-                    broadcast_log("STATUS: SKIPPED (File exists with same size)")
-                    return {"status": "skipped", "message": "Already downloaded", "log": f"File exists: {filepath}"}
-                elif remote_size == -1 and is_backup:
-                    broadcast_log("STATUS: SKIPPED (File exists, assuming duplicate for Backup)")
-                    return {"status": "skipped", "message": "Already downloaded", "log": f"File exists: {filepath}"}
-                
-                # Auto-increment until we find a free slot or a matching size
-                while True:
-                    next_filename = f"{name} ({counter}){dot_ext}"
-                    next_filepath = os.path.join(out_dir, next_filename)
-                    if not os.path.exists(next_filepath):
-                        filename = next_filename
-                        filepath = next_filepath
-                        break
-                    if remote_size > 0 and os.path.getsize(next_filepath) == remote_size:
-                        broadcast_log("STATUS: SKIPPED (File exists with same size)")
-                        return {"status": "skipped", "message": "Already downloaded", "log": f"File exists: {next_filepath}"}
-                    elif remote_size == -1 and is_backup:
-                        broadcast_log("STATUS: SKIPPED (File exists, assuming duplicate for Backup)")
-                        return {"status": "skipped", "message": "Already downloaded", "log": f"File exists: {next_filepath}"}
-                    counter += 1
-            
-            broadcast_log(f"Direct downloading story to: {filepath}")
-            
-            if dash_manifest:
-                import tempfile
-                
-                broadcast_log("DASH manifest found. Using yt-dlp to download highest quality (including 60fps).")
-                temp_dir = tempfile.gettempdir()
-                manifest_filename = f"dash_{shortcode}.mpd"
-                manifest_path = os.path.join(temp_dir, manifest_filename)
-                with open(manifest_path, "w", encoding="utf-8") as f:
-                    f.write(dash_manifest)
-                
-                manifest_url = "file:///" + manifest_path.replace("\\", "/")
-                # Strip extension from output path — yt-dlp adds its own
-                filepath_no_ext = os.path.splitext(filepath)[0]
-                cmd = ["yt-dlp", manifest_url, "--enable-file-urls", "-o", filepath_no_ext + ".%(ext)s", "--merge-output-format", "mp4"]
-                try:
-                    CREATE_NO_WINDOW = 0x08000000
-                    process = subprocess.Popen(
-                        cmd,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        creationflags=CREATE_NO_WINDOW,
-                        cwd=temp_dir,
-                        text=True,
-                        shell=True
-                    )
-                    stdout, stderr = process.communicate()
-                    
-                    try:
-                        os.remove(manifest_path)
-                        # yt-dlp copies the mpd to the output directory because we passed it as the URL, let's clean it up
-                        out_mpd = filepath_no_ext + ".mpd"
-                        if os.path.exists(out_mpd):
-                            os.remove(out_mpd)
-                    except:
-                        pass
-                    
-                    if process.returncode == 0:
-                        actual_file = filepath_no_ext + ".mp4"
-                        if os.path.exists(actual_file) or os.path.exists(filepath):
-                            broadcast_log("STATUS: SUCCESS (DASH yt-dlp)")
-                            return {"status": "success", "message": "Downloaded via DASH", "log": stdout}
-                    else:
-                        broadcast_log(f"DASH download failed: {stderr}. Falling back to progressive.")
-                except Exception as e:
-                    broadcast_log(f"yt-dlp not found or failed: {e}. Falling back to progressive MP4.")
-                    try: os.remove(manifest_path)
-                    except: pass
-            
-            if not url or url.startswith('blob:'):
-                # Last resort: use gallery-dl / yt-dlp with the post URL
-                fallback_url = None
-                if platform == "instagram":
-                    if shortcode and not shortcode.isdigit():
-                        fallback_url = f"https://www.instagram.com/p/{shortcode}/"
-                    elif metadata.get("media_id"):
-                        mid = str(metadata["media_id"]).split("_")[0]
-                        fallback_url = f"https://www.instagram.com/stories/{username}/{mid}/"
-                elif platform == "facebook":
-                    if metadata.get("story_url"):
-                        fallback_url = metadata.get("story_url")
-                    elif shortcode:
-                        fallback_url = f"https://www.facebook.com/reel/{shortcode}"
-                        
-                if fallback_url:
-                    broadcast_log(f"Blob URL detected. Falling back to yt-dlp/gallery-dl: {fallback_url}")
-                    # Switch to auto mode
-                    msg_copy = dict(msg)
-                    msg_copy["url"] = fallback_url
-                    msg_copy["mediaType"] = "auto"
-                    return download_media(msg_copy, platform, account, "auto")
-                else:
-                    broadcast_log("URL is a blob. No fallback available.")
-                    return {"status": "error", "message": "Failed DASH download, cannot fallback to blob", "log": "Blob URL"}
-                
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
-            with urllib.request.urlopen(req, timeout=15) as response, open(filepath, 'wb') as out_file:
-                out_file.write(response.read())
-                
-            broadcast_log("STATUS: SUCCESS (Direct)")
-            return {"status": "success", "message": "Downloaded via direct HTTP", "log": f"Saved to {filepath}"}
-            
+class YTDLPLogger:
+    def debug(self, msg): pass
+    def info(self, msg): pass
+    def warning(self, msg): pass
+    def error(self, msg):
+        Logger.log_info(f"yt-dlp error output: {msg}")
 
-        elif mediaType == "pfp_bot":
-            metadata = msg.get("direct_metadata") or {}
-            username = metadata.get("username")
-            if not username:
-                return {"status": "error", "message": "No username provided for PFP download"}
-            
-            pfp_script = os.path.join(home, "Downloads", "Carpetas_Mixtas", "Media Downloader", "pfp_downloader.py")
-            bot_cookie = os.path.join(home, "gallery-dl", "cookies_bot_pfp.txt")
-            if not os.path.exists(bot_cookie):
-                bot_cookie = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies_bot_pfp.txt")
-            dest_dir = os.path.join(home, "gallery-dl", "instagram", username)
-            
-            if not os.path.exists(pfp_script):
-                return {"status": "error", "message": f"pfp_downloader.py not found at {pfp_script}"}
+class DownloaderEngines:
+    @staticmethod
+    def yt_dlp_progress_hook(d):
+        if d['status'] == 'downloading':
+            try:
+                percent_str = d.get('_percent_str', '').strip()
+                speed_str = d.get('_speed_str', '').strip()
+                eta_str = d.get('_eta_str', '').strip()
                 
-            cmd = [sys.executable, pfp_script, username, bot_cookie, dest_dir]
-            broadcast_log(f"Executing PFP bot: {' '.join(cmd)}")
+                if percent_str:
+                    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                    clean_percent = ansi_escape.sub('', percent_str).strip()
+                    clean_speed = ansi_escape.sub('', speed_str).strip()
+                    
+                    NativeMessaging.send_message({
+                        "status": "progress",
+                        "percent": clean_percent,
+                        "speed": clean_speed,
+                        "eta": eta_str
+                    })
+            except Exception:
+                pass
+
+    @classmethod
+    def execute_ytdlp_native(cls, url, ydl_opts):
+        if not HAS_YTDLP:
+            raise Exception("yt-dlp is not installed as a python module. Please 'pip install yt-dlp'")
             
-            CREATE_NO_WINDOW = 0x08000000
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                creationflags=CREATE_NO_WINDOW,
-                cwd=home,
-                text=True
-            )
-            stdout, stderr = process.communicate()
-            broadcast_log(f"PFP Bot stdout: {stdout}")
-            if stderr:
-                broadcast_log(f"PFP Bot stderr: {stderr}")
+        Logger.broadcast_log(f"Ejecutando yt-dlp nativo para URL: {url}")
+        if 'progress_hooks' not in ydl_opts:
+            ydl_opts['progress_hooks'] = [cls.yt_dlp_progress_hook]
             
-            return {"status": "success", "message": "PFP download completed via Bot", "log": stdout}
-        
-        # Carpeta base de gallery-dl del usuario
-        gallery_dir = os.path.join(home, "gallery-dl")
-        if not os.path.exists(gallery_dir):
-            os.makedirs(gallery_dir)
-            
-        cmd = ["gallery-dl", url]
-        
-        if platform == "instagram":
-            # Usar archivo de configuración si existe
-            config_path = os.path.join(gallery_dir, "config.json")
-            if os.path.exists(config_path):
-                cmd.extend(["--config", config_path])
-                
-            # Elegir cookie según la cuenta
-            cookie_file = "www.instagram.com_cookiesM.txt" if account == "M" else "www.instagram.com_cookiesV.txt"
-            cookie_path = os.path.join(gallery_dir, cookie_file)
-            
-            # PROTECCIÓN ANTI-BAN: Si venimos de un "backup" invisible, prohibir estrictamente el uso de cookies
-            metadata = msg.get("direct_metadata") or {}
-            is_backup = metadata.get("is_backup", False)
-            username = metadata.get("username", "Unknown")
-            
-            if os.path.exists(cookie_path) and not is_backup:
-                cmd.extend(["--cookies", cookie_path])
-            elif is_backup:
-                broadcast_log("WARNING: Gallery-dl fallback invoked during an Auto-Backup. Cookies are DISABLED to ensure 100% invisibility.")
-            
-            # FIX: Si es backup, obligar a gallery-dl a escupir en Bandeja_Favoritos (sobreescribiendo config.json)
-            if is_backup:
-                backup_out = os.path.join(gallery_dir, "Bandeja_Favoritos", platform, "post", username)
-                cmd.extend(["-d", backup_out])
-            
-        elif platform == "twitter" or platform == "facebook":
-            # Para X y FB usamos yt-dlp normalmente
-            metadata = msg.get("direct_metadata") or {}
-            is_backup = metadata.get("is_backup", False)
-            username = metadata.get("username", "Unknown")
-            
-            # If the extension intercepted the raw MP4 URL or DASH manifest, we use it!
-            actual_url = url
-            temp_manifest = None
-            if metadata.get("is_direct"):
-                if metadata.get("url"):
-                    actual_url = metadata.get("url")
-                elif metadata.get("dash_manifest"):
-                    import tempfile
-                    # Write dash manifest to temp file so yt-dlp can parse it
-                    temp_manifest = tempfile.NamedTemporaryFile(delete=False, suffix=".mpd")
-                    temp_manifest.write(metadata.get("dash_manifest").encode('utf-8'))
-                    temp_manifest.close()
-                    actual_url = temp_manifest.name
-            
-            # Fix: If the extension sent the raw ID as the url (fallback), use the full story_url for yt-dlp instead
-            if "facebook.com" not in actual_url and "fbcdn.net" not in actual_url and not actual_url.startswith("http"):
-                if metadata.get("story_url"):
-                    actual_url = metadata.get("story_url")
-            
-            cmd = ["yt-dlp", actual_url]
-            
-            if metadata.get("is_direct") and metadata.get("tweet_id"):
-                cmd.extend(["-o", f"X_{metadata.get('tweet_id')}.%(ext)s"])
-                
-            if metadata.get("is_direct") and platform == "facebook":
-                timestamp = metadata.get("timestamp", int(time.time()))
-                shortcode = metadata.get("shortcode", "")
-                
-                # Convert timestamp to YYYY-MM-DD
-                try:
-                    date_str = datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
-                except Exception:
-                    date_str = datetime.datetime.now().strftime('%Y-%m-%d')
-                
-                subfolder = "Videos" if metadata.get("mediaType", msg.get("mediaType")) in ["video", "auto"] else "Pictures"
-                filename = f"{date_str}_{shortcode}.%(ext)s" if shortcode and shortcode != "story" else f"{date_str}_{timestamp}.%(ext)s"
-                
-                cmd.extend(["-o", os.path.join(gallery_dir, "facebook", username, subfolder, filename)])
-                
-            if platform == "twitter":
-                cookie_path = os.path.join(gallery_dir, "www.x.com_cookies.txt")
-                if os.path.exists(cookie_path) and not metadata.get("is_direct"):
-                    cmd.extend(["--cookies", cookie_path])
-            elif platform == "facebook":
-                # Do NOT use cookies for facebook by default because yt-dlp will hang due to Chrome SQLite lock.
-                # Only use a custom cookie file if the user exported it manually.
-                cookie_path = os.path.join(gallery_dir, "www.facebook.com_cookies.txt")
-                if os.path.exists(cookie_path):
-                    cmd.extend(["--cookies", cookie_path])
-            
-            # Si es backup, forzar a Bandeja_Favoritos
-            if is_backup:
-                backup_out = os.path.join(gallery_dir, "Bandeja_Favoritos", platform, "post", username)
-                cmd.extend(["-P", backup_out])
-            elif not (metadata.get("is_direct") and platform == "facebook"):
-                cmd.extend(["-P", os.path.join(gallery_dir, platform.capitalize())])
-            
-        broadcast_log(f"Executing: {' '.join(cmd)}")
-        
-        # We start the process without waiting so the extension UI doesn't block infinitely,
-        # but for simplicity we wait here (extension has a 5min timeout for native messaging usually).
-        # We will run it with CREATE_NO_WINDOW so no console pops up
-        CREATE_NO_WINDOW = 0x08000000
-        
-        # Need shell=True on windows if gallery-dl is a .cmd or .bat in Scripts, 
-        # but normally python scripts wrappers work without it if we pass full executable name.
-        # Let's try shell=True to ensure gallery-dl is found in PATH.
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            creationflags=CREATE_NO_WINDOW,
-            cwd=home,
-            text=True,
-            shell=True
-        )
+        ydl_opts['quiet'] = True
+        ydl_opts['no_warnings'] = True
+        ydl_opts['logger'] = YTDLPLogger()
         
         try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                if info:
+                    if 'entries' in info and len(info['entries']) > 0:
+                        filename = os.path.basename(ydl.prepare_filename(info['entries'][0]))
+                    else:
+                        filename = os.path.basename(ydl.prepare_filename(info))
+                    return {"status": "success", "message": "Descargado nativamente con yt-dlp", "filename": filename}
+                return {"status": "success", "message": "Descargado nativamente con yt-dlp"}
+        except Exception as e:
+            Logger.broadcast_log(f"Error en yt-dlp nativo: {str(e)}")
+            return {"status": "error", "message": str(e)}
+            
+    @staticmethod
+    def execute_gallery_dl(url, cmd_args):
+        Logger.broadcast_log(f"Executing gallery-dl: {' '.join(cmd_args)}")
+        CREATE_NO_WINDOW = 0x08000000
+        process = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                                   creationflags=CREATE_NO_WINDOW, cwd=os.path.expanduser("~"), text=True, shell=True)
+        try: 
             stdout, stderr = process.communicate(timeout=45)
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate()
-            stderr += "\n\nError: Download timed out after 45 seconds."
         
-        broadcast_log(f"Return code: {process.returncode}")
-        if stdout: broadcast_log(f"STDOUT: {stdout}")
-        if stderr: broadcast_log(f"STDERR: {stderr}")
-        
-        output_lower = (stdout + stderr).lower()
         if process.returncode == 0:
-            if is_skipped(stdout + stderr):
-                broadcast_log("STATUS: SKIPPED")
-                return {"status": "skipped", "message": "Already downloaded", "log": stdout}
-            
-            # Clean up temporary manifest
-            if temp_manifest and os.path.exists(temp_manifest.name):
-                try:
-                    os.remove(temp_manifest.name)
-                except:
-                    pass
+            if DownloaderEngines.is_skipped(stdout + stderr): 
+                return {"status": "skipped", "message": "Skipped by gallery-dl output"}
                 
-            broadcast_log("STATUS: SUCCESS")
-            return {"status": "success", "message": f"{platform.capitalize()} downloaded successfully (using yt-dlp)", "log": stdout}
-        else:
-            broadcast_log("STATUS: ERROR")
-            # Clean up temporary manifest
-            if temp_manifest and os.path.exists(temp_manifest.name):
-                try:
-                    os.remove(temp_manifest.name)
-                except:
-                    pass
-            return {"status": "error", "message": "Download failed", "log": stderr}
+            filename = None
+            try:
+                lines = [line.strip() for line in stdout.strip().split('\n') if line.strip()]
+                if lines:
+                    last_line = lines[-1]
+                    if last_line.startswith('# '): last_line = last_line[2:]
+                    filename = os.path.basename(last_line)
+            except: pass
             
-    except Exception as e:
-        broadcast_log(f"Exception: {str(e)}")
-        return {"status": "error", "message": str(e)}
+            res = {"status": "success", "message": "IG downloaded (gallery-dl)", "log": stdout}
+            if filename: res["filename"] = filename
+            return res
+        else:
+            return {"status": "error", "message": "Gallery-dl failed", "log": stderr}
 
-def is_skipped(text):
-    if not text:
+    @staticmethod
+    def is_skipped(text):
+        if not text: return False
+        text_lower = text.lower()
+        if "already exists" in text_lower or "skip" in text_lower: return True
+        for line in text.split('\n'):
+            ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+            clean_line = ansi_escape.sub('', line).strip()
+            if clean_line.startswith('#'): return True
         return False
-    text_lower = text.lower()
-    if "already exists" in text_lower or "skip" in text_lower:
-        return True
+
+    @staticmethod
+    def execute_direct_http(url, filepath):
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
+        with urllib.request.urlopen(req, timeout=15) as response, open(filepath, 'wb') as out_file:
+            out_file.write(response.read())
+        Logger.broadcast_log("STATUS: SUCCESS (Direct)")
+        return {"status": "success", "message": "Downloaded via direct HTTP", "filename": os.path.basename(filepath)}
+
+class MediaManager:
+    downloaded_urls_cache = {}
     
-    # gallery-dl outputs "# /path/to/file" when skipping due to archive
-    # ANSI escape codes might wrap the '#', so we check if '#' is the first non-whitespace, non-escape char
-    for line in text.split('\n'):
-        # Remove ANSI color codes
-        import re
-        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        clean_line = ansi_escape.sub('', line).strip()
-        if clean_line.startswith('#'):
-            return True
-    return False
+    @classmethod
+    def check_cache(cls, url, shortcode, dash_manifest, metadata):
+        if not url and not dash_manifest:
+            return False, {"status": "error", "message": "No URL provided"}
+            
+        if url:
+            cache_key = f"blob_fallback_{shortcode}" if url.startswith("blob:") and shortcode else url
+        else:
+            shortcode = metadata.get("shortcode")
+            cache_key = f"dash_{shortcode}_{metadata.get('index', '0')}"
+            
+        if cache_key in cls.downloaded_urls_cache:
+            last_time = cls.downloaded_urls_cache[cache_key]
+            if time.time() - last_time < 3:
+                Logger.broadcast_log("STATUS: SKIPPED (URL duplicated within 3s)")
+                return False, {"status": "skipped", "message": "Already downloaded in RAM cache"}
+                
+        cls.downloaded_urls_cache[cache_key] = time.time()
+        return True, None
+
+    @staticmethod
+    def get_remote_size(check_url):
+        if not check_url or check_url.startswith('blob:'): return -1
+        try:
+            req = urllib.request.Request(check_url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                return int(resp.getheader('Content-Length', -1))
+        except: return -1
+
+    @staticmethod
+    def get_out_dir(gallery_dir, platform, username, is_backup, subfolder, is_video, ext):
+        if is_backup:
+            if subfolder:
+                return os.path.join(gallery_dir, "Bandeja_Favoritos", platform, subfolder, username)
+            return os.path.join(gallery_dir, "Bandeja_Favoritos", platform, username)
+        
+        if platform == "facebook":
+            media_type_folder = "Videos" if (is_video or ext == "mp4") else "Pictures"
+            return os.path.join(gallery_dir, platform, username, media_type_folder)
+        return os.path.join(gallery_dir, platform, username)
+
+    @staticmethod
+    def generate_filename(filename_template, dt, shortcode, safe_id, ext, idx):
+        filename = filename_template
+        if "{date:" in filename:
+            def date_repl(match): return dt.strftime(match.group(1))
+            filename = re.sub(r'\{date:([^}]+)\}', date_repl, filename)
+            
+        def format_var(match):
+            var_name = match.group(1)
+            slice_str = match.group(2)
+            
+            val = ""
+            if var_name in ("shortcode", "sidecar_shortcode"): val = shortcode
+            elif var_name == "extension": val = ext
+            elif var_name == "id": val = safe_id
+            elif var_name == "num": val = str(idx) if idx is not None else ""
+            
+            if slice_str:
+                try:
+                    length = int(slice_str.strip("[:]"))
+                    val = val[:length]
+                except: pass
+            return val
+
+        filename = re.sub(r'\{(shortcode|extension|id|num)(\[:\d+\])?\}', format_var, filename)
+        filename = re.sub(r'\{(sidecar_shortcode)(\[:\d+\])?\}', format_var, filename)
+        
+        if shortcode and safe_id == shortcode:
+            filename = filename.replace(f"_{shortcode}_{shortcode}", f"_{shortcode}")
+            filename = filename.replace(f"{shortcode}_{shortcode}", f"{shortcode}")
+            
+        if idx is not None and str(idx).isdigit() and int(idx) > 0:
+            if "{num}" not in filename_template:
+                name, dot_ext = os.path.splitext(filename)
+                filename = f"{name}_{idx}{dot_ext}"
+                
+        for char in ['<', '>', ':', '"', '/', '\\', '|', '?', '*']:
+            filename = filename.replace(char, '_')
+            
+        return filename
+
+    @classmethod
+    def ensure_unique_filepath(cls, filepath, out_dir, filename, url, is_backup):
+        if os.path.exists(filepath):
+            if is_backup:
+                return filepath, True, {"status": "skipped", "message": "Already downloaded", "log": "File exists", "filename": os.path.basename(filepath)}
+            
+            remote_size = cls.get_remote_size(url)
+            name, dot_ext = os.path.splitext(filename)
+            counter = 1
+            
+            if remote_size > 0 and os.path.getsize(filepath) == remote_size:
+                return filepath, True, {"status": "skipped", "filename": os.path.basename(filepath)}
+            elif remote_size == -1 and is_backup:
+                return filepath, True, {"status": "skipped", "filename": os.path.basename(filepath)}
+            
+            while True:
+                next_filename = f"{name} ({counter}){dot_ext}"
+                next_filepath = os.path.join(out_dir, next_filename)
+                if not os.path.exists(next_filepath):
+                    return next_filepath, False, None
+                if remote_size > 0 and os.path.getsize(next_filepath) == remote_size:
+                    return next_filepath, True, {"status": "skipped", "filename": next_filename}
+                elif remote_size == -1 and is_backup:
+                    return next_filepath, True, {"status": "skipped", "filename": next_filename}
+                counter += 1
+        return filepath, False, None
+
+    @classmethod
+    def process_request(cls, msg, platform, account, mediaType="auto"):
+        url = msg.get("url")
+        metadata = msg.get("direct_metadata") or msg.get("metadata") or {}
+        dash_manifest = metadata.get("dash_manifest")
+        shortcode = metadata.get("shortcode", "")
+        
+        proceed, err_resp = cls.check_cache(url, shortcode, dash_manifest, metadata)
+        if not proceed: return err_resp
+
+        home = os.path.expanduser("~")
+        gallery_dir = os.path.join(home, "gallery-dl")
+        if not os.path.exists(gallery_dir): os.makedirs(gallery_dir)
+
+        # 1. PFP BOT
+        if mediaType == "pfp_bot":
+            username = metadata.get("username")
+            if not username: return {"status": "error"}
+            pfp_script = os.path.join(home, "Downloads", "Carpetas_Mixtas", "Media Downloader", "pfp_downloader.py")
+            if not os.path.exists(pfp_script):
+                pfp_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pfp_downloader.py")
+            bot_cookie = os.path.join(gallery_dir, "cookies_bot_pfp.txt")
+            if not os.path.exists(bot_cookie): bot_cookie = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies_bot_pfp.txt")
+            dest_dir = os.path.join(gallery_dir, "instagram", username)
+            
+            cmd = [sys.executable, pfp_script, username, bot_cookie, dest_dir]
+            CREATE_NO_WINDOW = 0x08000000
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW, cwd=home, text=True)
+            stdout, stderr = process.communicate()
+            return {"status": "success", "message": "PFP bot finished", "log": stdout}
+
+        # 2. DIRECT STORY HANDLING
+        if mediaType == "direct_story":
+            return cls._handle_direct_story(msg, platform, gallery_dir, url, dash_manifest, account)
+
+        # 3. YTDLP / GALLERY-DL HANDLING
+        if platform == "instagram":
+            return cls._handle_gallery_dl(url, account, gallery_dir, metadata, platform)
+        elif platform in ("twitter", "facebook"):
+            return cls._handle_ytdlp(url, platform, gallery_dir, metadata, msg)
+
+        return {"status": "error", "message": "Unknown platform"}
+
+    @classmethod
+    def _handle_direct_story(cls, msg, platform, gallery_dir, url, dash_manifest, account):
+        metadata = msg.get("direct_metadata") or {}
+        Logger.broadcast_log(f"Raw metadata received: {json.dumps(metadata)}")
+        config_path = os.path.join(gallery_dir, "config.json")
+        filename_template = "{date:%Y-%m-%d}_{shortcode}.{extension}"
+        
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    conf = json.load(f)
+                    extractor_conf = conf.get("extractor", {})
+                    platform_conf = extractor_conf.get(platform, extractor_conf.get("instagram", {}))
+                    if "filename" in platform_conf:
+                        val = platform_conf["filename"]
+                        if isinstance(val, dict):
+                            filename_template = val.get("sidecar_shortcode", val.get("", filename_template)) if metadata.get("index") else val.get("", filename_template)
+                        elif isinstance(val, str):
+                            filename_template = val
+            except Exception as e:
+                Logger.broadcast_log(f"Failed to read config: {e}")
+
+        username = metadata.get("username", "Direct_Stories")
+        timestamp = metadata.get("timestamp", int(time.time()))
+        shortcode = metadata.get("shortcode")
+        media_id = metadata.get("media_id")
+        
+        if not shortcode:
+            shortcode = str(media_id).split('_')[0] if media_id else str(int(time.time()))
+
+        is_video = metadata.get("is_video", False)
+        ext = "mp4" if (dash_manifest or is_video or ".mp4" in str(url) or "video" in str(url)) else "jpg"
+        dt = datetime.datetime.fromtimestamp(timestamp)
+        
+        if shortcode == "profile_pic":
+            filename = f"{username}_profile_pic_{dt.strftime('%Y-%m-%d_%H%M%S')}.{ext}"
+        else:
+            safe_id = str(media_id).split('_')[0] if (media_id and str(media_id).isdigit()) else str(media_id) if media_id else shortcode
+            filename = cls.generate_filename(filename_template, dt, shortcode, safe_id, ext, metadata.get("index"))
+
+        is_backup = metadata.get("is_backup", False)
+        media_category = metadata.get("media_category", "post")
+        subfolder = "" if media_category == "pfp" else media_category
+
+        out_dir = cls.get_out_dir(gallery_dir, platform, username, is_backup, subfolder, is_video, ext)
+        if not os.path.exists(out_dir): os.makedirs(out_dir)
+
+        user_id = metadata.get("user_id")
+        if user_id:
+            user_root_dir = os.path.dirname(out_dir) if (out_dir.endswith("Videos") or out_dir.endswith("Pictures")) else out_dir
+            id_file_path = os.path.join(user_root_dir, f"ID_{user_id}.txt")
+            if not os.path.exists(id_file_path):
+                try:
+                    with open(id_file_path, "w", encoding="utf-8") as f:
+                        f.write(f"Username: {username}\nPermanent ID: {user_id}\nProfile URL: https://www.facebook.com/profile.php?id={user_id}\n")
+                except: pass
+
+        filepath = os.path.join(out_dir, filename)
+        Logger.broadcast_log(f"--- NEW DIRECT DOWNLOAD REQUEST ---")
+        Logger.broadcast_log(f"Target filepath: {filepath}")
+
+        filepath, skipped, skip_res = cls.ensure_unique_filepath(filepath, out_dir, filename, url, is_backup)
+        if skipped: return skip_res
+
+        Logger.broadcast_log(f"Direct downloading to: {filepath}")
+
+        if dash_manifest:
+            Logger.broadcast_log("DASH manifest found. Using NATIVE yt-dlp.")
+            temp_manifest = tempfile.NamedTemporaryFile(delete=False, suffix=".mpd")
+            temp_manifest.write(dash_manifest.encode('utf-8'))
+            temp_manifest.close()
+            manifest_path = temp_manifest.name
+            
+            import pathlib
+            manifest_url = pathlib.Path(manifest_path).as_uri()
+            filepath_no_ext = os.path.splitext(filepath)[0]
+            
+            ydl_opts = {
+                'enable_file_urls': True,
+                'outtmpl': filepath_no_ext + '.%(ext)s',
+                'merge_output_format': 'mp4',
+                'updatetime': False  # Previene Error 22 en Windows por fechas de modificación inválidas
+            }
+            res = DownloaderEngines.execute_ytdlp_native(manifest_url, ydl_opts)
+            try: os.remove(manifest_path); os.remove(filepath_no_ext + ".mpd")
+            except: pass
+            
+            if res['status'] == 'success': return res
+            
+            # Limpiar archivos .part huérfanos generados por fallo de yt-dlp
+            try:
+                out_dir_path = os.path.dirname(filepath)
+                base_name = os.path.basename(filepath_no_ext)
+                for f in os.listdir(out_dir_path):
+                    if f.startswith(base_name) and f.endswith(".part"):
+                        os.remove(os.path.join(out_dir_path, f))
+            except: pass
+
+            Logger.broadcast_log("NATIVE DASH fallback failed. Continuing to direct URL fallback...")
+
+        if not url or url.startswith('blob:'):
+            fallback_url = None
+            if platform == "instagram":
+                if shortcode and not shortcode.isdigit(): fallback_url = f"https://www.instagram.com/p/{shortcode}/"
+                elif metadata.get("media_id"): fallback_url = f"https://www.instagram.com/stories/{username}/{str(metadata['media_id']).split('_')[0]}/"
+            elif platform == "facebook":
+                fallback_url = metadata.get("story_url") or (f"https://www.facebook.com/reel/{shortcode}" if shortcode else None)
+                    
+            if fallback_url:
+                Logger.broadcast_log(f"Blob URL detected. Falling back: {fallback_url}")
+                msg_copy = dict(msg)
+                msg_copy["url"] = fallback_url
+                msg_copy["mediaType"] = "auto"
+                return cls.process_request(msg_copy, platform, account, "auto")
+            return {"status": "error", "message": "Failed DASH download, cannot fallback to blob"}
+            
+        return DownloaderEngines.execute_direct_http(url, filepath)
+
+    @classmethod
+    def _handle_gallery_dl(cls, url, account, gallery_dir, metadata, platform):
+        cmd = ["gallery-dl", url]
+        config_path = os.path.join(gallery_dir, "config.json")
+        if os.path.exists(config_path): cmd.extend(["--config", config_path])
+        
+        cookie_file = "www.instagram.com_cookiesM.txt" if account == "M" else "www.instagram.com_cookiesV.txt"
+        cookie_path = os.path.join(gallery_dir, cookie_file)
+        is_backup = metadata.get("is_backup", False)
+        
+        if os.path.exists(cookie_path) and not is_backup:
+            cmd.extend(["--cookies", cookie_path])
+        elif is_backup:
+            Logger.broadcast_log("WARNING: Backup mode. Cookies DISABLED.")
+            backup_out = os.path.join(gallery_dir, "Bandeja_Favoritos", platform, "post", metadata.get("username", "Unknown"))
+            cmd.extend(["-d", backup_out])
+            
+        return DownloaderEngines.execute_gallery_dl(url, cmd)
+
+    @classmethod
+    def _handle_ytdlp(cls, url, platform, gallery_dir, metadata, msg):
+        actual_url = url
+        is_backup = metadata.get("is_backup", False)
+        username = metadata.get("username", "Unknown")
+
+        if metadata.get("is_direct"):
+            if metadata.get("url"): actual_url = metadata.get("url")
+            elif metadata.get("dash_manifest"):
+                temp_manifest = tempfile.NamedTemporaryFile(delete=False, suffix=".mpd")
+                temp_manifest.write(metadata.get("dash_manifest").encode('utf-8'))
+                temp_manifest.close()
+                actual_url = temp_manifest.name
+
+        if not actual_url or ("facebook.com" not in actual_url and "fbcdn.net" not in actual_url and not actual_url.startswith("http")):
+            if metadata.get("story_url"): actual_url = metadata.get("story_url")
+
+        ydl_opts = {}
+        out_dir = os.path.join(gallery_dir, platform.capitalize())
+
+        if metadata.get("is_direct") and metadata.get("tweet_id"):
+            ydl_opts['outtmpl'] = os.path.join(out_dir, f"X_{metadata.get('tweet_id')}.%(ext)s")
+
+        if platform == "facebook":
+            timestamp = metadata.get("timestamp", int(time.time()))
+            shortcode = metadata.get("shortcode", "")
+            try: date_str = datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
+            except Exception: date_str = datetime.datetime.now().strftime('%Y-%m-%d')
+            
+            subfolder = "Videos" if metadata.get("mediaType", msg.get("mediaType")) in ["video", "auto"] else "Pictures"
+            filename = f"{date_str}_{shortcode}.%(ext)s" if shortcode and shortcode != "story" else f"{date_str}_{timestamp}.%(ext)s"
+            
+            if is_backup:
+                out_dir = os.path.join(gallery_dir, "Bandeja_Favoritos", platform, "post", username)
+            else:
+                out_dir = os.path.join(gallery_dir, "facebook", username, subfolder)
+            ydl_opts['outtmpl'] = os.path.join(out_dir, filename)
+        else:
+            if 'outtmpl' not in ydl_opts:
+                if is_backup: out_dir = os.path.join(gallery_dir, "Bandeja_Favoritos", platform, "post", username)
+                ydl_opts['outtmpl'] = os.path.join(out_dir, '%(title)s.%(ext)s')
+
+        if platform == "twitter":
+            cookie_path = os.path.join(gallery_dir, "www.x.com_cookies.txt")
+            if os.path.exists(cookie_path) and not metadata.get("is_direct"): ydl_opts['cookiefile'] = cookie_path
+        elif platform == "facebook":
+            cookie_path = os.path.join(gallery_dir, "www.facebook.com_cookies.txt")
+            if os.path.exists(cookie_path): ydl_opts['cookiefile'] = cookie_path
+                
+        res = DownloaderEngines.execute_ytdlp_native(actual_url, ydl_opts)
+        
+        if metadata.get("is_direct") and metadata.get("dash_manifest"):
+            try: os.remove(actual_url)
+            except: pass
+            
+        return res
 
 def main():
-    threading.Thread(target=tcp_server_thread, daemon=True).start()
+    EnvironmentSetup.inject_paths()
+    tcp_server = TCPServer()
+    tcp_server.start()
+    
     while True:
         try:
-            msg = get_message()
+            msg = NativeMessaging.get_message()
             if "url" in msg:
                 mediaType = msg.get("mediaType", "auto")
-                result = download_media(msg, msg.get("platform", "auto"), msg.get("account", "M"), mediaType)
-                send_message(result)
+                result = MediaManager.process_request(msg, msg.get("platform", "auto"), msg.get("account", "M"), mediaType)
+                NativeMessaging.send_message(result)
             elif "status" in msg and msg.get("action") == "backup_log":
-                # Forward logs from background.js to TCP GUI
-                broadcast_log(msg.get("message", ""))
+                Logger.broadcast_log(msg.get("message", ""))
             else:
-                send_message({"status": "error", "message": "No URL provided"})
+                NativeMessaging.send_message({"status": "error", "message": "No URL provided"})
         except Exception as e:
-            send_message({"status": "error", "message": str(e)})
+            NativeMessaging.send_message({"status": "error", "message": str(e)})
 
 if __name__ == '__main__':
     main()

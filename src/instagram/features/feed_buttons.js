@@ -1,4 +1,4 @@
-/* Media Downloader - Feed Buttons: Injects download button next to the Bookmark in feed/reels */
+﻿/* Media Downloader - Feed Buttons: Injects download button next to the Bookmark in feed/reels */
 
 function injectFeedButtons() {
     if (!document.body) return;

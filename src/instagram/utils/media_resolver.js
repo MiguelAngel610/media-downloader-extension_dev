@@ -129,7 +129,7 @@ async function resolveMediaUrl(media, article, knownShortcode = null, carouselIn
                 }
             }
 
-            bestMetadata.shortcode = targetMedia.shortcode || targetMedia.code;
+            bestMetadata.shortcode = targetMedia.shortcode || targetMedia.code || expectedShortcode || null;
             if (targetMedia.username) bestMetadata.username = targetMedia.username;
             if (targetMedia.timestamp) bestMetadata.timestamp = targetMedia.timestamp;
             

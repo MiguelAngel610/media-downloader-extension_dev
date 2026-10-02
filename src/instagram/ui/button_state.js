@@ -90,6 +90,8 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
 
         if (foundShortcode) {
             metadata.shortcode = foundShortcode;
+        } else if (String(metadata.shortcode).match(/^\d+(_\d+)?$/)) {
+            metadata.shortcode = idToShortcode(String(metadata.shortcode).split('_')[0]);
         } else if (String(metadata.shortcode).length > 15) {
             metadata.shortcode = null;
         }
@@ -180,6 +182,10 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
             metadata.media_category = "post";
         }
         
+        if (window.MDToastManager) {
+            window.MDToastManager.showInfo("⏳ Starting download...");
+        }
+
         chrome.runtime.sendMessage({
             action: "queue_download",
             url: finalUrl,
@@ -194,10 +200,6 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
             updateButtonIcon(btn, SVG_CHECK, isFloating);
 
             if (parentArticle) parentArticle.__md_download_state = { time: Date.now(), class: 'md-success', html: SVG_CHECK, isFloating: isFloating };
-
-            if (window.MDToastManager) {
-                window.MDToastManager.showSuccess("Download successful! (Sent to manager)", 3000);
-            }
 
             setTimeout(() => {
                 btn.classList.remove('md-success');
