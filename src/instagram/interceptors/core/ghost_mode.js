@@ -159,13 +159,11 @@ window.__md_applyGhostVisuals = function() {
     }
     
     let css = users.map(u => {
-        let alt1 = `[alt$=" ${u}"]`;
-        let alt2 = `[alt^="${u}'s "]`;
         return `
         a[href^="/stories/${u}/"] canvas,
-        header :has(img[alt*="${u}"]) canvas,
-        [role="button"]:has(img[alt*="${u}"]):not(:has(video)) canvas,
-        button:has(img[alt*="${u}"]):not(:has(video)) canvas { 
+        header :has(img:is([alt="${u}"], [alt^="${u}'s "], [alt$=" ${u}"], [alt^="${u} "])) canvas,
+        [role="button"]:has(img:is([alt="${u}"], [alt^="${u}'s "], [alt$=" ${u}"], [alt^="${u} "])):not(:has(video)) canvas,
+        button:has(img:is([alt="${u}"], [alt^="${u}'s "], [alt$=" ${u}"], [alt^="${u} "])):not(:has(video)) canvas { 
             filter: grayscale(100%) contrast(0) brightness(1.6) !important; 
             opacity: 0.15 !important;
             transition: all 0.5s ease;
