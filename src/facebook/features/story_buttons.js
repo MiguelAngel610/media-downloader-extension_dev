@@ -79,8 +79,11 @@ function injectStoryButtons() {
         let storyId = match ? match[1] : null;
 
         // Fix duplicated IDs in URL (e.g. 1234_1234)
-        if (storyId && storyId.includes('_')) {
-            storyId = storyId.split('_').pop();
+        if (storyId) {
+            storyId = storyId.split('?')[0].split('&')[0].split('/')[0];
+            if (storyId.includes('_')) {
+                storyId = storyId.split('_').pop();
+            }
         }
 
         let metadata = {
@@ -98,6 +101,27 @@ function injectStoryButtons() {
             if (extracted.shortcode && extracted.shortcode !== "story" && !storyId) {
                 metadata.shortcode = extracted.shortcode;
             }
+        }
+
+        // Direct DOM Fallback for Username from the Story Header
+        if (metadata.username === "fb_user" || metadata.username === "facebook.menu") {
+            try {
+                // The story author link is usually within the same major container as the play button
+                let container = targetBtn.closest('div[data-pagelet]') || document.body;
+                let authorLinks = container.querySelectorAll('a[role="link"][tabindex="0"]');
+                for (let link of authorLinks) {
+                    if (link.href && link.href.includes('facebook.com') && !link.href.includes('stories')) {
+                        let parts = new URL(link.href).pathname.split('/');
+                        let potentialName = parts[1]; // pathname starts with / so index 1 is the first path segment
+                        if (potentialName && !['messages', 'groups', 'events', 'watch', 'gaming', 'marketplace', 'bookmarks', 'menu', 'pages', 'friends', 'photo'].includes(potentialName.toLowerCase())) {
+                            if (!/^\d+$/.test(potentialName)) {
+                                metadata.username = potentialName;
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (e) {}
         }
 
         if (window.MDToastManager) window.MDToastManager.showInfo("🔍 Scanning Facebook state for media...");

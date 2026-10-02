@@ -61,7 +61,9 @@ class FBMetadataParser {
                             'close', 'next', 'previous', 'send message', 'follow',
                             'message', 'reply', 'new', 'create', 'join', 'chat', 'history', 'missing',
                             'reproducciones', 'views', 'mil', 'plays', 'reproducir',
-                            'earlier', 'yesterday', 'today', 'ayer', 'hoy', 'mañana', 'hace'
+                            'earlier', 'yesterday', 'today', 'ayer', 'hoy', 'mañana', 'hace',
+                            'story', 'stories', 'historia', 'historias', 'crear', 'add', 'agregar',
+                            'archive', 'archivo', 'archived', 'guardado'
                         ];
                         
                         let isBlocked = false;
@@ -88,7 +90,7 @@ class FBMetadataParser {
                                 } else {
                                     let parts = path.split('/');
                                     // Ensure it's likely a user profile path and NOT a numeric ID
-                                    if (parts.length > 1 && !['photo', 'groups', 'watch', 'stories', 'gaming', 'marketplace', 'permalink', 'events'].includes(parts[1].toLowerCase())) {
+                                    if (parts.length > 1 && !['photo', 'groups', 'watch', 'stories', 'gaming', 'marketplace', 'permalink', 'events', 'bookmarks', 'menu', 'messages', 'friends', 'pages'].includes(parts[1].toLowerCase())) {
                                         if (!/^\d+$/.test(parts[1])) {
                                             foundHandle = parts[1];
                                         }
@@ -144,7 +146,7 @@ class FBMetadataParser {
                             // Check for story id
                             const storyMatch = url.match(/stories\/[^\/]+\/([^\/]+)/);
                             if (storyMatch) {
-                                metadata.shortcode = storyMatch[1];
+                                metadata.shortcode = storyMatch[1].split('?')[0].split('&')[0].split('/')[0];
                             }
                         }
                     }
@@ -156,6 +158,10 @@ class FBMetadataParser {
             if (window.location.search.includes('id=')) {
                 let idMatch = window.location.search.match(/id=(\d+)/);
                 if (idMatch) userId = idMatch[1];
+            }
+            if (!userId && url.includes('/stories/')) {
+                let storyUserMatch = url.match(/\/stories\/(\d+)\//);
+                if (storyUserMatch) userId = storyUserMatch[1];
             }
             if (!userId) {
                 // Scan the raw HTML for Facebook's entity_id or userID definitions

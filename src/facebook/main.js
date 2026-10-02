@@ -21,19 +21,26 @@ window.addEventListener("message", (event) => {
         const shortcode = md.shortcode || "story";
         const timestamp = md.timestamp || Math.floor(Date.now() / 1000);
 
-        if (url) {
+        if (url || md.dash_manifest || md.story_url) {
+            let finalUrl = url || md.story_url;
+            let finalMediaType = (url || md.dash_manifest) ? "direct_story" : "auto";
+
+            if (!url && !md.dash_manifest) {
+                console.warn("[FB-MD] GraphQL Cache miss. Delegating story URL to yt-dlp fallback.");
+            }
+
             if (window.MDToastManager) window.MDToastManager.showInfo("⏳ Downloading media...");
 
             chrome.runtime.sendMessage({
                 action: "queue_download",
-                url: url,
-                mediaType: "direct_story",
+                url: finalUrl,
+                mediaType: finalMediaType,
                 platform: "facebook",
                 direct_metadata: {
                     username: username,
                     shortcode: shortcode,
                     is_video: type === "video",
-                    is_direct: true,
+                    is_direct: !!url || !!md.dash_manifest,
                     timestamp: timestamp,
                     dash_manifest: md.dash_manifest,
                     story_url: md.story_url
@@ -47,9 +54,9 @@ window.addEventListener("message", (event) => {
                 }
             });
         } else {
-            console.warn("[FB-MD] No direct URL found after retries.");
+            console.warn("[FB-MD] No URL or story URL available to download.");
             if (window.MDToastManager) {
-                window.MDToastManager.showError("❌ Could not extract URL. Navigate to the next story and come back, then try again.");
+                window.MDToastManager.showError("❌ Could not extract URL and no fallback URL available.");
             }
         }
     }

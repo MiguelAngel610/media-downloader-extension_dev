@@ -53,7 +53,7 @@ html:not(.night):not(.theme-dark) .tel-downloader-progress-toast {
 .tel-downloader-progress-title {
     margin: 0;
     color: #f4f4f5; /* Zinc 100 */
-    font-size: 13px;
+    font-size: 15px; /* Increased from 13px */
     font-weight: 600;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     white-space: nowrap;
@@ -102,7 +102,7 @@ html:not(.night):not(.theme-dark) .tel-downloader-progress-close:hover {
 .tel-downloader-progress-track {
     position: relative;
     width: 100%;
-    height: 12px;
+    height: 18px; /* Increased from 12px to fit larger text */
     background: rgba(255, 255, 255, 0.1);
     border-radius: 999px;
     overflow: hidden;
@@ -159,11 +159,11 @@ html:not(.night):not(.theme-dark) .tel-downloader-progress-track {
     left: 50%;
     transform: translate(-50%, -50%);
     margin: 0;
-    color: #ffffff;
-    font-size: 9px;
+    color: rgba(0, 0, 0, 0.85); /* Changed to near-black */
+    font-size: 11px;
     font-weight: 700;
     font-family: monospace;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    text-shadow: 0 1px 1px rgba(255,255,255,0.4); /* subtle light text shadow for depth */
     z-index: 5;
 }
 

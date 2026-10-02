@@ -7,17 +7,17 @@ function injectGhostModeToggles() {
     if (window.__md_fb_ghost_injected) return;
     
     // Facebook's top right navigation area
-    const navBar = document.querySelector('div[role="navigation"]');
-    if (!navBar) return;
+    let rightNav = document.querySelector('div[aria-label="Account Controls and Settings"]');
     
-    // Find the rightmost part of the nav bar, usually where the profile and Messenger icons are
-    // Facebook UI uses a flex container on the right side
-    let rightNav = Array.from(navBar.querySelectorAll('div')).find(el => {
-        let style = window.getComputedStyle(el);
-        return style.display === 'flex' && el.childElementCount >= 3;
-    });
-
-    if (!rightNav) rightNav = navBar;
+    // Fallback if the aria-label changes
+    if (!rightNav) {
+        const navBar = document.querySelector('div[role="banner"]');
+        if (navBar && navBar.lastElementChild) {
+            rightNav = navBar.lastElementChild;
+        }
+    }
+    
+    if (!rightNav) return;
 
     // Retrieve state
     chrome.storage.local.get(['fb_ghost_seen', 'fb_ghost_presence'], function(res) {

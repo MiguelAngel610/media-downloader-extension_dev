@@ -91,8 +91,8 @@
             const monthNamesEn = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
             const monthNamesEs = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 
-            // Match "15 de jul. de 2025", "15 jul 2025", "15 de julio"
-            const dayMonthMatch = text.match(/(\d{1,2})\s*(?:de\s*)?([a-záéíóú]{3,10})\.?\s*(?:(?:de|,)?\s*(\d{4}))?/i);
+            // Match "15 de jul. de 2025", "15 jul 2025", "15 de julio" (must be the whole string or start of string)
+            const dayMonthMatch = text.match(/^(?:\w+,\s*)?(\d{1,2})\s*(?:de\s*)?([a-záéíóú]{3,10})\.?\s*(?:(?:de|,)?\s*(\d{4}))?/i);
             if (dayMonthMatch) {
                 const mStr = dayMonthMatch[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").substring(0, 3);
                 let mIdx = monthNamesEs.indexOf(mStr);
@@ -104,8 +104,8 @@
                 }
             }
 
-            // Match "Jun 18, 02:28 PM" or "July 15, 2025"
-            const monthDayMatch = text.match(/([a-z]{3,9})\s+(\d{1,2})(?:,?\s*(\d{4}))?/i);
+            // Match "Jun 18, 02:28 PM" or "July 15, 2025" (must be the whole string or start of string)
+            const monthDayMatch = text.match(/^(?:\w+,\s*)?([a-z]{3,9})\s+(\d{1,2})(?:,?\s*(\d{4}))?/i);
             if (monthDayMatch) {
                 const mStr = monthDayMatch[1].toLowerCase().substring(0, 3);
                 let mIdx = monthNamesEn.indexOf(mStr);
@@ -158,7 +158,7 @@
         const prioritySelectors = [
             ".media-viewer-subtitle, .media-header-subtitle, .StoryViewer-subtitle, div[class*='subtitle'], div[class*='SubTitle']",
             "time, [class*='time'], [class*='Time'], .date, [class*='date'], [class*='Date']",
-            ".MessageMeta, .sub-text, .meta, span.O6fpaxCe, span, p"
+            ".MessageMeta, .sub-text, .meta, span.O6fpaxCe"
         ];
 
         for (let sel of prioritySelectors) {
@@ -171,7 +171,10 @@
                     continue;
                 }
 
-                const parsed = parseDateText(el.getAttribute("title")) || parseDateText(el.getAttribute("aria-label")) || parseDateText(el.textContent);
+                let textToParse = el.getAttribute("title") || el.getAttribute("aria-label") || el.textContent;
+                if (!textToParse || textToParse.length > 50) continue; // Skip huge text blocks to prevent false positives
+
+                const parsed = parseDateText(textToParse);
                 if (parsed === "TIME_ONLY") foundTimeOnly = true;
                 else if (parsed) return parsed;
             }

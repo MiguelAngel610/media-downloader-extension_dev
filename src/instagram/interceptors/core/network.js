@@ -1,5 +1,6 @@
 import { mdLog } from './logger.js';
-import { showGhostToast, isPresenceRequest, isSeenRequest, extractSignatureFromUrl, processAndPostData } from './fiber_search.js';
+import { showGhostToast, isPresenceRequest, isSeenRequest } from './ghost_mode.js';
+import { extractSignatureFromUrl, processAndPostData } from './media_parser.js';
 const originalFetch = window.fetch;
 window.fetch = async function (...args) {
     let url = args[0];

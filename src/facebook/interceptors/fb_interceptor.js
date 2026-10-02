@@ -101,6 +101,134 @@
         return null;
     }
 
+    /**
+     * DOM Viewport Intersection Strategy
+     * Scans the DOM for the largest visible media element (Image or Video).
+     * @returns {{ mediaUrl: string, mediaType: string }|null}
+     */
+    function extractFromDOM() {
+        let maxArea = 0;
+        let bestMedia = null;
+        let isVideo = false;
+
+        // Scan images
+        let imgs = document.querySelectorAll('img');
+        for (let img of imgs) {
+            if (img.src && !img.src.includes('static.xx.fbcdn.net') && !img.src.startsWith('data:')) {
+                let rect = img.getBoundingClientRect();
+                let area = rect.width * rect.height;
+                // Use 50px threshold to ignore thumbnails and icons but catch ultra-wide/tall aspect ratios
+                if (area > maxArea && rect.top >= 0 && rect.width > 50 && rect.height > 50) {
+                    maxArea = area;
+                    bestMedia = img;
+                    isVideo = false;
+                }
+            }
+        }
+
+        // Scan videos
+        let videos = document.querySelectorAll('video');
+        for (let v of videos) {
+            let rect = v.getBoundingClientRect();
+            let area = rect.width * rect.height;
+            if (area > maxArea && rect.top >= 0 && rect.width > 50 && rect.height > 50) {
+                maxArea = area;
+                bestMedia = v;
+                isVideo = true;
+            }
+        }
+
+        if (bestMedia) {
+            let src = bestMedia.src || bestMedia.currentSrc;
+            
+            // Scan GraphQL cache backwards for the most recent media node to extract true ID and timestamp
+            let latestVideoUrl = null;
+            let latestDash = null;
+            let latestId = null;
+            let latestCreationTime = null;
+            let latestUsername = null;
+            let cache = window.__FB_JSON_CACHE__ || {};
+            
+            function searchCacheForMedia(obj, parentStory) {
+                if (!obj || typeof obj !== 'object') return;
+                
+                let currentStory = parentStory;
+                if (obj.__typename === "Story" || obj.creation_time) {
+                    currentStory = obj;
+                }
+
+                if (isVideo && (obj.__typename === "Video" || obj.playable_url || obj.dash_manifest || obj.videoDeliveryResponseFragment)) {
+                    let urls = extractVideoUrls(obj);
+                    let dash = obj.dash_manifest || obj.videoDeliveryResponseFragment?.videoDeliveryResponseResult?.dash_manifest;
+                    if (urls.hdUrl || urls.sdUrl || dash) {
+                        latestVideoUrl = urls.hdUrl || urls.sdUrl;
+                        if (dash && typeof dash === 'string') {
+                            latestDash = dash.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+                        }
+                        if (currentStory) {
+                            let rawId = currentStory.id || currentStory.story_id;
+                            latestId = rawId ? rawId.toString().split('?')[0].split('&')[0].split('/')[0].split('#')[0] : null;
+                            latestCreationTime = currentStory.creation_time;
+                            if (currentStory.story_bucket_owner && currentStory.story_bucket_owner.name) {
+                                latestUsername = currentStory.story_bucket_owner.name;
+                            } else if (currentStory.actors && currentStory.actors[0] && currentStory.actors[0].name) {
+                                latestUsername = currentStory.actors[0].name;
+                            }
+                        }
+                        return;
+                    }
+                } else if (!isVideo && obj.image && obj.image.uri) {
+                    let cacheUri = obj.image.uri.split('?')[0];
+                    let domUri = src ? src.split('?')[0] : "";
+                    if (cacheUri === domUri || (!domUri && obj.__typename === "Photo")) {
+                        if (currentStory) {
+                            let rawId = currentStory.id || currentStory.story_id;
+                            latestId = rawId ? rawId.toString().split('?')[0].split('&')[0].split('/')[0].split('#')[0] : null;
+                            latestCreationTime = currentStory.creation_time;
+                            if (currentStory.story_bucket_owner && currentStory.story_bucket_owner.name) {
+                                latestUsername = currentStory.story_bucket_owner.name;
+                            } else if (currentStory.actors && currentStory.actors[0] && currentStory.actors[0].name) {
+                                latestUsername = currentStory.actors[0].name;
+                            }
+                        }
+                        return;
+                    }
+                }
+                
+                for (let key in obj) {
+                    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                        searchCacheForMedia(obj[key], currentStory);
+                        if ((isVideo && (latestVideoUrl || latestDash)) || (!isVideo && latestId)) return;
+                    }
+                }
+            }
+            
+            if (Array.isArray(cache)) {
+                for (let i = cache.length - 1; i >= 0; i--) {
+                    searchCacheForMedia(cache[i], null);
+                    if ((isVideo && (latestVideoUrl || latestDash)) || (!isVideo && latestId)) break;
+                }
+            }
+            
+            let cacheMeta = {};
+            if (latestId) {
+                latestId = latestId.toString().split('?')[0].split('&')[0].split('/')[0];
+                cacheMeta.shortcode = latestId;
+            }
+            if (latestCreationTime) cacheMeta.timestamp = latestCreationTime;
+            if (latestUsername) cacheMeta.username = latestUsername.replace(/[^a-zA-Z0-9_.]/g, '_').toLowerCase();
+
+            if (isVideo && src && src.startsWith('blob:')) {
+                if (latestVideoUrl || latestDash) {
+                    return { mediaUrl: latestVideoUrl || null, mediaType: 'video', dash_manifest: latestDash, cache_metadata: cacheMeta };
+                }
+            } else if (src && src.startsWith('http')) {
+                return { mediaUrl: src, mediaType: isVideo ? 'video' : 'image', cache_metadata: cacheMeta };
+            }
+        }
+        return null;
+    }
+
     // --- Network Interceptors ---
 
     const originalFetch = window.fetch;
@@ -122,7 +250,17 @@
                         let json = JSON.parse(cleanText);
                         window.__FB_JSON_CACHE__.push(json);
                         if (window.__FB_JSON_CACHE__.length > 30) window.__FB_JSON_CACHE__.shift();
-                    } catch (e) { }
+                    } catch (e) {
+                        let lines = cleanText.split('\n');
+                        for (let line of lines) {
+                            if (!line.trim()) continue;
+                            try {
+                                let json = JSON.parse(line);
+                                window.__FB_JSON_CACHE__.push(json);
+                                if (window.__FB_JSON_CACHE__.length > 30) window.__FB_JSON_CACHE__.shift();
+                            } catch (err) {}
+                        }
+                    }
                 }).catch(() => { });
             }
         } catch (e) { }
@@ -144,7 +282,17 @@
                                 let json = JSON.parse(cleanText);
                                 window.__FB_JSON_CACHE__.push(json);
                                 if (window.__FB_JSON_CACHE__.length > 30) window.__FB_JSON_CACHE__.shift();
-                            } catch (e) { }
+                            } catch (e) {
+                                let lines = cleanText.split('\n');
+                                for (let line of lines) {
+                                    if (!line.trim()) continue;
+                                    try {
+                                        let json = JSON.parse(line);
+                                        window.__FB_JSON_CACHE__.push(json);
+                                        if (window.__FB_JSON_CACHE__.length > 30) window.__FB_JSON_CACHE__.shift();
+                                    } catch (err) {}
+                                }
+                            }
                         }
                     } catch (e) { }
                 });
@@ -213,154 +361,92 @@
         return null;
     }
 
-    /**
-     * Decodes a JSON-escaped string (handles \/ \u0026 etc).
-     * @param {string} str - The escaped string.
-     * @returns {string} The decoded string.
-     */
-    function decodeEscapedStr(str) {
-        try { return JSON.parse('"' + str + '"'); }
-        catch (e) { return str.replace(/\\\//g, '/'); }
-    }
-
-    /**
-     * STRATEGY 2: Scans inline <script> tags for the story ID and extracts
-     * video URLs from the surrounding text using regex.
-     * This covers the SSR/hydration case where data is embedded in the HTML
-     * and never passes through fetch/XHR.
-     * @param {string} storyId - The base64 story ID (Uzpf...).
-     * @param {object} finalMetadata - Metadata object to augment with DASH if found.
-     * @returns {{ mediaUrl: string, mediaType: string, finalMetadata: object }|null}
-     */
-    function extractFromInlineScripts(storyId, finalMetadata) {
-        if (!storyId) return null;
-
-        // Strip base64 padding for broader matching — the '=' may be encoded as \u003d
-        let searchId = storyId.replace(/=+$/, '');
-        let scripts = document.querySelectorAll('script:not([src])');
-
-        for (let script of scripts) {
-            let text = script.textContent;
-            if (!text || text.length < 200 || !text.includes(searchId)) continue;
-
-            console.log("[FB] Found story ID in inline script. Extracting media URLs...");
-
-            // Take a text window around the story ID to scope extraction to the right story
-            let idPos = text.indexOf(searchId);
-            let windowStart = Math.max(0, idPos - 3000);
-            let windowEnd = Math.min(text.length, idPos + 15000);
-            let textWindow = text.substring(windowStart, windowEnd);
-
-            let hdUrl = null;
-            let sdUrl = null;
-
-            // Search progressive_urls array entries (most reliable, HD quality)
-            let progMatches = [...textWindow.matchAll(/"progressive_url"\s*:\s*"((?:[^"\\]|\\.)+)"(?:(?!"progressive_url").)*?"quality"\s*:\s*"(HD|SD)"/g)];
-            for (let p of progMatches) {
-                let decoded = decodeEscapedStr(p[1]);
-                if (p[2] === 'HD') hdUrl = decoded;
-                else if (p[2] === 'SD' && !sdUrl) sdUrl = decoded;
-            }
-
-            // Fallback: playable_url_quality_hd
-            if (!hdUrl) {
-                let m = textWindow.match(/"playable_url_quality_hd"\s*:\s*"((?:[^"\\]|\\.)+)"/);
-                if (m) hdUrl = decodeEscapedStr(m[1]);
-            }
-
-            // Fallback: browser_native_hd_url
-            if (!hdUrl) {
-                let m = textWindow.match(/"browser_native_hd_url"\s*:\s*"((?:[^"\\]|\\.)+)"/);
-                if (m) hdUrl = decodeEscapedStr(m[1]);
-            }
-
-            // Fallback: playable_url (SD)
-            if (!sdUrl) {
-                let m = textWindow.match(/"playable_url"\s*:\s*"((?:[^"\\]|\\.)+)"/);
-                if (m) sdUrl = decodeEscapedStr(m[1]);
-            }
-
-            let mediaUrl = hdUrl || sdUrl;
-
-            if (mediaUrl && mediaUrl.includes('fbcdn.net')) {
-                // Check for DASH manifest
-                let dashMatch = textWindow.match(/"dash_manifest"\s*:\s*"((?:[^"\\]|\\.)+)"/);
-                if (dashMatch && !mediaUrl) {
-                    finalMetadata.dash_manifest = decodeEscapedStr(dashMatch[1]);
-                }
-                return { mediaUrl, mediaType: "video", finalMetadata };
-            }
-
-            // Check for Photo stories
-            if (textWindow.includes('"__typename":"Photo"') || textWindow.includes('"__typename\\u0022:\\u0022Photo"')) {
-                let imgMatch = textWindow.match(/"image"\s*:\s*\{\s*"uri"\s*:\s*"((?:[^"\\]|\\.)+)"/);
-                if (imgMatch) {
-                    let imgUrl = decodeEscapedStr(imgMatch[1]);
-                    if (imgUrl && imgUrl.includes('fbcdn.net')) {
-                        return { mediaUrl: imgUrl, mediaType: "image", finalMetadata };
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Attempts to extract story media with retries.
-     * Strategy 1: GraphQL JSON cache (populated by fetch/XHR interceptors).
-     * Strategy 2: Inline script scanning (covers SSR/hydration on F5).
-     */
-    function extractStoryWithRetry(currentStoryId, finalMetadata, attempt, maxRetries, retryDelayMs) {
-        // Strategy 1: GraphQL JSON cache
-        let result = searchCacheForStory(currentStoryId, finalMetadata);
-
-        // Strategy 2: Inline script scanning (only if cache missed)
-        if (!result) {
-            result = extractFromInlineScripts(currentStoryId, finalMetadata);
-        }
-
-        if (result) {
-            console.log(`[FB] Media extracted successfully (attempt ${attempt}/${maxRetries}).`);
-            window.postMessage({
-                action: "FB_STORY_RESULT",
-                url: result.mediaUrl,
-                type: result.mediaType,
-                metadata: result.finalMetadata
-            }, "*");
-            return;
-        }
-
-        if (attempt < maxRetries) {
-            console.log(`[FB] No media found (attempt ${attempt}/${maxRetries}). Retrying in ${retryDelayMs}ms...`);
-            setTimeout(() => {
-                extractStoryWithRetry(currentStoryId, finalMetadata, attempt + 1, maxRetries, retryDelayMs);
-            }, retryDelayMs);
-            return;
-        }
-
-        // All retries exhausted
-        console.warn("[FB] All retry attempts exhausted. No direct URL or DASH found.");
-        window.postMessage({
-            action: "FB_STORY_RESULT",
-            url: null,
-            type: "video",
-            metadata: finalMetadata
-        }, "*");
-    }
+    // --- Story Media Extraction Handler ---
 
     window.addEventListener("message", (event) => {
         if (event.source !== window || !event.data) return;
 
-        if (event.data.action === "FB_GET_STORY_MEDIA") {
+        const action = event.data.action;
+        if (action === "FB_GET_STORY_MEDIA" || action === "FB_GET_STORY_VIDEO" || action === "FB_GET_STORY_IMAGE") {
             let finalMetadata = event.data.metadata || {};
 
-            // Extract the current Story ID from the URL (base64-encoded Uzpf... format)
+            // Try to find the exact story ID from the visible DOM container (bypasses stale URL issues)
+            let activeDataId = null;
+            let dataElements = document.querySelectorAll('[data-id^="Uzpf"]');
+            for (let el of dataElements) {
+                let rect = el.getBoundingClientRect();
+                // If it's visible on screen, this is our active story!
+                if (rect.width > 0 && rect.height > 0 && rect.left >= 0 && rect.right <= (window.innerWidth || document.documentElement.clientWidth)) {
+                    activeDataId = el.getAttribute('data-id');
+                    break;
+                }
+            }
+
+            // Extract the current Story ID: DOM data-id > URL match > finalMetadata.shortcode
             let currentUrl = decodeURIComponent(window.location.href);
             let urlIdMatch = currentUrl.match(/Uzpf[a-zA-Z0-9_-]+={0,2}/);
-            let currentStoryId = urlIdMatch ? urlIdMatch[0] : finalMetadata.shortcode;
+            let currentStoryId = activeDataId || (urlIdMatch ? urlIdMatch[0] : finalMetadata.shortcode);
 
-            // Start the retry-based extraction (3 attempts, 1.5s apart = max 3s wait)
-            extractStoryWithRetry(currentStoryId, finalMetadata, 1, 3, 1500);
+            if (currentStoryId && currentStoryId.startsWith('Uzpf')) {
+                try {
+                    let decoded = atob(currentStoryId);
+                    let numMatch = decoded.match(/\d+/);
+                    if (numMatch) finalMetadata.shortcode = numMatch[0];
+                } catch(e) {}
+            } else if (currentStoryId) {
+                finalMetadata.shortcode = currentStoryId;
+            }
+
+            console.log(`[FB Interceptor] Received ${action} for ID: ${currentStoryId}`);
+
+            // Strategy 1 (and only): GraphQL JSON cache
+            let result = searchCacheForStory(currentStoryId, finalMetadata);
+
+            if (result) {
+                // If action enforces a type, override it
+                if (action === "FB_GET_STORY_VIDEO") result.mediaType = "video";
+                if (action === "FB_GET_STORY_IMAGE") result.mediaType = "image";
+
+                console.log(`[FB Interceptor] Media extracted successfully from GraphQL cache.`);
+                window.postMessage({
+                    action: "FB_STORY_RESULT",
+                    url: result.mediaUrl,
+                    type: result.mediaType,
+                    metadata: result.finalMetadata
+                }, "*");
+            } else {
+                console.warn("[FB Interceptor] GraphQL Cache miss. Attempting DOM Viewport Fallback...");
+                
+                let domResult = extractFromDOM();
+                if (domResult) {
+                    console.log("[FB Interceptor] DOM Viewport Strategy Success:", domResult.mediaUrl);
+                    if (domResult.dash_manifest) {
+                        finalMetadata.dash_manifest = domResult.dash_manifest;
+                    }
+                    if (domResult.cache_metadata) {
+                        if (domResult.cache_metadata.shortcode) finalMetadata.shortcode = domResult.cache_metadata.shortcode;
+                        if (domResult.cache_metadata.timestamp) finalMetadata.timestamp = domResult.cache_metadata.timestamp;
+                        if (domResult.cache_metadata.username) finalMetadata.username = domResult.cache_metadata.username;
+                    }
+                    window.postMessage({
+                        action: "FB_STORY_RESULT",
+                        url: domResult.mediaUrl,
+                        type: domResult.mediaType,
+                        metadata: finalMetadata
+                    }, "*");
+                } else {
+                    console.warn("[FB Interceptor] DOM Fallback failed. Delegating to yt-dlp fallback.");
+                    
+                    // Fallback to yt-dlp
+                    // We send url: null so main.js knows it needs to use yt-dlp on the story_url
+                    window.postMessage({
+                        action: "FB_STORY_RESULT",
+                        url: null,
+                        type: action === "FB_GET_STORY_IMAGE" ? "image" : "video",
+                        metadata: finalMetadata
+                    }, "*");
+                }
+            }
         }
     });
 })();

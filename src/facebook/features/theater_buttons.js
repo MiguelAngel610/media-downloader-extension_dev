@@ -45,9 +45,20 @@ function injectTheaterButtons() {
             e.stopPropagation();
             e.stopImmediatePropagation();
             
-            let metadata = { username: "fb_user", shortcode: "post", timestamp: Math.floor(Date.now() / 1000) };
+            let metadata = { 
+                username: "fb_user", 
+                shortcode: "post", 
+                timestamp: Math.floor(Date.now() / 1000),
+                story_url: window.location.href
+            };
+            
             if (window.FBMetadataParser) {
-                metadata = window.FBMetadataParser.extractFromDOM(dialog);
+                let extracted = window.FBMetadataParser.extractFromDOM(dialog);
+                metadata.username = extracted.username || metadata.username;
+                metadata.timestamp = extracted.timestamp || metadata.timestamp;
+                if (extracted.shortcode && extracted.shortcode !== "story") {
+                    metadata.shortcode = extracted.shortcode;
+                }
             }
 
             if (hasVideo) {
