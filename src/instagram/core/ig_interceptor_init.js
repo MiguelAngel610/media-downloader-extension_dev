@@ -53,11 +53,11 @@ chrome.runtime.onMessage.addListener((msg) => {
             window.MDToastManager.showError("Host Error: " + (msg.response.message || "Unknown error"));
         } else if (msg.response.status === 'success' && window.MDToastManager) {
             let text = "✅ Download completed!";
-            if (msg.response.filename) text += "<br><strong style='font-size:1.1em; color:#fff;'>" + msg.response.filename + "</strong>";
+            if (msg.response.filename) text += "<br><strong style='font-size:1.1em; opacity:0.9;'>" + msg.response.filename + "</strong>";
             window.MDToastManager.showSuccess(text, 4000);
         } else if (msg.response.status === 'skipped' && window.MDToastManager) {
             let text = "⏭️ File already exists";
-            if (msg.response.filename) text += "<br><strong style='font-size:1.1em; color:#fff;'>" + msg.response.filename + "</strong>";
+            if (msg.response.filename) text += "<br><strong style='font-size:1.1em; opacity:0.9;'>" + msg.response.filename + "</strong>";
             window.MDToastManager.showInfo(text, 3000);
         } else if (msg.response.status === 'progress' && window.MDToastManager) {
             if (!window.__md_last_progress_toast || Date.now() - window.__md_last_progress_toast > 5000) {
