@@ -58,3 +58,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 });
+
+// Universal Shortcut Support
+if (window.ShortcutManager) {
+    window.ShortcutManager.onShortcutPressed(() => {
+        const btn = document.querySelector('.DownloadButton');
+        if (btn) {
+            btn.click();
+            return;
+        }
+
+        // If we are the top window, try to find the iframe and click it inside
+        if (window.self === window.top) {
+            const iframe = document.querySelector('iframe');
+            if (iframe) {
+                try {
+                    let doc = iframe.contentDocument || iframe.contentWindow.document;
+                    let innerBtn = doc.querySelector('.DownloadButton');
+                    if (innerBtn) {
+                        innerBtn.click();
+                    }
+                } catch(e) {}
+            }
+        }
+    });
+}
