@@ -26,6 +26,13 @@ setInterval(() => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "get_photo_date_at_time") {
         const targetTime = request.time;
+        
+        // If we are the top-level wrapper and haven't found any dates, 
+        // ignore the message so the inner iframe can respond instead.
+        if (window.self === window.top && dateTimeline.length === 0) {
+            return false;
+        }
+
         let bestMatch = null;
         for (let i = dateTimeline.length - 1; i >= 0; i--) {
             if (dateTimeline[i].appearedAt <= targetTime + 500) {
