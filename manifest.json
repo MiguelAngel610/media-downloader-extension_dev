@@ -133,8 +133,12 @@
         "*://photos.google.com/*"
       ],
       "js": [
+        "src/shared/utils/toast_manager.js",
         "src/shared/utils/date_parser.js",
         "src/google_photos/main.js"
+      ],
+      "css": [
+        "src/shared/styles/content.css"
       ],
       "run_at": "document_end"
     },
@@ -143,9 +147,14 @@
         "*://*.icloud.com/*"
       ],
       "js": [
+        "src/shared/utils/toast_manager.js",
         "src/shared/utils/date_parser.js",
         "src/icloud/main.js"
       ],
+      "css": [
+        "src/shared/styles/content.css"
+      ],
+      "all_frames": true,
       "run_at": "document_end"
     }
   ],
