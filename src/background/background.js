@@ -374,13 +374,17 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
                         responded = true;
                         const includeSeconds = response.hasSeconds !== false;
                         const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(response.timestamp), includeSeconds);
-                        suggest({ filename: `${datePrefix}_${baseName}${ext}`, conflictAction: "uniquify" });
+                        const finalName = `${datePrefix}_${baseName}${ext}`;
+                        suggest({ filename: finalName, conflictAction: "uniquify" });
+                        chrome.tabs.sendMessage(tab.id, { action: "show_download_toast", filename: finalName, hasSeconds: includeSeconds });
                     }
                     
                     if (pendingRequests === 0 && !responded) {
                         if (!hasDateAlready) {
                             const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(item.startTime));
-                            suggest({ filename: `${datePrefix}_${baseName}${ext}`, conflictAction: "uniquify" });
+                            const finalName = `${datePrefix}_${baseName}${ext}`;
+                            suggest({ filename: finalName, conflictAction: "uniquify" });
+                            chrome.tabs.sendMessage(tab.id, { action: "show_download_toast", filename: finalName, hasSeconds: true });
                         } else {
                             suggest();
                         }

@@ -47,7 +47,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (bestMatch && window.MDDateParser) {
             const parsed = window.MDDateParser.parseLocalizedDate(bestMatch.dateStr);
             if (parsed) {
-                if (window.MDToastManager) window.MDToastManager.showSuccess("✅ Original date extracted from iCloud");
                 sendResponse({ success: true, timestamp: parsed.getTime(), hasSeconds: false });
                 return true;
             }
@@ -55,6 +54,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         
         if (window.MDToastManager) window.MDToastManager.showError("⚠️ Could not extract iCloud date.");
         sendResponse({ success: false });
+        return true;
+    }
+
+    if (request.action === "show_download_toast") {
+        if (window.self === window.top) return false;
+        if (window.MDToastManager) window.MDToastManager.showSuccess(`✅ Descargado: ${request.filename}`);
+        sendResponse({ success: true });
         return true;
     }
 });

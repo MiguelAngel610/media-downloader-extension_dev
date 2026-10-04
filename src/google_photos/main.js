@@ -134,17 +134,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
             if (exactTimestamp) {
                 parsed = new Date(exactTimestamp);
-                if (window.MDToastManager) window.MDToastManager.showSuccess(`✅ EXACT date extracted (with seconds)`);
+                sendResponse({ success: true, timestamp: parsed.getTime(), hasSeconds: true });
             } else {
-                if (window.MDToastManager) window.MDToastManager.showSuccess(`✅ Original date extracted (no seconds)`);
+                sendResponse({ success: true, timestamp: parsed.getTime(), hasSeconds: false });
             }
 
-            sendResponse({ success: true, timestamp: parsed.getTime() });
             return true;
         } else {
             if (window.MDToastManager) window.MDToastManager.showError(`⚠️ Parsing failed for: ${bestMatch.dateStr} / ${bestMatch.timeStr}`);
             sendResponse({ success: false });
             return true;
         }
+    }
+
+    if (request.action === "show_download_toast") {
+        let msg = request.hasSeconds ? `✅ Descargado: ${request.filename}` : `✅ Descargado (Sin seg): ${request.filename}`;
+        if (window.MDToastManager) window.MDToastManager.showSuccess(msg);
+        sendResponse({ success: true });
+        return true;
     }
 });
