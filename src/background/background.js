@@ -358,7 +358,7 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
             if (tabs.length === 0) {
                 if (!hasDateAlready) {
                     const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(item.startTime));
-                    suggest({ filename: `${datePrefix}${ext}`, conflictAction: "uniquify" });
+                    suggest({ filename: `${datePrefix}_${baseName}${ext}`, conflictAction: "uniquify" });
                 } else {
                     suggest();
                 }
@@ -373,13 +373,13 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
                     } else if (!responded && response && response.success && response.timestamp) {
                         responded = true;
                         const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(response.timestamp));
-                        suggest({ filename: `${datePrefix}${ext}`, conflictAction: "uniquify" });
+                        suggest({ filename: `${datePrefix}_${baseName}${ext}`, conflictAction: "uniquify" });
                     }
                     
                     if (pendingRequests === 0 && !responded) {
                         if (!hasDateAlready) {
                             const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(item.startTime));
-                            suggest({ filename: `${datePrefix}${ext}`, conflictAction: "uniquify" });
+                            suggest({ filename: `${datePrefix}_${baseName}${ext}`, conflictAction: "uniquify" });
                         } else {
                             suggest();
                         }
