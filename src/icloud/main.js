@@ -48,7 +48,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             const parsed = window.MDDateParser.parseLocalizedDate(bestMatch.dateStr);
             if (parsed) {
                 if (window.MDToastManager) window.MDToastManager.showSuccess("✅ Original date extracted from iCloud");
-                sendResponse({ success: true, timestamp: parsed.getTime() });
+                sendResponse({ success: true, timestamp: parsed.getTime(), hasSeconds: false });
                 return true;
             }
         }

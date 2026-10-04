@@ -62,7 +62,7 @@ class MDFilenameFormatter {
      * @param {string|Date|number} dateInput - The date to format. If null, uses current date.
      * @returns {string} The standardized datetime string (e.g., 20221231_223239).
      */
-    static formatDateTime(dateInput) {
+    static formatDateTime(dateInput, includeSeconds = true) {
         let d;
         try {
             d = dateInput ? new Date(dateInput) : new Date();
@@ -79,9 +79,13 @@ class MDFilenameFormatter {
         const day = String(d.getDate()).padStart(2, '0');
         const hours = String(d.getHours()).padStart(2, '0');
         const minutes = String(d.getMinutes()).padStart(2, '0');
-        const seconds = String(d.getSeconds()).padStart(2, '0');
-
-        return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+        
+        if (includeSeconds) {
+            const seconds = String(d.getSeconds()).padStart(2, '0');
+            return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+        } else {
+            return `${year}${month}${day}_${hours}${minutes}`;
+        }
     }
 
     /**

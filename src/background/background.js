@@ -372,7 +372,8 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
                         // ignore error for tabs without our script
                     } else if (!responded && response && response.success && response.timestamp) {
                         responded = true;
-                        const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(response.timestamp));
+                        const includeSeconds = response.hasSeconds !== false;
+                        const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(response.timestamp), includeSeconds);
                         suggest({ filename: `${datePrefix}_${baseName}${ext}`, conflictAction: "uniquify" });
                     }
                     
