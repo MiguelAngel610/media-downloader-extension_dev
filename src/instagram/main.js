@@ -7,9 +7,6 @@ function injectMinimalistButtons() {
     // Inject profile pic button
     injectPfpButton();
 
-    // Inject story button
-    injectStoryButton();
-
     // Inject feed/reel download buttons
     injectFeedButtons();
 

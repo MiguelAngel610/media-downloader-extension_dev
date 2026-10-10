@@ -121,36 +121,55 @@ function injectStoryButton() {
 
     let possibleDots = [];
     
-    // 1. Find by SVG icon (3 circles) - very robust against localization and class changes
-    let svgs = document.querySelectorAll('svg');
-    for (let b of svgs) {
-        if (b.querySelectorAll('circle').length === 3) {
-            let target = b.closest('button, [role="button"], div[role="button"]') || b;
-            let rect = target.getBoundingClientRect();
-            let inStoryZone = rect.width > 0 && rect.height > 0;
-            if (inStoryZone && !possibleDots.includes(target)) possibleDots.push(target);
+    // CACHE LOGIC: Ultra-fast 60FPS check
+    if (window.__md_cachedStoryDots && document.body.contains(window.__md_cachedStoryDots)) {
+        let rect = window.__md_cachedStoryDots.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+            possibleDots = [window.__md_cachedStoryDots];
         }
     }
 
-    // 2. Find by aria-label - fallback if SVG changes, but limited to elements that actually have aria-labels to save performance
-    let labeledBtns = document.querySelectorAll('button[aria-label], [role="button"][aria-label]');
-    for (let b of labeledBtns) {
-        let label = (b.getAttribute('aria-label') || '').toLowerCase();
-        if (label === 'more' || label === 'más' || label === 'mas' || label.includes('opciones') || label.includes('options')) {
-            let rect = b.getBoundingClientRect();
-            let inStoryZone = rect.width > 0 && rect.height > 0;
-            if (inStoryZone && !possibleDots.includes(b)) possibleDots.push(b);
+    // HEAVY SCAN: Only runs if cache is invalid/empty, throttled to max once every 150ms
+    if (possibleDots.length === 0) {
+        if (window.__md_lastStoryButtonScan && Date.now() - window.__md_lastStoryButtonScan < 150) {
+            return; // Wait for throttle
         }
-    }
+        window.__md_lastStoryButtonScan = Date.now();
+        window.__md_cachedStoryDots = null;
 
-    // Sort by proximity to screen center so the active story slide header is always selected over background feed posts
-    possibleDots.sort((a, b) => {
-        let aR = a.getBoundingClientRect(), bR = b.getBoundingClientRect();
-        return Math.abs((aR.left + aR.width / 2) - (window.innerWidth / 2)) - Math.abs((bR.left + bR.width / 2) - (window.innerWidth / 2));
-    });
+        // 1. Find by SVG icon (3 circles) - very robust against localization and class changes
+        let svgs = document.querySelectorAll('svg');
+        for (let b of svgs) {
+            if (b.querySelectorAll('circle').length === 3) {
+                let target = b.closest('button, [role="button"], div[role="button"]') || b;
+                let rect = target.getBoundingClientRect();
+                let inStoryZone = rect.width > 0 && rect.height > 0;
+                if (inStoryZone && !possibleDots.includes(target)) possibleDots.push(target);
+            }
+        }
+
+        // 2. Find by aria-label - fallback if SVG changes, but limited to elements that actually have aria-labels to save performance
+        let labeledBtns = document.querySelectorAll('button[aria-label], [role="button"][aria-label]');
+        for (let b of labeledBtns) {
+            let label = (b.getAttribute('aria-label') || '').toLowerCase();
+            if (label === 'more' || label === 'más' || label === 'mas' || label.includes('opciones') || label.includes('options')) {
+                let rect = b.getBoundingClientRect();
+                let inStoryZone = rect.width > 0 && rect.height > 0;
+                if (inStoryZone && !possibleDots.includes(b)) possibleDots.push(b);
+            }
+        }
+
+        // Sort by proximity to screen center so the active story slide header is always selected over background feed posts
+        possibleDots.sort((a, b) => {
+            let aR = a.getBoundingClientRect(), bR = b.getBoundingClientRect();
+            return Math.abs((aR.left + aR.width / 2) - (window.innerWidth / 2)) - Math.abs((bR.left + bR.width / 2) - (window.innerWidth / 2));
+        });
+    }
 
     let dotsBtn = possibleDots.length > 0 ? possibleDots[0] : null;
     if (dotsBtn) {
+        window.__md_cachedStoryDots = dotsBtn;
+        
         if (dotsBtn.classList.contains('md-hijacked-dots')) {
             dotsBtn.classList.remove('md-hijacked-dots');
         }
