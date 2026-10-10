@@ -1,5 +1,32 @@
 /* Media Downloader - Story Button: Download button injected next to the 3-dots in stories */
 
+function syncStoryButtonState(btn) {
+    let parent = btn.closest('article, main, div[role="dialog"]');
+    if (parent && parent.__md_download_state) {
+        let state = parent.__md_download_state;
+        if (Date.now() - state.time < 2000) {
+            if (!btn.classList.contains(state.class)) {
+                btn.className = 'md-native-btn md-story-dl-btn-inline ' + state.class;
+                btn.innerHTML = state.html;
+                if (state.class === 'md-loading') {
+                    btn.style.opacity = '0.5';
+                    btn.style.background = 'rgba(255, 255, 255, 0.3)';
+                } else if (state.class === 'md-success') {
+                    btn.style.opacity = '1';
+                    btn.style.background = 'transparent';
+                }
+            }
+        } else {
+            if (btn.classList.contains('md-loading') || btn.classList.contains('md-success')) {
+                btn.className = 'md-native-btn md-story-dl-btn-inline';
+                if (typeof SVG_DOWNLOAD !== 'undefined') btn.innerHTML = SVG_DOWNLOAD;
+                btn.style.opacity = '1';
+                btn.style.background = 'transparent';
+            }
+        }
+    }
+}
+
 function detectSharedReelOrPost() {
     // Check 0: Ground Truth from Instagram API JSON internal dictionary
     let currentUrl = window.location.href;
@@ -178,13 +205,16 @@ function injectStoryButton() {
 
         let existingBtn = dotsBtn.previousElementSibling;
         if (existingBtn && existingBtn.classList.contains('md-story-dl-btn-inline')) {
-            // The button is already exactly where it should be
+            if (typeof syncStoryButtonState === 'function') syncStoryButtonState(existingBtn);
             return;
         }
 
-        // If the button exists somewhere else in the header (orphaned by React re-renders), remove it
         let orphanedBtn = header.querySelector('.md-story-dl-btn-inline');
-        if (orphanedBtn) orphanedBtn.remove();
+        if (orphanedBtn) {
+            dotsBtn.parentNode.insertBefore(orphanedBtn, dotsBtn);
+            if (typeof syncStoryButtonState === 'function') syncStoryButtonState(orphanedBtn);
+            return;
+        }
 
         let dlBtn = document.createElement('div');
         dlBtn.className = 'md-native-btn md-story-dl-btn-inline';
@@ -207,6 +237,7 @@ function injectStoryButton() {
         dlBtn.style.zIndex = '9999'; // Ensure it's on top
         
         dotsBtn.parentNode.insertBefore(dlBtn, dotsBtn);
+        if (typeof syncStoryButtonState === 'function') syncStoryButtonState(dlBtn);
 
             dlBtn.onclick = async (e) => {
                 e.preventDefault();
