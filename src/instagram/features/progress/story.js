@@ -108,23 +108,24 @@ export function syncStoryProgressBar() {
         }
 
         if (possibleSegmentRows.length === 0) {
-            document.querySelectorAll('div[style*="width:"], div[style*="transform:"]').forEach(inner => {
-                let current = inner.parentElement;
-                let climbs = 0;
-                while (current && climbs < 4) {
-                    if (isValidSegmentRow(current) && !possibleSegmentRows.includes(current)) {
-                        possibleSegmentRows.push(current);
-                        break;
+            if (!window.__md_lastHeavySearch || Date.now() - window.__md_lastHeavySearch > 250) {
+                window.__md_lastHeavySearch = Date.now();
+                
+                document.querySelectorAll('div[style*="width:"], div[style*="transform:"]').forEach(inner => {
+                    let current = inner.parentElement;
+                    let climbs = 0;
+                    while (current && climbs < 4) {
+                        if (isValidSegmentRow(current) && !possibleSegmentRows.includes(current)) {
+                            possibleSegmentRows.push(current);
+                            break;
+                        }
+                        current = current.parentElement;
+                        climbs++;
                     }
-                    current = current.parentElement;
-                    climbs++;
-                }
-            });
+                });
 
-            // Instant universal structural detection at frame 0
-            if (possibleSegmentRows.length === 0) {
-                if (!window.__md_lastHeavySearch || Date.now() - window.__md_lastHeavySearch > 250) {
-                    window.__md_lastHeavySearch = Date.now();
+                // Instant universal structural detection at frame 0
+                if (possibleSegmentRows.length === 0) {
                     let allDivs = document.querySelectorAll('section div, div[role="dialog"] div, main div');
                     for (let d of allDivs) {
                         if (d.children.length === 0 || d.children.length > 150) continue;
@@ -198,9 +199,17 @@ export function syncStoryProgressBar() {
                 slider.addEventListener('touchcancel', endDrag, false);
                 slider.addEventListener('change', endDrag, false);
                 slider.addEventListener('blur', endDrag, false);
-                window.addEventListener('mouseup', endDrag, false);
-                window.addEventListener('pointerup', endDrag, false);
-                window.addEventListener('touchend', endDrag, false);
+
+                if (!window.__md_storyGlobalListenersAttached) {
+                    window.__md_storyGlobalListenersAttached = true;
+                    const globalEndDrag = () => {
+                        let activeSlider = document.querySelector('#md-story-slider');
+                        if (activeSlider) activeSlider.__md_isDragging = false;
+                    };
+                    window.addEventListener('mouseup', globalEndDrag, false);
+                    window.addEventListener('pointerup', globalEndDrag, false);
+                    window.addEventListener('touchend', globalEndDrag, false);
+                }
 
                 slider.addEventListener('click', (e) => e.stopPropagation(), false);
                 slider.addEventListener('focus', (e) => e.target.blur(), false);
