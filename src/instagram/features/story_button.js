@@ -1,7 +1,7 @@
 /* Media Downloader - Story Button: Download button injected next to the 3-dots in stories */
 
 function syncStoryButtonState(btn) {
-    let parent = btn.closest('article, main, div[role="dialog"], section');
+    let parent = btn.closest('article, main, div[role="dialog"], section, header, ._aa61') || document.body;
     if (parent && parent.__md_download_state) {
         let state = parent.__md_download_state;
         if (Date.now() - state.time < 2000) {
