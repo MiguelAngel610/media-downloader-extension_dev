@@ -157,29 +157,37 @@ function injectStoryButton() {
 
         let header = dotsBtn.closest('header, section, ._aa61') || dotsBtn.parentNode;
 
-        let existingBtn = header.querySelector('.md-story-dl-btn-inline');
-        if (!existingBtn) {
-            let dlBtn = document.createElement('div');
-            dlBtn.className = 'md-native-btn md-story-dl-btn-inline';
-            dlBtn.innerHTML = SVG_DOWNLOAD;
-            dlBtn.style.color = 'white';
-            dlBtn.style.cursor = 'pointer';
-            dlBtn.style.display = 'flex';
-            dlBtn.style.alignItems = 'center';
-            dlBtn.style.justifyContent = 'center';
-            dlBtn.style.padding = '8px';
-            dlBtn.style.margin = '0';
-            dlBtn.style.lineHeight = '0';
-            dlBtn.style.background = 'transparent';
-            dlBtn.title = "Download Story";
+        let existingBtn = dotsBtn.previousElementSibling;
+        if (existingBtn && existingBtn.classList.contains('md-story-dl-btn-inline')) {
+            // The button is already exactly where it should be
+            return;
+        }
 
-            dlBtn.onmouseenter = () => dlBtn.style.opacity = '0.5';
-            dlBtn.onmouseleave = () => dlBtn.style.opacity = '1';
+        // If the button exists somewhere else in the header (orphaned by React re-renders), remove it
+        let orphanedBtn = header.querySelector('.md-story-dl-btn-inline');
+        if (orphanedBtn) orphanedBtn.remove();
 
-            dlBtn.style.pointerEvents = 'auto'; // Ensure it's clickable even if parent isn't
-            dlBtn.style.zIndex = '9999'; // Ensure it's on top
-            
-            dotsBtn.parentNode.insertBefore(dlBtn, dotsBtn);
+        let dlBtn = document.createElement('div');
+        dlBtn.className = 'md-native-btn md-story-dl-btn-inline';
+        dlBtn.innerHTML = SVG_DOWNLOAD;
+        dlBtn.style.color = 'white';
+        dlBtn.style.cursor = 'pointer';
+        dlBtn.style.display = 'flex';
+        dlBtn.style.alignItems = 'center';
+        dlBtn.style.justifyContent = 'center';
+        dlBtn.style.padding = '8px';
+        dlBtn.style.margin = '0';
+        dlBtn.style.lineHeight = '0';
+        dlBtn.style.background = 'transparent';
+        dlBtn.title = "Download Story";
+
+        dlBtn.onmouseenter = () => dlBtn.style.opacity = '0.5';
+        dlBtn.onmouseleave = () => dlBtn.style.opacity = '1';
+
+        dlBtn.style.pointerEvents = 'auto'; // Ensure it's clickable even if parent isn't
+        dlBtn.style.zIndex = '9999'; // Ensure it's on top
+        
+        dotsBtn.parentNode.insertBefore(dlBtn, dotsBtn);
 
             dlBtn.onclick = async (e) => {
                 e.preventDefault();
@@ -340,7 +348,5 @@ function injectStoryButton() {
                     if (window.MDToastManager) window.MDToastManager.showError("Err: " + (err.message || err.toString()));
                 }
             };
-        }
     }
 }
-
