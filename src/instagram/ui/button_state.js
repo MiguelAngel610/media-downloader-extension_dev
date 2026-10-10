@@ -23,7 +23,12 @@ function updateButtonIcon(btn, newSvgCode, isFloating) {
 function sendDownloadRequest(btn, url, metadata, isFloating = false, originalElement = null) {
     btn.classList.add('md-loading');
 
-    let parentArticle = (originalElement || btn).closest('article, main, div[role="dialog"], section, header, ._aa61') || document.body;
+    let parentArticle;
+    if (window.location.href.includes('/stories/')) {
+        parentArticle = document.body;
+    } else {
+        parentArticle = (originalElement || btn).closest('article, main, div[role="dialog"]');
+    }
     if (parentArticle) {
         parentArticle.__md_download_state = { time: Date.now(), class: 'md-loading', html: SVG_DOWNLOAD, isFloating: isFloating };
     }
