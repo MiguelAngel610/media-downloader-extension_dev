@@ -151,7 +151,8 @@ function injectStoryButton() {
     // CACHE LOGIC: Ultra-fast 60FPS check
     if (window.__md_cachedStoryDots && document.body.contains(window.__md_cachedStoryDots)) {
         let rect = window.__md_cachedStoryDots.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
+        let isHijacked = window.__md_cachedStoryDots.classList.contains('md-hijacked-dots');
+        if ((rect.width > 0 && rect.height > 0) || isHijacked) {
             possibleDots = [window.__md_cachedStoryDots];
         }
     }
@@ -170,7 +171,8 @@ function injectStoryButton() {
             if (b.querySelectorAll('circle').length === 3) {
                 let target = b.closest('button, [role="button"], div[role="button"]') || b;
                 let rect = target.getBoundingClientRect();
-                let inStoryZone = rect.width > 0 && rect.height > 0;
+                let isHijacked = target.classList.contains('md-hijacked-dots');
+                let inStoryZone = (rect.width > 0 && rect.height > 0) || isHijacked;
                 if (inStoryZone && !possibleDots.includes(target)) possibleDots.push(target);
             }
         }
@@ -181,7 +183,8 @@ function injectStoryButton() {
             let label = (b.getAttribute('aria-label') || '').toLowerCase();
             if (label === 'more' || label === 'más' || label === 'mas' || label.includes('opciones') || label.includes('options')) {
                 let rect = b.getBoundingClientRect();
-                let inStoryZone = rect.width > 0 && rect.height > 0;
+                let isHijacked = b.classList.contains('md-hijacked-dots');
+                let inStoryZone = (rect.width > 0 && rect.height > 0) || isHijacked;
                 if (inStoryZone && !possibleDots.includes(b)) possibleDots.push(b);
             }
         }
