@@ -152,7 +152,13 @@ function injectStoryButton() {
     if (window.__md_cachedStoryDots && document.body.contains(window.__md_cachedStoryDots)) {
         let rect = window.__md_cachedStoryDots.getBoundingClientRect();
         let isHijacked = window.__md_cachedStoryDots.classList.contains('md-hijacked-dots');
-        if ((rect.width > 0 && rect.height > 0) || isHijacked) {
+        
+        let centerX = window.innerWidth / 2;
+        let distanceToCenter = Math.abs((rect.left + rect.width / 2) - centerX);
+
+        // Invalidate cache if the story slide is moved off-screen (inactive carousel item)
+        // A visible element will always be within innerWidth/2 of the center
+        if (distanceToCenter < window.innerWidth / 2 && ((rect.width > 0 && rect.height > 0) || isHijacked)) {
             possibleDots = [window.__md_cachedStoryDots];
         }
     }
