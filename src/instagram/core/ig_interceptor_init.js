@@ -59,11 +59,6 @@ chrome.runtime.onMessage.addListener((msg) => {
             let text = "⏭️ File already exists";
             if (msg.response.filename) text += "<br><strong style='font-size:1.1em; opacity:0.9;'>" + msg.response.filename + "</strong>";
             window.MDToastManager.showInfo(text, 3000);
-        } else if (msg.response.status === 'progress' && window.MDToastManager) {
-            if (!window.__md_last_progress_toast || Date.now() - window.__md_last_progress_toast > 5000) {
-                window.MDToastManager.showInfo("⏳ Downloading... <strong style='font-size:1.1em'>" + (msg.response.percent || "") + "</strong>");
-                window.__md_last_progress_toast = Date.now();
-            }
         }
     }
 });

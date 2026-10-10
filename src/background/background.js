@@ -57,6 +57,11 @@ function connectToNativeHost() {
                 nativePort.postMessage({ action: "backup_log", status: "error", message: `\n[Backup] 🛑 Stopped manually by user.` });
             }
         } else if (message.status) {
+            // Drop progress updates completely as requested by the user to avoid yt-dlp bugs and IPC spam
+            if (message.status === 'progress') {
+                return;
+            }
+
             // General response from host (e.g. success or error for a download)
             chrome.tabs.query({}, (tabs) => {
                 for (let tab of tabs) {
