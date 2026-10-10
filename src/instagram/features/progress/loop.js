@@ -10,7 +10,7 @@ export function startSyncLoop() {
             return;
         }
         syncOverlays();
-        if (typeof injectStoryButton === 'function') injectStoryButton();
+        if (typeof window.injectStoryButton === 'function') window.injectStoryButton();
         requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);

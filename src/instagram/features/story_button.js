@@ -369,3 +369,5 @@ function injectStoryButton() {
             };
     }
 }
+
+window.injectStoryButton = injectStoryButton;
