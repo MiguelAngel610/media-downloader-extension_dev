@@ -129,9 +129,9 @@ function injectStoryButton() {
         }
     }
 
-    // HEAVY SCAN: Only runs if cache is invalid/empty, throttled to max once every 150ms
+    // HEAVY SCAN: Only runs if cache is invalid/empty, throttled to max once every 16ms (1 frame)
     if (possibleDots.length === 0) {
-        if (window.__md_lastStoryButtonScan && Date.now() - window.__md_lastStoryButtonScan < 150) {
+        if (window.__md_lastStoryButtonScan && Date.now() - window.__md_lastStoryButtonScan < 16) {
             return; // Wait for throttle
         }
         window.__md_lastStoryButtonScan = Date.now();
