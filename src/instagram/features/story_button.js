@@ -170,8 +170,8 @@ function injectStoryButton() {
     if (dotsBtn) {
         window.__md_cachedStoryDots = dotsBtn;
         
-        if (dotsBtn.classList.contains('md-hijacked-dots')) {
-            dotsBtn.classList.remove('md-hijacked-dots');
+        if (!dotsBtn.classList.contains('md-hijacked-dots')) {
+            dotsBtn.classList.add('md-hijacked-dots');
         }
 
         let header = dotsBtn.closest('header, section, ._aa61') || dotsBtn.parentNode;
