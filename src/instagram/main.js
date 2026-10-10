@@ -17,10 +17,19 @@ function injectMinimalistButtons() {
     startSyncLoop();
 }
 
+let mdInjectTimeout = null;
+function throttledInject() {
+    if (mdInjectTimeout) return;
+    mdInjectTimeout = setTimeout(() => {
+        injectMinimalistButtons();
+        mdInjectTimeout = null;
+    }, 150); // Runs max ~6 times a second instead of 60, preventing CPU spikes while feeling instant
+}
+
 // MutationObserver to re-run injection on DOM changes
 if (window.MDObserverManager) {
     window.MDObserverManager.observeDOM(() => {
-        injectMinimalistButtons();
+        throttledInject();
     });
 } else {
     injectMinimalistButtons();
