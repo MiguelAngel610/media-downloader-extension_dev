@@ -23,7 +23,7 @@ function updateButtonIcon(btn, newSvgCode, isFloating) {
 function sendDownloadRequest(btn, url, metadata, isFloating = false, originalElement = null) {
     btn.classList.add('md-loading');
 
-    let parentArticle = (originalElement || btn).closest('article, main, div[role="dialog"]');
+    let parentArticle = (originalElement || btn).closest('article, main, div[role="dialog"], section');
     if (parentArticle) {
         parentArticle.__md_download_state = { time: Date.now(), class: 'md-loading', html: SVG_DOWNLOAD, isFloating: isFloating };
     }
@@ -35,8 +35,8 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
         metadata.username = resolveUsername(btn, originalElement);
     }
 
-    // If we have the exact media_id from ig_interceptor, use it to calculate the perfect shortcode ONLY if missing
-    if (!metadata.shortcode && metadata.media_id) {
+    // Always prioritize the exact media_id to calculate the perfect shortcode, as it guarantees uniqueness per slide/story
+    if (metadata.media_id && String(metadata.media_id).match(/^\d+(_\d+)?$/)) {
         metadata.shortcode = idToShortcode(String(metadata.media_id).split('_')[0]);
     }
 
