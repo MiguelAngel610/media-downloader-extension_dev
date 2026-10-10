@@ -23,8 +23,9 @@ function updateButtonIcon(btn, newSvgCode, isFloating) {
 function sendDownloadRequest(btn, url, metadata, isFloating = false, originalElement = null) {
     btn.classList.add('md-loading');
 
+    let isStoryBtn = btn && btn.classList.contains('md-story-dl-btn-inline');
     let parentArticle;
-    if (window.location.href.includes('/stories/')) {
+    if (isStoryBtn || window.location.href.includes('/stories/')) {
         parentArticle = document.body;
     } else {
         parentArticle = (originalElement || btn).closest('article, main, div[role="dialog"]');
