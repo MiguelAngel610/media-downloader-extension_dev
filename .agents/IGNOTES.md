@@ -437,3 +437,15 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 4. Aumento del throttle de escaneo pesado en story_button.js a 200ms y acotamiento de busqueda de SVGs a contenedores de cabecera (header, section, ._aa61).
 5. Acotamiento de busqueda de bookmark en feed_buttons.js a contenedores de posts (article, dialog, main section) y retorno rapido en el listener de clics de main.js.
 6. Empaquetado y compilacion del bundle de features mediante esbuild (dist/video_progress.bundle.js).
+
+## Refactor (Octubre 2026): Limpieza Quirurgica de Codigo Muerto en Modulo de Instagram
+**Objetivo:** Erradicar funciones huerfanas, constantes no utilizadas, estilos CSS obsoletos y carpetas vacias sin romper referencias cruzadas ni scopes globales.
+**Elementos Eliminados:**
+1. src/instagram/features/feed/: Carpeta vacia residual eliminada.
+2. src/instagram/utils/platform.js: Funcion huerfana extractUrlSignature() eliminada.
+3. src/instagram/ui/svgs.js: Constante no utilizada SVG_SKIP eliminada.
+4. src/instagram/core/styles.js: Reglas CSS obsoletas .md-mini-btn* y animacion @keyframes mdPfpFill (.md-pfp-extracting) eliminadas.
+5. src/instagram/features/progress/story.js: Selector residual .md-mini-btn eliminado.
+**Falsos Positivos Validados y Preservados:**
+- idToShortcode() y getPlatform() en platform.js: Preservadas y validadas (llamadas desde button_state.js).
+- Reempaquetado exitoso de dist/video_progress.bundle.js via esbuild.

@@ -8,18 +8,6 @@ function getPlatform() {
     return "unknown";
 }
 
-function extractUrlSignature(url) {
-    if (!url) return null;
-    try {
-        let urlObj = new URL(url);
-        let parts = urlObj.pathname.split('/');
-        return parts[parts.length - 1];
-    } catch(e) {
-        let match = url.match(/\/([^\/]+\.(jpg|webp|mp4))/);
-        return match ? match[1] : null;
-    }
-}
-
 function idToShortcode(idStr) {
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
     try {

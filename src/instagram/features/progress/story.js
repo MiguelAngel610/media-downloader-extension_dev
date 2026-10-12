@@ -85,7 +85,7 @@ export function syncStoryProgressBar() {
                 if (tag === 'svg' || tag === 'button' || tag === 'img' || tag === 'header' || tag === 'canvas') {
                     return false;
                 }
-                if (ch.querySelector('button, [role="button"], svg, img, header, canvas, .md-story-dl-btn-inline, .md-mini-btn')) {
+                if (ch.querySelector('button, [role="button"], svg, img, header, canvas, .md-story-dl-btn-inline')) {
                     return false;
                 }
                 let txt = ch.textContent ? ch.textContent.trim() : '';
