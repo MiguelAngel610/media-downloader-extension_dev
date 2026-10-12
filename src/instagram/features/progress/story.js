@@ -126,8 +126,9 @@ export function syncStoryProgressBar() {
 
                 // Instant universal structural detection at frame 0
                 if (possibleSegmentRows.length === 0) {
-                    let allDivs = document.querySelectorAll('section div, div[role="dialog"] div, main div');
-                    for (let d of allDivs) {
+                    let container = document.querySelector('section, div[role="dialog"], main, ._aa61') || document.body;
+                    let candidateDivs = container.querySelectorAll('div');
+                    for (let d of candidateDivs) {
                         if (d.children.length === 0 || d.children.length > 150) continue;
                         if (isValidSegmentRow(d) && !possibleSegmentRows.includes(d)) {
                             possibleSegmentRows.push(d);
@@ -274,13 +275,11 @@ export function syncStoryProgressBar() {
             if (totalSegments === 0) totalSegments = 1;
 
             let activeIndex = totalSegments;
-            let activePct = 0; // Restore to 0
+            let activePct = 0;
 
-            for (let i = 0; i < segmentElements.length; i++) {
-                let seg = segmentElements[i];
+            function measureSegment(seg) {
                 let parentRect = seg.getBoundingClientRect();
-                if (parentRect.width === 0) continue;
-
+                if (parentRect.width === 0) return 0;
                 let minPct = 100;
                 let nodes = [seg, ...Array.from(seg.querySelectorAll('div'))];
                 for (let n of nodes) {
@@ -289,26 +288,50 @@ export function syncStoryProgressBar() {
                         let overlapLeft = Math.max(nRect.left, parentRect.left);
                         let overlapRight = Math.min(nRect.right, parentRect.right);
                         let visibleWidth = Math.max(0, overlapRight - overlapLeft);
-
-                        let pct = (visibleWidth / parentRect.width) * 100;
-                        pct = Math.max(0, Math.min(100, pct));
-                        if (pct < minPct) {
-                            minPct = pct;
-                        }
+                        let pct = Math.max(0, Math.min(100, (visibleWidth / parentRect.width) * 100));
+                        if (pct < minPct) minPct = pct;
                     }
                 }
+                return minPct;
+            }
 
-                let val = minPct;
-                if (val < 0.5) {
-                    activeIndex = i + 1;
-                    activePct = 0;
-                    break;
-                } else if (val < 99.5) { // Restore to 99.5 to prevent the 'salto horrible'
-                    activeIndex = i + 1;
+            let lastIdx = window.__md_lastKnownSegmentIndex || 1;
+            let found = false;
+
+            // Fast path: Check last known segment first to avoid measuring all segments at 60FPS
+            if (lastIdx >= 1 && lastIdx <= segmentElements.length) {
+                let val = measureSegment(segmentElements[lastIdx - 1]);
+                if (val >= 0.5 && val < 99.5) {
+                    activeIndex = lastIdx;
                     activePct = val;
-                    break;
+                    found = true;
+                } else if (val >= 99.5 && lastIdx < segmentElements.length) {
+                    let nextVal = measureSegment(segmentElements[lastIdx]);
+                    if (nextVal < 99.5) {
+                        activeIndex = lastIdx + 1;
+                        activePct = nextVal;
+                        found = true;
+                    }
                 }
             }
+
+            // Fallback: Full scan on transition or initial load
+            if (!found) {
+                for (let i = 0; i < segmentElements.length; i++) {
+                    let val = measureSegment(segmentElements[i]);
+                    if (val < 0.5) {
+                        activeIndex = i + 1;
+                        activePct = 0;
+                        break;
+                    } else if (val < 99.5) {
+                        activeIndex = i + 1;
+                        activePct = val;
+                        break;
+                    }
+                }
+            }
+
+            window.__md_lastKnownSegmentIndex = activeIndex;
 
             if (activeIndex > totalSegments) activeIndex = totalSegments;
             if (activeIndex === 0) activeIndex = 1;

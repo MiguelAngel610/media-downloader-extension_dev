@@ -422,3 +422,18 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 3. En injectStoryButton(), al detectar un cambio de currentStoryKey (window.__md_lastActiveStoryKey !== currentStoryKey), se invalida la cache de dots y se restablecen forzosamente todos los botones de historia en el DOM a su estado default.
 4. En syncStoryButtonState(btn), si el estado no coincide con el storyKey actual o ya expiro, se restablece automaticamente el boton a SVG_DOWNLOAD.
 5. En el callback de chrome.runtime.sendMessage, se valida si el usuario sigue en la misma historia antes de asignar md-success al boton.
+
+## Fix (Octubre 2026): Optimizacion Masiva de Rendimiento y Erradicacion de Layout Thrashing en Instagram
+**Problema:** Rendimiento degradado, lag y micro-tirones constantes en el feed y en stories de Instagram.
+**Causas Raiz:**
+1. RAF Fork Bomb en feed.js: Durante cambios de pagina o modales, syncOverlays() llamaba a requestAnimationFrame(syncOverlays) dentro del frame loop de loop.js, multiplicando callbacks exponencialmente en cada frame.
+2. Layout Thrashing cuadratico en feed.js: Para cada video del feed, se recorrian botones y medios con bucles while que trepaban hasta document.body llamando a getComputedStyle a 60 FPS, intercalando lecturas de layout con escrituras forzadas.
+3. Medicion masiva de segmentos en story.js: syncStoryProgressBar() calculaba geometrias con getBoundingClientRect() en todos los segmentos (hasta 50) y todos sus divs hijos en cada frame de 16ms.
+4. Escaneo de SVGs sin throttle efectivo en story_button.js y feed_buttons.js: Throttle de 16ms inexistente en monitores de 60Hz y consultas querySelectorAll('svg') sin acotar al contenedor activo.
+**Solucion:**
+1. Eliminacion de la llamada redundante requestAnimationFrame(syncOverlays) en feed.js.
+2. Filtro anticipado para descartar videos fuera del viewport en feed.js, reemplazo de escalada con offsetParent === null, y ejecucion del chequeo de carrusel activo acotado unicamente al contenedor padre con throttle de 150ms.
+3. Fast-path en story.js: medicion dirigida unicamente al segmento actualmente activo (__md_lastKnownSegmentIndex), reduciendo 30-50 consultas geometricas por frame a tan solo 1. Acotamiento del escaneo de filas al contenedor de historia.
+4. Aumento del throttle de escaneo pesado en story_button.js a 200ms y acotamiento de busqueda de SVGs a contenedores de cabecera (header, section, ._aa61).
+5. Acotamiento de busqueda de bookmark en feed_buttons.js a contenedores de posts (article, dialog, main section) y retorno rapido en el listener de clics de main.js.
+6. Empaquetado y compilacion del bundle de features mediante esbuild (dist/video_progress.bundle.js).

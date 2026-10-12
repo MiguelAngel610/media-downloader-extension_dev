@@ -1,4 +1,4 @@
-﻿/* Media Downloader - Feed Buttons: Injects download button next to the Bookmark in feed/reels */
+/* Media Downloader - Feed Buttons: Injects download button next to the Bookmark in feed/reels */
 
 function injectFeedButtons() {
     if (!document.body) return;
@@ -7,7 +7,18 @@ function injectFeedButtons() {
 
     // Posts/Reels: Inject next to Bookmark button
     let bookmarkSvgs = [];
-    document.querySelectorAll('svg').forEach(s => {
+    let candidateContainers = document.querySelectorAll('article, div[role="dialog"], main section');
+    let svgsToInspect = [];
+    if (candidateContainers.length > 0) {
+        for (let c of candidateContainers) {
+            svgsToInspect.push(...c.querySelectorAll('svg'));
+        }
+    }
+    if (svgsToInspect.length === 0) {
+        svgsToInspect = Array.from(document.querySelectorAll('svg'));
+    }
+
+    svgsToInspect.forEach(s => {
         let label = (s.getAttribute('aria-label') || '').toLowerCase();
         // Incluir "remove" / "eliminar" por si el usuario ya tiene el post guardado
         if (['save', 'guardar', 'salvar', 'enregistrer', 'speichern', 'remove', 'eliminar'].includes(label)) {

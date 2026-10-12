@@ -35,6 +35,10 @@ if (window.MDObserverManager) {
 
 // Global click interceptor to defeat invisible overlays
 document.addEventListener('click', (e) => {
+    if (e.target && e.target.closest && e.target.closest('.md-native-btn, .md-post-btn, .md-story-dl-btn-inline, .md-pfp-btn')) {
+        return; // Direct click on button, no recovery calculation needed
+    }
+
     let buttons = document.querySelectorAll('.md-native-btn, .md-post-btn, .md-story-dl-btn-inline, .md-pfp-btn');
     for (let btn of buttons) {
         if (btn.style.visibility === 'hidden' || btn.style.display === 'none') continue;
@@ -42,8 +46,6 @@ document.addEventListener('click', (e) => {
         let rect = btn.getBoundingClientRect();
         if (e.clientX >= rect.left && e.clientX <= rect.right &&
             e.clientY >= rect.top && e.clientY <= rect.bottom) {
-
-            if (e.target === btn || btn.contains(e.target)) return;
 
             // An invisible overlay stole the click — steal it back!
             e.preventDefault();

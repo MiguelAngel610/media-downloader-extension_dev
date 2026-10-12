@@ -184,16 +184,24 @@ function injectStoryButton() {
         }
     }
 
-    // HEAVY SCAN: Only runs if cache is invalid/empty, throttled to max once every 16ms (1 frame)
+    // HEAVY SCAN: Only runs if cache is invalid/empty, throttled to max once every 200ms
     if (possibleDots.length === 0) {
-        if (window.__md_lastStoryButtonScan && Date.now() - window.__md_lastStoryButtonScan < 16) {
+        if (window.__md_lastStoryButtonScan && Date.now() - window.__md_lastStoryButtonScan < 200) {
             return; // Wait for throttle
         }
         window.__md_lastStoryButtonScan = Date.now();
         window.__md_cachedStoryDots = null;
 
-        // 1. Find by SVG icon (3 circles) - very robust against localization and class changes
-        let svgs = document.querySelectorAll('svg');
+        // 1. Find by SVG icon (3 circles) - check story headers/sections first before searching whole DOM
+        let containers = document.querySelectorAll('header, section, ._aa61, div[role="dialog"]');
+        let svgs = [];
+        if (containers.length > 0) {
+            for (let c of containers) svgs.push(...c.querySelectorAll('svg'));
+        }
+        if (svgs.length === 0) {
+            svgs = Array.from(document.querySelectorAll('svg'));
+        }
+
         for (let b of svgs) {
             if (b.querySelectorAll('circle').length === 3) {
                 let target = b.closest('button, [role="button"], div[role="button"]') || b;

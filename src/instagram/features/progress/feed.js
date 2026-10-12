@@ -26,7 +26,6 @@ export function syncOverlays() {
         }
         
         if (Date.now() < mdSuspendUntil) {
-            requestAnimationFrame(syncOverlays);
             return;
         } else {
             let overlayRoot = document.getElementById('md-overlay-root');
@@ -142,6 +141,16 @@ export function syncOverlays() {
                 for (let v of videos) {
                     let rect = v.getBoundingClientRect();
 
+                    // Bail out immediately for off-screen videos to save layout computation
+                    if (rect.width === 0 || rect.height === 0 || rect.bottom < -100 || rect.top > window.innerHeight + 100 || rect.right < -100 || rect.left > window.innerWidth + 100) {
+                        let customContainer = window.__md_videoSliders.get(v);
+                        if (customContainer && customContainer.__md_lastDisplay !== 'none') {
+                            customContainer.style.display = 'none';
+                            customContainer.__md_lastDisplay = 'none';
+                        }
+                        continue;
+                    }
+
                     // Calculate visible rect by intersecting with clipping ancestors
                     let visibleRect = {
                         left: rect.left,
@@ -242,48 +251,39 @@ export function syncOverlays() {
                         }
 
                         if (customContainer && customContainer.parentNode === overlayRoot) {
-                            let isVisuallyHidden = false;
-                            let checkNode = v;
-                            while (checkNode && checkNode !== document.body) {
-                                let s = window.getComputedStyle(checkNode);
-                                if (s.opacity === '0' || s.visibility === 'hidden' || s.display === 'none') {
-                                    isVisuallyHidden = true; break;
-                                }
-                                checkNode = checkNode.parentElement;
+                            let isVisuallyHidden = v.offsetParent === null;
+                            if (!isVisuallyHidden) {
+                                try {
+                                    let s = window.getComputedStyle(v);
+                                    if (s.opacity === '0' || s.visibility === 'hidden' || s.display === 'none') isVisuallyHidden = true;
+                                } catch(e) {}
                             }
 
                             let isCarouselInactive = false;
                             if (window.__md_activeDlButtons) {
                                 for (let item of window.__md_activeDlButtons) {
-                                    if (item.badge && item.wrapper) {
-                                        let mRect = item.wrapper.getBoundingClientRect();
-                                        if (mRect.width > 0) {
-                                            let activeMedia = null;
-                                            let mediaNodes = Array.from(item.wrapper.querySelectorAll('img, video')).filter(m => m.getBoundingClientRect().width > 200);
-                                            let mCenter = mRect.left + mRect.width / 2;
-                                            let minCenterDist = Infinity;
-                                            for (let media of mediaNodes) {
-                                                let r = media.getBoundingClientRect();
-                                                if (r.width > 0) {
-                                                    let isH = false;
-                                                    let cNode = media;
-                                                    while (cNode && cNode !== document.body) {
-                                                        let s = window.getComputedStyle(cNode);
-                                                        if (s.opacity === '0' || s.visibility === 'hidden') { isH = true; break; }
-                                                        cNode = cNode.parentElement;
+                                    if (item.badge && item.wrapper && item.wrapper.contains(v)) {
+                                        let now = Date.now();
+                                        if (!item.__md_lastMediaCheck || now - item.__md_lastMediaCheck > 150) {
+                                            item.__md_lastMediaCheck = now;
+                                            let mRect = item.wrapper.getBoundingClientRect();
+                                            if (mRect.width > 0) {
+                                                let mediaNodes = Array.from(item.wrapper.querySelectorAll('img, video')).filter(m => m.getBoundingClientRect().width > 150);
+                                                let mCenter = mRect.left + mRect.width / 2;
+                                                let minCenterDist = Infinity;
+                                                let activeMedia = null;
+                                                for (let media of mediaNodes) {
+                                                    let r = media.getBoundingClientRect();
+                                                    if (r.width > 0) {
+                                                        let dist = Math.abs((r.left + r.width / 2) - mCenter);
+                                                        if (dist < minCenterDist) { minCenterDist = dist; activeMedia = media; }
                                                     }
-                                                    if (isH) continue;
-                                                    let center = r.left + r.width / 2;
-                                                    let dist = Math.abs(center - mCenter);
-                                                    if (dist < minCenterDist) { minCenterDist = dist; activeMedia = media; }
                                                 }
+                                                if (activeMedia) item.__md_activeMedia = activeMedia;
                                             }
-                                            if (activeMedia) item.__md_activeMedia = activeMedia;
                                         }
-                                        if (item.wrapper.contains(v)) {
-                                            if (item.__md_activeMedia && item.__md_activeMedia !== v) isCarouselInactive = true;
-                                            break;
-                                        }
+                                        if (item.__md_activeMedia && item.__md_activeMedia !== v) isCarouselInactive = true;
+                                        break;
                                     }
                                 }
                             }
