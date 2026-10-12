@@ -20,18 +20,45 @@ function updateButtonIcon(btn, newSvgCode, isFloating) {
     }
 }
 
+function getStoryKey() {
+    let url = window.location.href;
+    let match = url.match(/\/stories\/([^\/?#]+)(?:\/(\d+))?/);
+    if (match) {
+        let userOrType = match[1];
+        let storyId = match[2] || '';
+        try {
+            let params = new URLSearchParams(window.location.search);
+            let queryMediaId = params.get('story_media_id');
+            if (queryMediaId) storyId = queryMediaId;
+        } catch (e) {}
+        if (storyId) return userOrType + '/' + storyId;
+        return userOrType;
+    }
+    return window.location.pathname;
+}
+window.getStoryKey = getStoryKey;
+
 function sendDownloadRequest(btn, url, metadata, isFloating = false, originalElement = null) {
     btn.classList.add('md-loading');
 
     let isStoryBtn = btn && btn.classList.contains('md-story-dl-btn-inline');
     let parentArticle;
+    let requestStoryKey = (isStoryBtn || window.location.href.includes('/stories/')) ?
+        (typeof getStoryKey === 'function' ? getStoryKey() : window.location.pathname) : null;
+
     if (isStoryBtn || window.location.href.includes('/stories/')) {
         parentArticle = document.body;
     } else {
         parentArticle = (originalElement || btn).closest('article, main, div[role="dialog"]');
     }
     if (parentArticle) {
-        parentArticle.__md_download_state = { time: Date.now(), class: 'md-loading', html: SVG_DOWNLOAD, isFloating: isFloating };
+        parentArticle.__md_download_state = {
+            time: Date.now(),
+            class: 'md-loading',
+            html: SVG_DOWNLOAD,
+            isFloating: isFloating,
+            storyKey: requestStoryKey
+        };
     }
 
     if (!metadata) metadata = {};
@@ -167,12 +194,22 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
                     console.error("Media Downloader: Cannot resolve original URL for blob.");
                     btn.classList.remove('md-loading');
                     btn.classList.add('md-error');
-                    if (parentArticle) parentArticle.__md_download_state = { time: Date.now(), class: 'md-error', html: SVG_DOWNLOAD, isFloating: isFloating };
+                    if (parentArticle) {
+                        parentArticle.__md_download_state = {
+                            time: Date.now(),
+                            class: 'md-error',
+                            html: SVG_DOWNLOAD,
+                            isFloating: isFloating,
+                            storyKey: requestStoryKey
+                        };
+                    }
 
                     setTimeout(() => {
                         btn.classList.remove('md-error');
                         updateButtonIcon(btn, SVG_DOWNLOAD, isFloating);
-                        if (parentArticle) delete parentArticle.__md_download_state;
+                        if (parentArticle && (!parentArticle.__md_download_state || parentArticle.__md_download_state.storyKey === requestStoryKey)) {
+                            delete parentArticle.__md_download_state;
+                        }
                     }, 2000);
                     return; // abort
                 }
@@ -202,15 +239,37 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
         }, (response) => {
             btn.classList.remove('md-loading');
 
-            btn.classList.add('md-success');
-            updateButtonIcon(btn, SVG_CHECK, isFloating);
+            let activeStoryKey = (isStoryBtn || window.location.href.includes('/stories/')) ?
+                (typeof getStoryKey === 'function' ? getStoryKey() : window.location.pathname) : null;
 
-            if (parentArticle) parentArticle.__md_download_state = { time: Date.now(), class: 'md-success', html: SVG_CHECK, isFloating: isFloating };
+            let isSameStory = !requestStoryKey || (activeStoryKey === requestStoryKey);
 
-            setTimeout(() => {
+            if (isSameStory) {
+                btn.classList.add('md-success');
+                updateButtonIcon(btn, SVG_CHECK, isFloating);
+            } else {
                 btn.classList.remove('md-success');
                 updateButtonIcon(btn, SVG_DOWNLOAD, isFloating);
-                if (parentArticle) delete parentArticle.__md_download_state;
+            }
+
+            if (parentArticle) {
+                parentArticle.__md_download_state = {
+                    time: Date.now(),
+                    class: 'md-success',
+                    html: SVG_CHECK,
+                    isFloating: isFloating,
+                    storyKey: requestStoryKey
+                };
+            }
+
+            setTimeout(() => {
+                if (isSameStory) {
+                    btn.classList.remove('md-success');
+                    updateButtonIcon(btn, SVG_DOWNLOAD, isFloating);
+                }
+                if (parentArticle && (!parentArticle.__md_download_state || parentArticle.__md_download_state.storyKey === requestStoryKey)) {
+                    delete parentArticle.__md_download_state;
+                }
             }, 2000);
         });
     });

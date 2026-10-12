@@ -409,3 +409,16 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 ## Fix (10 de Septiembre 2026): Anillo Gris del Modo Fantasma desaparece en Historias
 **Causa Raíz:** Instagram implementó un A/B test (o cambio definitivo) en la interfaz web donde el botón del anillo de las historias en la barra superior (Stories Tray) cambió su etiqueta HTML de `<button>` a `<div role="button">`. Como nuestro selector CSS de Ghost Mode esperaba un `button:has(...)`, dejó de coincidir y el anillo gris ya no se mostraba a pesar de estar guardado en memoria.
 **Solución:** Se actualizó el selector en `fiber_search.js` para incluir `[role="button"]:has(img[alt*="${u}"]):not(:has(video)) canvas`, garantizando que coincida tanto con el diseño antiguo como con el nuevo, y filtrando cualquier falso positivo en carruseles de video.
+
+## Fix (Octubre 2026): Estado Checked Persistente al Cambiar de Historia en Instagram
+**Problema:** Al descargar una historia y navegar a la siguiente (o cambiar de slide), el boton de descarga en la nueva historia se quedaba congelado en el estado de exito/checked (md-success) en lugar de volver a su estado default.
+**Causas Raiz:**
+1. document.body.__md_download_state no tenia asociacion con el ID o URL de la historia descargada. Cualquier historia navegada dentro de la ventana de 2 segundos heredaba el md-success via syncStoryButtonState.
+2. Cuando React reutilizaba el nodo de cabecera o boton entre historias, o cuando pasaban los 2 segundos y se eliminaba __md_download_state, la condicion if (parent && parent.__md_download_state) impedia que el bloque else restableciera el boton al estado default.
+3. Si la respuesta de descarga finalizaba despues de que el usuario ya habia cambiado de historia, el callback modificaba el boton visible en la nueva historia.
+**Solucion:**
+1. Se implemento getStoryKey() para identificar univocamente cada slide de historia (por usuario y story_id / story_media_id).
+2. Se vinculo storyKey dentro de __md_download_state en utton_state.js y story_button.js.
+3. En injectStoryButton(), al detectar un cambio de currentStoryKey (window.__md_lastActiveStoryKey !== currentStoryKey), se invalida la cache de dots y se restablecen forzosamente todos los botones de historia en el DOM a su estado default.
+4. En syncStoryButtonState(btn), si el estado no coincide con el storyKey actual o ya expiro, se restablece automaticamente el boton a SVG_DOWNLOAD.
+5. En el callback de chrome.runtime.sendMessage, se valida si el usuario sigue en la misma historia antes de asignar md-success al boton.

@@ -2,27 +2,30 @@
 
 function syncStoryButtonState(btn) {
     let parent = document.body;
-    if (parent && parent.__md_download_state) {
-        let state = parent.__md_download_state;
-        if (Date.now() - state.time < 2000) {
-            if (!btn.classList.contains(state.class)) {
-                btn.className = 'md-native-btn md-story-dl-btn-inline ' + state.class;
-                btn.innerHTML = state.html;
-                if (state.class === 'md-loading') {
-                    btn.style.opacity = '0.5';
-                    btn.style.background = 'rgba(255, 255, 255, 0.3)';
-                } else if (state.class === 'md-success') {
-                    btn.style.opacity = '1';
-                    btn.style.background = 'transparent';
-                }
-            }
-        } else {
-            if (btn.classList.contains('md-loading') || btn.classList.contains('md-success')) {
-                btn.className = 'md-native-btn md-story-dl-btn-inline';
-                if (typeof SVG_DOWNLOAD !== 'undefined') btn.innerHTML = SVG_DOWNLOAD;
+    let currentKey = typeof getStoryKey === 'function' ? getStoryKey() : window.location.pathname;
+    let state = parent && parent.__md_download_state;
+
+    if (state && state.storyKey === currentKey && (Date.now() - state.time < 2000)) {
+        if (!btn.classList.contains(state.class)) {
+            btn.className = 'md-native-btn md-story-dl-btn-inline ' + state.class;
+            btn.innerHTML = state.html;
+            if (state.class === 'md-loading') {
+                btn.style.opacity = '0.5';
+                btn.style.background = 'rgba(255, 255, 255, 0.3)';
+            } else if (state.class === 'md-success') {
                 btn.style.opacity = '1';
                 btn.style.background = 'transparent';
             }
+        }
+    } else {
+        if (btn.classList.contains('md-loading') || btn.classList.contains('md-success')) {
+            btn.className = 'md-native-btn md-story-dl-btn-inline';
+            if (typeof SVG_DOWNLOAD !== 'undefined') btn.innerHTML = SVG_DOWNLOAD;
+            btn.style.opacity = '1';
+            btn.style.background = 'transparent';
+        }
+        if (state && state.storyKey === currentKey && Date.now() - state.time >= 2000) {
+            delete parent.__md_download_state;
         }
     }
 }
@@ -146,6 +149,24 @@ function showSharedReelWarning(info) {
 function injectStoryButton() {
     if (!window.location.href.includes('/stories/')) return;
 
+    let currentStoryKey = (typeof getStoryKey === 'function') ? getStoryKey() : window.location.pathname;
+    if (window.__md_lastActiveStoryKey && window.__md_lastActiveStoryKey !== currentStoryKey) {
+        // Active story slide changed! Drop cached dots from previous story slide
+        window.__md_cachedStoryDots = null;
+
+        // Reset any existing story download buttons in DOM to clean default state
+        let storyBtns = document.querySelectorAll('.md-story-dl-btn-inline');
+        for (let b of storyBtns) {
+            if (b.classList.contains('md-loading') || b.classList.contains('md-success')) {
+                b.className = 'md-native-btn md-story-dl-btn-inline';
+                if (typeof SVG_DOWNLOAD !== 'undefined') b.innerHTML = SVG_DOWNLOAD;
+                b.style.opacity = '1';
+                b.style.background = 'transparent';
+            }
+        }
+    }
+    window.__md_lastActiveStoryKey = currentStoryKey;
+
     let possibleDots = [];
     
     // CACHE LOGIC: Ultra-fast 60FPS check
@@ -258,6 +279,15 @@ function injectStoryButton() {
                     dlBtn.classList.add('md-loading');
                     dlBtn.style.opacity = '0.5';
 
+                    let clickStoryKey = (typeof getStoryKey === 'function') ? getStoryKey() : window.location.pathname;
+                    document.body.__md_download_state = {
+                        time: Date.now(),
+                        class: 'md-loading',
+                        html: SVG_DOWNLOAD,
+                        isFloating: true,
+                        storyKey: clickStoryKey
+                    };
+
                     let check = { detected: false };
                     try {
                         check = detectSharedReelOrPost();
@@ -269,6 +299,10 @@ function injectStoryButton() {
                         showSharedReelWarning(check);
                         dlBtn.classList.remove('md-loading');
                         dlBtn.style.opacity = '1';
+                        dlBtn.style.background = 'transparent';
+                        if (document.body.__md_download_state && document.body.__md_download_state.storyKey === clickStoryKey) {
+                            delete document.body.__md_download_state;
+                        }
                         return;
                     }
 
@@ -399,11 +433,19 @@ function injectStoryButton() {
                     console.error("Media Downloader: Could not find media URL.");
                     dlBtn.classList.remove('md-loading');
                     dlBtn.style.opacity = '1';
+                    dlBtn.style.background = 'transparent';
+                    if (document.body.__md_download_state && document.body.__md_download_state.storyKey === clickStoryKey) {
+                        delete document.body.__md_download_state;
+                    }
                 }
                 } catch (err) {
                     console.error("Story Download Error:", err);
                     dlBtn.classList.remove('md-loading');
                     dlBtn.style.opacity = '1';
+                    dlBtn.style.background = 'transparent';
+                    if (document.body.__md_download_state && document.body.__md_download_state.storyKey === clickStoryKey) {
+                        delete document.body.__md_download_state;
+                    }
                     if (window.MDToastManager) window.MDToastManager.showError("Err: " + (err.message || err.toString()));
                 }
             };
