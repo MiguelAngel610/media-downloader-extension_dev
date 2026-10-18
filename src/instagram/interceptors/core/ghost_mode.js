@@ -1,5 +1,5 @@
 import { mdLog } from './logger.js';
-import { clearStoryCheckpoint } from './story_resume.js';
+import { clearStoryCheckpoint, saveStoryCheckpoint, getStorySegmentInfo } from './story_resume.js';
 // --- Ghost Online: WebSocket Interceptor ---
 let OriginalWebSocket = window.WebSocket;
 window.WebSocket = function(url, protocols) {
@@ -177,54 +177,7 @@ window.__md_applyGhostVisuals = function() {
 };
 
 function isViewingLastStorySegment() {
-    // Method 1: Check our custom counter element from video_progress.js (e.g. "2/5", "5/5", "1/1")
-    let counter = document.querySelector('#md-story-counter');
-    if (counter && counter.textContent && counter.textContent.includes('/')) {
-        let parts = counter.textContent.split('/');
-        let cur = parseInt(parts[0], 10);
-        let total = parseInt(parts[1], 10);
-        if (!isNaN(cur) && !isNaN(total) && total > 0) {
-            return { isLast: cur >= total, cur, total };
-        }
-    }
-
-    // Method 2: Check native segment bars at the top of the story viewer
-    let allDivs = document.querySelectorAll('div');
-    for (let d of allDivs) {
-        if (d.children.length === 0 || d.children.length > 150) continue;
-        let rect = d.getBoundingClientRect();
-        if (rect.width > 100 && rect.top >= -20 && rect.top < 150 && rect.height > 0 && rect.height <= 35) {
-            let style = window.getComputedStyle(d);
-            if (style.display === 'flex' || style.display === 'grid') {
-                let firstChild = d.children[0];
-                if (firstChild && firstChild.id !== 'md-story-progress-container') {
-                    let cr = firstChild.getBoundingClientRect();
-                    if (cr.height > 0 && cr.height <= 20 && cr.width >= 1) {
-                        let segs = Array.from(d.children).filter(c => c.id !== 'md-story-progress-container');
-                        let total = segs.length;
-                        if (total > 1) {
-                            for (let i = 0; i < total - 1; i++) {
-                                let s = segs[i];
-                                let inner = s.querySelector('div, span');
-                                if (inner) {
-                                    let pRect = s.getBoundingClientRect();
-                                    let iRect = inner.getBoundingClientRect();
-                                    // If an earlier segment is less than 95% full or actively animating, we are NOT on the last segment
-                                    if (pRect.width > 0 && (iRect.width / pRect.width) < 0.95) {
-                                        return { isLast: false, cur: i + 1, total };
-                                    }
-                                }
-                            }
-                        }
-                        return { isLast: true, cur: total, total };
-                    }
-                }
-            }
-        }
-    }
-    
-    // Default to true if unable to find multiple segments (single story case)
-    return { isLast: true, cur: 1, total: 1 };
+    return getStorySegmentInfo();
 }
 
 window.__md_markStoryAsGhostSeen = function(networkUsername = null) {
@@ -244,6 +197,7 @@ window.__md_markStoryAsGhostSeen = function(networkUsername = null) {
     // Only turn icon gray if the user has reached the final story of this author!
     if (!segInfo.isLast) {
         mdLog("👀 Story Protected", `@${username} slide (${segInfo.cur}/${segInfo.total}) viewed in stealth — Ring stays colorful`, "#3b82f6");
+        saveStoryCheckpoint(username, segInfo.cur, segInfo.total);
         if (seenUsers[username]) {
             delete seenUsers[username];
             localStorage.setItem('md_ghost_seen_users', JSON.stringify(seenUsers));
