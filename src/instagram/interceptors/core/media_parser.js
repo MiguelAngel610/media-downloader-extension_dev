@@ -1,4 +1,5 @@
 import { mdLog } from './logger.js';
+import { clearStoryCheckpoint } from './story_resume.js';
 
 window.__md_storyMedia = window.__md_storyMedia || {};
 
@@ -124,6 +125,7 @@ export function processAndPostData(data) {
             if (tsMs > seenTime + 5000) { // New story uploaded after previous view
                 delete seenUsers[uname];
                 seenModified = true;
+                clearStoryCheckpoint(uname);
                 mdLog("✨ Story Alert", `New story posted by @${uname} after previous view — Ring restored to colorful`, "#06b6d4");
             }
         };

@@ -449,3 +449,13 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 **Falsos Positivos Validados y Preservados:**
 - idToShortcode() y getPlatform() en platform.js: Preservadas y validadas (llamadas desde button_state.js).
 - Reempaquetado exitoso de dist/video_progress.bundle.js via esbuild.
+
+## Feature (Octubre 2026): Smart Resume Guard para Historias en Modo Fantasma
+**Problema:** Al tener Ghost Mode activo, las historias de Instagram siempre se abrian desde la diapositiva 1 (la primera historia), incluso si el usuario ya habia visto varias diapositivas previamente. Esto se debe a que Ghost Mode bloquea las peticiones de seen, dejando el estado de reel.seen en 0 tanto en el servidor como en el cliente de React (Relay), provocando que Instagram siempre evalue la primera diapositiva como no vista.
+**Solucion (Opcion 1 - Deep-Link Resume Guard sin Fallbacks Forzados):**
+1. Se implemento [story_resume.js](file:///c:/Users/Migue/Documents/Projects/media_downloader_extension_dev/src/instagram/interceptors/core/story_resume.js) que mantiene en localStorage (clave md_ghost_story_checkpoints) el ultimo storyId visto de cada usuario con expiracion automatica de 24 horas.
+2. Intercepcion de enlaces en el DOM (pointerenter, pointerdown, click en fase de captura): reescribe dinamicamente href de /stories/<username>/ hacia /stories/<username>/<storyId>/ antes de que el enrutador de React procese el evento.
+3. Hook transparente a history.pushState y history.replaceState en el Main World para reescribir llamadas genericas y registrar en tiempo real los cambios de diapositiva sin sobrecarga ni polling.
+4. Al completar todas las diapositivas de un usuario (MD_GHOST_HISTORY_ADD / segInfo.isLast), o al detectarse una nueva historia subida (media_parser.js), el checkpoint se elimina para permitir reproducir la nueva historia o reiniciar desde el principio.
+5. Sin fallbacks ni saltos artificiales en el DOM para evitar enmascarar errores.
+6. Recompilacion de dist/ig_interceptor.bundle.js con esbuild.

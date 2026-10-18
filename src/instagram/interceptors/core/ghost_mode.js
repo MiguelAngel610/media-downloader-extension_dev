@@ -1,4 +1,5 @@
 import { mdLog } from './logger.js';
+import { clearStoryCheckpoint } from './story_resume.js';
 // --- Ghost Online: WebSocket Interceptor ---
 let OriginalWebSocket = window.WebSocket;
 window.WebSocket = function(url, protocols) {
@@ -253,6 +254,7 @@ window.__md_markStoryAsGhostSeen = function(networkUsername = null) {
     
     seenUsers[username] = Date.now();
     localStorage.setItem('md_ghost_seen_users', JSON.stringify(seenUsers));
+    clearStoryCheckpoint(username);
     
     // Notify content script to save in extension storage
     window.postMessage({ type: 'MD_GHOST_HISTORY_ADD', username: username, timestamp: Date.now() }, '*');
