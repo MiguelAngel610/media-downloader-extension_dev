@@ -189,6 +189,10 @@ window.__md_markStoryAsGhostSeen = function(networkUsername = null) {
     }
     
     let segInfo = isViewingLastStorySegment();
+    if (!segInfo || !segInfo.ready || segInfo.total <= 0) {
+        return; // Story viewer is still mounting, do NOT prematurely complete or clear checkpoints
+    }
+
     let seenUsers = {};
     try {
         seenUsers = JSON.parse(localStorage.getItem('md_ghost_seen_users') || '{}');

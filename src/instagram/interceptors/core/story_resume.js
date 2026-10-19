@@ -82,6 +82,25 @@ export function getCurrentStoryUsername() {
     }
 }
 
+function measureSegment(seg) {
+    if (!seg) return 0;
+    let parentRect = seg.getBoundingClientRect();
+    if (parentRect.width === 0) return 0;
+    let minPct = 100;
+    let nodes = [seg, ...Array.from(seg.querySelectorAll('div, span'))];
+    for (let n of nodes) {
+        let nRect = n.getBoundingClientRect();
+        if (nRect.height > 0 && nRect.height <= 25 && nRect.width <= parentRect.width + 2) {
+            let overlapLeft = Math.max(nRect.left, parentRect.left);
+            let overlapRight = Math.min(nRect.right, parentRect.right);
+            let visibleWidth = Math.max(0, overlapRight - overlapLeft);
+            let pct = Math.max(0, Math.min(100, (visibleWidth / parentRect.width) * 100));
+            if (pct < minPct) minPct = pct;
+        }
+    }
+    return minPct;
+}
+
 export function getStorySegmentInfo() {
     // Method 1: Check our custom counter element from video_progress.js (e.g. "2/5", "5/5", "1/1")
     let counter = document.querySelector('#md-story-counter');
@@ -90,46 +109,40 @@ export function getStorySegmentInfo() {
         let cur = parseInt(parts[0], 10);
         let total = parseInt(parts[1], 10);
         if (!isNaN(cur) && !isNaN(total) && total > 0) {
-            return { isLast: cur >= total, cur, total };
+            return { ready: true, isLast: cur >= total, cur, total };
         }
     }
 
-    // Method 2: Check native segment bars at the top of the story viewer
+    // Method 2: Scan for native segment row at the top of the story card
     let allDivs = document.querySelectorAll('div');
     for (let d of allDivs) {
         if (d.children.length === 0 || d.children.length > 150) continue;
         let rect = d.getBoundingClientRect();
-        if (rect.width > 100 && rect.top >= -20 && rect.top < 150 && rect.height > 0 && rect.height <= 35) {
+        if (rect.width > 150 && rect.top >= -30 && rect.top < 150 && rect.height > 0 && rect.height <= 35) {
             let style = window.getComputedStyle(d);
             if (style.display === 'flex' || style.display === 'grid') {
-                let firstChild = d.children[0];
-                if (firstChild && firstChild.id !== 'md-story-progress-container') {
-                    let cr = firstChild.getBoundingClientRect();
-                    if (cr.height > 0 && cr.height <= 20 && cr.width >= 1) {
-                        let segs = Array.from(d.children).filter(c => c.id !== 'md-story-progress-container');
-                        let total = segs.length;
-                        if (total > 1) {
-                            for (let i = 0; i < total - 1; i++) {
-                                let s = segs[i];
-                                let inner = s.querySelector('div, span');
-                                if (inner) {
-                                    let pRect = s.getBoundingClientRect();
-                                    let iRect = inner.getBoundingClientRect();
-                                    // If an earlier segment is less than 95% full or actively animating, we are NOT on the last segment
-                                    if (pRect.width > 0 && (iRect.width / pRect.width) < 0.95) {
-                                        return { isLast: false, cur: i + 1, total };
-                                    }
-                                }
-                            }
+                let segs = Array.from(d.children).filter(c => c.id !== 'md-story-progress-container');
+                let total = segs.length;
+                if (total > 1) {
+                    let first = segs[0];
+                    if (first.querySelector('button, img, svg, header, canvas')) continue;
+
+                    let activeIndex = total;
+                    for (let i = 0; i < total; i++) {
+                        let pct = measureSegment(segs[i]);
+                        if (pct < 98) {
+                            activeIndex = i + 1;
+                            break;
                         }
-                        return { isLast: true, cur: total, total };
                     }
+                    return { ready: true, isLast: activeIndex >= total, cur: activeIndex, total };
                 }
             }
         }
     }
 
-    return { isLast: true, cur: 1, total: 1 };
+    // Not mounted or single story without progress bars yet
+    return { ready: false, isLast: false, cur: 1, total: 0 };
 }
 
 function findNextStoryButton() {
@@ -143,11 +156,12 @@ function findNextStoryButton() {
     }
 
     let allBtns = document.querySelectorAll('button, div[role="button"]');
+    let centerX = window.innerWidth / 2;
     for (let b of allBtns) {
         let r = b.getBoundingClientRect();
-        if (r.width > 20 && r.height > 20 && r.left > window.innerWidth / 2 && r.top > 100 && r.top < window.innerHeight - 100) {
+        if (r.width > 20 && r.height > 20 && r.left > centerX + 100 && r.left < window.innerWidth && r.top > 100 && r.top < window.innerHeight - 100) {
             let s = b.querySelector('svg');
-            if (s && !b.querySelector('img') && !b.classList.contains('md-native-btn')) {
+            if (s && !b.querySelector('img') && !b.classList.contains('md-native-btn') && !b.id.includes('md')) {
                 return b;
             }
         }
@@ -155,40 +169,64 @@ function findNextStoryButton() {
     return null;
 }
 
-export function triggerNextStorySlide(useButtonFallback = false) {
-    let keyEvtDown = new KeyboardEvent('keydown', {
-        key: 'ArrowRight',
-        code: 'ArrowRight',
-        keyCode: 39,
-        which: 39,
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-        view: window
-    });
-    let keyEvtUp = new KeyboardEvent('keyup', {
-        key: 'ArrowRight',
-        code: 'ArrowRight',
-        keyCode: 39,
-        which: 39,
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-        view: window
-    });
-
-    let target = document.activeElement || document.body || document;
-    target.dispatchEvent(keyEvtDown);
-    target.dispatchEvent(keyEvtUp);
-    window.dispatchEvent(keyEvtDown);
-    window.dispatchEvent(keyEvtUp);
-
-    if (useButtonFallback) {
-        let nextBtn = findNextStoryButton();
-        if (nextBtn) {
-            try { nextBtn.click(); } catch (e) {}
+function tapStoryRightZone() {
+    try {
+        let activeMedia = document.querySelector('section video, section img, div[role="dialog"] video, div[role="dialog"] img, ._aa61 video, ._aa61 img');
+        if (!activeMedia) {
+            let allMedia = Array.from(document.querySelectorAll('video, img')).filter(el => {
+                let r = el.getBoundingClientRect();
+                return r.width > 200 && r.height > 200 && Math.abs((r.left + r.width / 2) - window.innerWidth / 2) < 300;
+            });
+            if (allMedia.length > 0) activeMedia = allMedia[0];
         }
+        if (activeMedia) {
+            let r = activeMedia.getBoundingClientRect();
+            let clickX = r.left + r.width * 0.8;
+            let clickY = r.top + r.height * 0.5;
+            let targetEl = document.elementFromPoint(clickX, clickY);
+            if (targetEl && !targetEl.closest('#md-story-slider, #md-floating-btn, .md-native-btn')) {
+                ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(evtType => {
+                    let evt = new MouseEvent(evtType, {
+                        clientX: clickX,
+                        clientY: clickY,
+                        bubbles: true,
+                        cancelable: true,
+                        view: window
+                    });
+                    targetEl.dispatchEvent(evt);
+                });
+                return true;
+            }
+        }
+    } catch (e) {}
+    return false;
+}
+
+function pressKeyboardArrowRight() {
+    let target = document.querySelector('section, div[role="dialog"]') || document.activeElement || document.body || document;
+    ['keydown', 'keyup'].forEach(evtType => {
+        let evt = new KeyboardEvent(evtType, {
+            key: 'ArrowRight',
+            code: 'ArrowRight',
+            keyCode: 39,
+            which: 39,
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            view: window
+        });
+        target.dispatchEvent(evt);
+        window.dispatchEvent(evt);
+    });
+}
+
+export function triggerNextStorySlide() {
+    let btn = findNextStoryButton();
+    if (btn) {
+        try { btn.click(); } catch (e) {}
     }
+    tapStoryRightZone();
+    pressKeyboardArrowRight();
 }
 
 let resumeInProgress = false;
@@ -204,8 +242,8 @@ function executeSlideAdvance(username, targetSlide, initialSeg) {
 
     let stepsMax = target - initialSeg.cur;
     let stepCount = 0;
-    let consecutiveSameSlide = 0;
-    let lastSeenSlide = initialSeg.cur;
+
+    mdLog("🔄 Story Resume", `Advancing @${username} from slide ${initialSeg.cur} to ${target}...`, "#8b5cf6");
 
     let advanceInterval = setInterval(() => {
         if (getCurrentStoryUsername() !== username) {
@@ -215,23 +253,23 @@ function executeSlideAdvance(username, targetSlide, initialSeg) {
         }
 
         let curSeg = getStorySegmentInfo();
-        if (curSeg.cur >= target || stepCount >= stepsMax + 2) {
+        if (curSeg.ready && curSeg.cur >= target) {
             clearInterval(advanceInterval);
             resumeInProgress = false;
             mdLog("🔄 Story Resume", `Successfully resumed @${username} to slide ${curSeg.cur}/${curSeg.total}`, "#8b5cf6");
             return;
         }
 
-        if (curSeg.cur === lastSeenSlide) {
-            consecutiveSameSlide++;
-        } else {
-            consecutiveSameSlide = 0;
-            lastSeenSlide = curSeg.cur;
+        if (stepCount >= stepsMax + 3) {
+            clearInterval(advanceInterval);
+            resumeInProgress = false;
+            mdLog("🔄 Story Resume", `Resume advance completed at slide ${curSeg.cur}/${curSeg.total}`, "#8b5cf6");
+            return;
         }
 
-        triggerNextStorySlide(consecutiveSameSlide > 1);
+        triggerNextStorySlide();
         stepCount++;
-    }, 60);
+    }, 75);
 }
 
 function attemptResumeForUser(username) {
@@ -246,7 +284,7 @@ function attemptResumeForUser(username) {
 
     resumeInProgress = true;
     let attempts = 0;
-    const maxAttempts = 30; // Max 1.5 seconds
+    const maxAttempts = 40; // Max 2 seconds waiting for story segments to render
 
     let mountCheckInterval = setInterval(() => {
         attempts++;
@@ -257,7 +295,7 @@ function attemptResumeForUser(username) {
         }
 
         let segInfo = getStorySegmentInfo();
-        if (segInfo.total > 1) {
+        if (segInfo.ready && segInfo.total > 1) {
             clearInterval(mountCheckInterval);
             executeSlideAdvance(username, targetSlide, segInfo);
             return;
@@ -274,7 +312,7 @@ function checkAndSaveProgress(username) {
     if (resumeInProgress) return;
 
     let segInfo = getStorySegmentInfo();
-    if (!segInfo || segInfo.total <= 1) return;
+    if (!segInfo.ready || segInfo.total <= 1) return;
 
     if (segInfo.isLast) {
         if (lastSavedSlide[username] !== 'CLEARED') {
