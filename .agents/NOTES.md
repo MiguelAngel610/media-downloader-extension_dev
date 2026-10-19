@@ -64,9 +64,19 @@
    - Provee `.pollDOM(callback)`: Un engine limpio basado en `setInterval` para las redes que lo requieran (ej. Telegram).
 3. Todas las redes sociales fueron conectadas a este nuevo motor ultra-eficiente.
 
-## Futuras Expansiones: iCloud y Google Photos
-**Estado:** PENDIENTE (En Pausa)
-- Se planea expandir el ecosistema a servicios de nube personales como iCloud (www.icloud.com/photos) y Google Photos.
-- **Objetivo Principal:** Interceptar el boton nativo de descarga de dichas plataformas para extraer la fecha original (via DOM scraping o API interception) y renombrar el archivo descargado para que coincida con el formato del proyecto (ej: YYYY-MM-DD_NombreArchivo.jpg).
-- **Implementacion pausada** a favor de continuar estabilizando el nucleo de Instagram.
+## Rediseño Integral de la Interfaz del Popup (Modo Blanco & Modern Web Guidance)
+**Fecha:** 19 de Octubre 2026
+**Problemática:** La interfaz anterior del popup era monocromática oscura, angosta (320px), poco intuitiva, sin affordances claras para la captura del atajo de teclado ni soporte de tema claro nativo.
+**Solución Técnica Aplicada:**
+1. **Modo Blanco Nativo por Defecto (`data-theme="light"`):**
+   - Paleta de diseño basada en tokens HSL modernos (`#f8fafc` surface, `#ffffff` cards, contraste de texto > 14:1 según pautas de accesibilidad WCAG AAA).
+   - Selector dinámico de tema (Modo Blanco / Modo Oscuro) con persistencia local en `chrome.storage.local.popupTheme`.
+2. **Modern Web Guidance Best Practices:**
+   - **Controles de formulario y Switches:** Switches accesibles con radio de enfoque `:focus-visible` de 2px con offset y cards táctiles con propagación de clic (`wireToggle`).
+   - **Child-State Styling (`:has()`):** Las tarjetas reaccionan dinámicamente cuando su switch hijo está activado (`.toggle-card:has(input:checked)`), aportando retroalimentación visual inmediata con bordes de acento e iluminación sutil.
+   - **Segmented Control Tabs:** Reemplazo de botones genéricos por una barra segmentada con `role="tablist"` y `aria-selected` con micro-animaciones `fadeInTab`.
+   - **Grabador de Atajo Universal Intuitivo:** Input interactivo que entra en estado de escucha al hacer clic, permitiendo presionar cualquier tecla para registrarla y botón clear para restablecer.
+   - **Pegado Rápido con Portapapeles:** Botón integrado en la barra de descarga directa con `navigator.clipboard.readText()`.
+3. **Mapeo y Retrocompatibilidad:** Se preservaron intactos todos los identificadores de storage (`vanishMode`, `ghostOnline`, `ghostSeen`, `fb_ghost_seen`, `fb_ghost_presence`, `globalShortcutObj`, `ghostHistory`) y la mensajería hacia el Host Python y Service Worker.
+
 

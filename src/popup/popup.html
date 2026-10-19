@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,155 +7,252 @@
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="logo">
-                <img src="../../assets/icons/icon48.png" alt="Logo">
-                <h1>Media Downloader</h1>
+    <div class="app-container">
+        <!-- Top App Bar -->
+        <header class="app-header">
+            <div class="brand">
+                <img src="../../assets/icons/icon48.png" alt="Logo" class="brand-icon">
+                <div class="brand-info">
+                    <h1 class="brand-title">Media Downloader</h1>
+                    <div class="status-pill">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Activo</span>
+                    </div>
+                </div>
             </div>
-            <span class="subtitle">IG &bull; FB &bull; X &bull; TG</span>
+            <button id="theme-toggle-btn" class="icon-btn" aria-label="Cambiar tema blanco/oscuro" title="Cambiar tema">
+                <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </button>
         </header>
 
-        <section>
-            <span class="section-title">Global Settings</span>
-            <div class="toggle-row">
-                <div>
-                    <div class="toggle-label">
-                        <span class="icon">⌨️</span> Universal Shortcut
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Global Shortcut Card -->
+            <section class="card shortcut-card">
+                <div class="card-lead">
+                    <div class="badge-icon badge-purple">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                            <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M18 12h.001M8 16h8"></path>
+                        </svg>
                     </div>
-                    <div class="toggle-desc">One hotkey for IG, X, and TG</div>
-                </div>
-                <input type="text" id="global-shortcut" placeholder="Ex: d" style="width: 100px; text-align: center; background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px; padding: 6px; font-weight: bold; font-size: 11px;">
-            </div>
-        </section>
-
-        <div class="divider"></div>
-
-        <section class="platform-tabs">
-            <div class="tab-buttons">
-                <button id="tab-btn-ig" class="tab-btn active" style="background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); color: white;">IG</button>
-                <button id="tab-btn-fb" class="tab-btn" style="background: #1877F2; color: white;">FB</button>
-                <button id="tab-btn-x" class="tab-btn" style="background: #000000; color: white; border: 1px solid #333;">X</button>
-                <button id="tab-btn-tg" class="tab-btn" style="background: #2AABEE; color: white;">TG</button>
-            </div>
-        </section>
-
-        <section id="ig-settings" class="tab-panel active">
-            <div class="toggle-row">
-                <div>
-                    <div class="toggle-label">
-                        <span class="icon">👻</span> Vanish Mode
-                    </div>
-                    <div class="toggle-desc">View stories without leaving a trace</div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="vanish-toggle">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <div class="toggle-row">
-                <div>
-                    <div class="toggle-label">
-                        <span class="icon">🟢</span> Hide Online Status
+                    <div class="card-text">
+                        <span class="card-title">Atajo Universal</span>
+                        <span class="card-desc">Descarga rápida en IG, X y TG</span>
                     </div>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" id="ghost-online-toggle">
-                    <span class="slider"></span>
-                </label>
-            </div>
+                <div class="shortcut-recorder" id="shortcut-box" title="Haz clic y presiona cualquier tecla">
+                    <input type="text" id="global-shortcut" readonly placeholder="Ninguno" aria-label="Tecla de atajo">
+                    <button id="clear-shortcut-btn" class="shortcut-clear" title="Borrar atajo" aria-label="Borrar atajo">&times;</button>
+                </div>
+            </section>
 
-            <div class="toggle-row">
-                <div>
-                    <div class="toggle-label">
-                        <span class="icon">👀</span> Hide Seen Status
+            <!-- Platform Tabs -->
+            <nav class="segmented-control" role="tablist" aria-label="Plataformas">
+                <button id="tab-btn-ig" class="segment-btn active" role="tab" aria-selected="true" aria-controls="ig-settings">
+                    <svg class="tab-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                        <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                    </svg>
+                    <span>Instagram</span>
+                </button>
+                <button id="tab-btn-fb" class="segment-btn" role="tab" aria-selected="false" aria-controls="fb-settings">
+                    <svg class="tab-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+                    </svg>
+                    <span>Facebook</span>
+                </button>
+                <button id="tab-btn-x" class="segment-btn" role="tab" aria-selected="false" aria-controls="x-settings">
+                    <svg class="tab-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                    <span>X</span>
+                </button>
+                <button id="tab-btn-tg" class="segment-btn" role="tab" aria-selected="false" aria-controls="tg-settings">
+                    <svg class="tab-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                    <span>Telegram</span>
+                </button>
+            </nav>
+
+            <!-- Instagram Settings Panel -->
+            <section id="ig-settings" class="tab-panel active" role="tabpanel" aria-labelledby="tab-btn-ig">
+                <div class="toggle-card">
+                    <div class="card-lead">
+                        <div class="badge-icon badge-violet">
+                            <span class="emoji-icon">👻</span>
+                        </div>
+                        <div class="card-text">
+                            <span class="card-title">Modo Fantasma (Vanish)</span>
+                            <span class="card-desc">Ve historias en sigilo sin dejar rastro</span>
+                        </div>
+                    </div>
+                    <label class="switch" for="vanish-toggle">
+                        <input type="checkbox" id="vanish-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-card">
+                    <div class="card-lead">
+                        <div class="badge-icon badge-emerald">
+                            <span class="emoji-icon">🟢</span>
+                        </div>
+                        <div class="card-text">
+                            <span class="card-title">Ocultar En Línea</span>
+                            <span class="card-desc">Nadie sabrá cuando estás conectado</span>
+                        </div>
+                    </div>
+                    <label class="switch" for="ghost-online-toggle">
+                        <input type="checkbox" id="ghost-online-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-card">
+                    <div class="card-lead">
+                        <div class="badge-icon badge-sky">
+                            <span class="emoji-icon">👀</span>
+                        </div>
+                        <div class="card-text">
+                            <span class="card-title">Ocultar Visto en DMs</span>
+                            <span class="card-desc">Lee mensajes directos sin marcar leído</span>
+                        </div>
+                    </div>
+                    <label class="switch" for="ghost-seen-toggle">
+                        <input type="checkbox" id="ghost-seen-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Ghost History Drawer -->
+                <div class="history-accordion">
+                    <button id="btn-ghost-history" class="accordion-trigger" type="button">
+                        <span class="trigger-label">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            Historial Fantasma
+                        </span>
+                        <span id="ghost-history-badge" class="counter-badge">0</span>
+                    </button>
+                    <div id="ghost-history-container" class="accordion-content" style="display: none;">
+                        <div class="history-header">
+                            <span class="history-title">Historias vistas en sigilo</span>
+                            <button id="btn-clear-ghost-history" class="text-danger-btn" type="button">Vaciar</button>
+                        </div>
+                        <div id="ghost-history-list" class="history-list">
+                            <!-- Injected dynamically -->
+                        </div>
                     </div>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" id="ghost-seen-toggle">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            
-            <div style="margin-top: 10px; padding: 0;">
-                <button id="btn-ghost-history" style="width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; transition: all 0.2s;">View Ghost History 👀</button>
-            </div>
-            
-            <div id="ghost-history-container" style="display: none; margin-top: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span style="font-size: 11px; font-weight: bold; color: var(--text-secondary);">Recently viewed</span>
-                    <button id="btn-clear-ghost-history" style="background: none; border: none; color: #ef4444; font-size: 11px; cursor: pointer;">Clear</button>
-                </div>
-                <div id="ghost-history-list" style="max-height: 120px; overflow-y: auto; font-size: 12px;">
-                    <!-- List items will be injected here -->
-                </div>
-            </div>
-        </section>
+            </section>
 
-        <section id="fb-settings" class="tab-panel hidden">
-            <div class="toggle-row">
-                <div>
-                    <div class="toggle-label">
-                        <span class="icon">👻</span> Ghost Mode
+            <!-- Facebook Settings Panel -->
+            <section id="fb-settings" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-btn-fb">
+                <div class="toggle-card">
+                    <div class="card-lead">
+                        <div class="badge-icon badge-blue">
+                            <span class="emoji-icon">👻</span>
+                        </div>
+                        <div class="card-text">
+                            <span class="card-title">Sin Confirmación de Visto</span>
+                            <span class="card-desc">Historias y mensajes sin notificación</span>
+                        </div>
                     </div>
-                    <div class="toggle-desc">Hide read receipts</div>
+                    <label class="switch" for="fb-ghost-seen-toggle">
+                        <input type="checkbox" id="fb-ghost-seen-toggle">
+                        <span class="slider"></span>
+                    </label>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" id="fb-ghost-seen-toggle">
-                    <span class="slider"></span>
-                </label>
-            </div>
 
-            <div class="toggle-row">
-                <div>
-                    <div class="toggle-label">
-                        <span class="icon">🛡️</span> Offline Status
+                <div class="toggle-card">
+                    <div class="card-lead">
+                        <div class="badge-icon badge-slate">
+                            <span class="emoji-icon">🛡️</span>
+                        </div>
+                        <div class="card-text">
+                            <span class="card-title">Estado Desconectado</span>
+                            <span class="card-desc">Oculta presencia activa en Messenger</span>
+                        </div>
                     </div>
-                    <div class="toggle-desc">Hide active presence</div>
+                    <label class="switch" for="fb-ghost-presence-toggle">
+                        <input type="checkbox" id="fb-ghost-presence-toggle">
+                        <span class="slider"></span>
+                    </label>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" id="fb-ghost-presence-toggle">
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </section>
+            </section>
 
-        <section id="x-settings" class="tab-panel hidden">
-            <div style="text-align: center; color: var(--text-secondary); padding: 20px 0; font-size: 12px;">
-                No settings available for X yet.
-            </div>
-        </section>
+            <!-- X Panel -->
+            <section id="x-settings" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-btn-x">
+                <div class="info-card">
+                    <div class="info-icon">⚡</div>
+                    <p class="info-title">Descarga Nativa Activada</p>
+                    <p class="info-desc">Los botones de descarga HD aparecen automáticamente bajo cada post y video en X.com.</p>
+                </div>
+            </section>
 
-        <section id="tg-settings" class="tab-panel hidden">
-            <div style="text-align: center; color: var(--text-secondary); padding: 20px 0; font-size: 12px;">
-                No settings available for Telegram yet.
-            </div>
-        </section>
+            <!-- Telegram Panel -->
+            <section id="tg-settings" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-btn-tg">
+                <div class="info-card">
+                    <div class="info-icon">🚀</div>
+                    <p class="info-title">Soporte WebK & WebZ</p>
+                    <p class="info-desc">Remuxeo automático de MP4 y descarga de medios restringidos activo directamente en Telegram Web.</p>
+                </div>
+            </section>
 
-        <div class="divider"></div>
+            <!-- Quick Download Section -->
+            <section class="card download-card">
+                <label for="url-input" class="card-title">Descarga Rápida de Enlace</label>
+                <div class="input-with-button">
+                    <input type="text" id="url-input" placeholder="Pega un enlace de IG, FB, X o TG..." autocomplete="off" spellcheck="false">
+                    <button id="paste-btn" class="paste-btn" type="button" title="Pegar del portapapeles" aria-label="Pegar enlace">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                        </svg>
+                        <span>Pegar</span>
+                    </button>
+                </div>
 
+                <button id="download-btn" class="primary-btn" type="button">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Descargar Ahora</span>
+                </button>
 
+                <div id="status-message" class="status-alert hidden" role="alert" aria-live="polite"></div>
+            </section>
+        </main>
 
-        <section>
-            <span class="section-title">Quick Download</span>
-
-            <div class="input-group">
-                <input type="text" id="url-input" placeholder="Paste an IG, FB, X or TG link...">
-            </div>
-
-            <button id="download-btn" class="primary-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                Download
-            </button>
-
-            <div id="status-message" class="status hidden"></div>
-        </section>
-
-        <footer>
-            Make sure the Native Host is running
+        <!-- Footer -->
+        <footer class="app-footer">
+            <span class="footer-hint">
+                <span class="pulse-indicator"></span> Host Python Nativo listo
+            </span>
         </footer>
     </div>
+
     <script src="popup.js"></script>
 </body>
 </html>
