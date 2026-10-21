@@ -121,8 +121,14 @@ export function processAndPostData(data) {
         checkResetFn = function(uname, ts) {
             if (!uname || !ts || !seenUsers[uname]) return;
             let seenTime = typeof seenUsers[uname] === 'object' ? seenUsers[uname].seenAt : seenUsers[uname];
-            let tsMs = ts > 100000000000 ? ts : ts * 1000;
-            if (tsMs > seenTime + 5000) { // New story uploaded after previous view
+            let numTs = Number(ts);
+            if (isNaN(numTs) || numTs <= 0) return;
+
+            let tsMs = numTs;
+            if (numTs > 1e14) tsMs = Math.floor(numTs / 1000); // Microseconds to milliseconds
+            else if (numTs < 1e11) tsMs = numTs * 1000;       // Seconds to milliseconds
+
+            if (tsMs > seenTime + 10000) { // Genuinely new story uploaded after previous view (10s buffer)
                 delete seenUsers[uname];
                 seenModified = true;
                 clearStoryCheckpoint(uname);

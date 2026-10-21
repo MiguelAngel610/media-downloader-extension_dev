@@ -170,7 +170,8 @@ export function syncStoryProgressBar() {
 
                 let counter = document.createElement('div');
                 counter.id = 'md-story-counter';
-                counter.textContent = '1/1'; // Prevent empty counter flash on initial render
+                counter.textContent = ''; // Avoid dummy '1/1' which falsely triggers story completion guards
+                counter.dataset.ready = 'false';
 
                 customContainer.appendChild(slider);
                 customContainer.appendChild(counter);
@@ -339,8 +340,14 @@ export function syncStoryProgressBar() {
             window.__md_activeStorySegment = segmentElements[activeIndex - 1] || null;
 
             let counter = customContainer.querySelector('#md-story-counter');
-            if (counter && counter.textContent !== `${activeIndex}/${totalSegments}`) {
-                counter.textContent = `${activeIndex}/${totalSegments}`;
+            if (counter) {
+                let formatted = `${activeIndex}/${totalSegments}`;
+                if (counter.textContent !== formatted) {
+                    counter.textContent = formatted;
+                }
+                counter.dataset.cur = String(activeIndex);
+                counter.dataset.total = String(totalSegments);
+                counter.dataset.ready = 'true';
             }
 
             let slider = customContainer.querySelector('#md-story-slider');

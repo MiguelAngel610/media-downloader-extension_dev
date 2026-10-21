@@ -463,3 +463,22 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 3. **Reanudación Activa Nativa:** Al montar el visor de historias de un usuario con checkpoint (`slideIndex > 1`), `story_resume.js` espera a que las barras de segmentos estén presentes y ejecuta avances programados (~60ms por paso) disparando el evento de teclado universal y agnóstico de idioma `KeyboardEvent('keydown', { key: 'ArrowRight' })` (con fallback dinámico al botón chevron Next), guiando la máquina de estados nativa de React de forma imperceptible y fluida (~120ms total).
 4. **Invalidación y Limpieza:** Al alcanzar la última diapositiva (`segInfo.isLast`), o al detectarse una nueva historia subida vía GraphQL (`media_parser.js`), el checkpoint del usuario se purga automáticamente.
 5. Reempaquetado exitoso de `dist/ig_interceptor.bundle.js` vía esbuild.
+
+## Auditoría Profunda y Corrección Integral: Ghost Mode y Story Resume Guard
+**Fecha:** 21 de Octubre 2026
+**Estado:** RESUELTO
+**Problemática:** Tras la implementación inicial del guard, las historias en modo fantasma continuaban regresando a la diapositiva 1, los checkpoints se borraban prematuramente, se inundaba la consola con logs continuos de `"✨ Story Alert New story posted..."`, y se reportaban fallos de navegación.
+**Causas Raíz Descubiertas en la Auditoría:**
+1. **Falso '1/1' en `#md-story-counter` (story.js):** El elemento se inicializaba con `textContent = '1/1'` para evitar flash visual. Al montar la historia, `getStorySegmentInfo()` leía inmediatamente `1/1` (`cur=1, total=1`), interpretando erróneamente que la historia estaba en su última diapositiva (`isLast: true`). Esto provocaba que `ghost_mode.js` marcara al usuario como visto en `md_ghost_seen_users` y ejecutara `clearStoryCheckpoint(username)` en el mismo milisegundo de entrar a la historia.
+2. **Loop de Falsos Positivos de "Story Alert" (media_parser.js):** En GraphQL de Instagram, `device_timestamp` se transmite en microsegundos (~1.7e15), mientras que `seenTime` usa `Date.now()` en milisegundos (~1.7e12). La comparación `tsMs > seenTime + 5000` resultaba siempre verdadera (por un factor de 1000), borrando cíclicamente `seenUsers[uname]` y ejecutando `clearStoryCheckpoint(uname)` en cada petición de red en segundo plano.
+3. **Botón de Navegación Equivocado (findNextStoryButton):** El selector `button[aria-label="Next"]` o con `left > centerX + 100` en desktop web apunta al chevron de navegación de **siguiente cuenta/usuario**, no de siguiente diapositiva. Al intentar avanzar diapositivas, la extensión hacía clic en ese botón, saltando de usuario y abortando el resume.
+4. **Falta de Guard contra `resumeInProgress` en `ghost_mode.js`:** Durante el avance programado (ej. diapositiva 1 a 3), Instagram enviaba peticiones `seen` intermedias; `__md_markStoryAsGhostSeen` capturaba estas peticiones y sobreescribía el checkpoint con diapositivas inferiores.
+5. **Bloqueo Involuntario de Likes:** `isSeenRequest` contenía `usepolarisstorylike` y `xdtstorylike`, lo que bloqueaba la posibilidad de dar like a historias cuando Ghost Mode estaba activo.
+**Solución Quirúrgica:**
+1. `story.js`: `#md-story-counter` se inicializa vacío (`dataset.ready = 'false'`) y sólo se marca `ready = 'true'` con `dataset.cur` y `dataset.total` tras la medición geométrica real.
+2. `story_resume.js`: Eliminado `findNextStoryButton`. El avance simula el clic nativo en el 85% horizontal de la tarjeta de la historia con `buttons: 1`, `composed: true`, invocando `.click()` en el elemento objetivo y despachando `KeyboardEvent('ArrowRight')`.
+3. `story_resume.js`: Búsqueda de segmentos acotada al contenedor raíz de historia (`section, div[role="dialog"], main`), erradicando `document.querySelectorAll('div')`.
+4. `ghost_mode.js`: Eliminados `xdtstorylike` y `usepolarisstorylike`. Se blindó `__md_markStoryAsGhostSeen` con `window.__md_resumeInProgress` para evitar limpiar o sobreescribir checkpoints durante el avance activo.
+5. `media_parser.js`: Normalización estricta de marcas de tiempo (microsegundos, milisegundos y segundos) con margen de reloj de 10 segundos para descartar falsas alertas de historias nuevas.
+6. Compilación exitosa de ambos bundles (`dist/ig_interceptor.bundle.js` y `dist/video_progress.bundle.js`).
+

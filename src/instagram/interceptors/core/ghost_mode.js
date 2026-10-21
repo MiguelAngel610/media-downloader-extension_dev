@@ -104,8 +104,6 @@ export function isSeenRequest(url, body) {
                       bodyStr.includes('storyseen') ||
                       bodyStr.includes('story_seen') ||
                       bodyStr.includes('xdtstoryseen') ||
-                      bodyStr.includes('xdtstorylike') ||
-                      bodyStr.includes('usepolarisstorylike') ||
                       bodyStr.includes('ig_reels_video_view') ||
                       bodyStr.includes('ig_story_view') ||
                       bodyStr.includes('view_seen_at') ||
@@ -181,6 +179,7 @@ function isViewingLastStorySegment() {
 }
 
 window.__md_markStoryAsGhostSeen = function(networkUsername = null) {
+    if (window.__md_resumeInProgress) return; // Do not touch checkpoints or update seen state while auto-advancing slides
     let username = networkUsername;
     if (!username) {
         let match = window.location.href.match(/\/stories\/([^\/]+)\//);
