@@ -157,22 +157,66 @@ window.__md_applyGhostVisuals = function() {
         return;
     }
     
-    let css = users.map(u => {
-        return `
-        a[href^="/stories/${u}/"] canvas,
-        header :has(img:is([alt="${u}"], [alt^="${u}'s "], [alt$=" ${u}"], [alt^="${u} "])) canvas,
-        [role="button"]:has(img:is([alt="${u}"], [alt^="${u}'s "], [alt$=" ${u}"], [alt^="${u} "])):not(:has(video)) canvas,
-        button:has(img:is([alt="${u}"], [alt^="${u}'s "], [alt$=" ${u}"], [alt^="${u} "])):not(:has(video)) canvas { 
+    let cssRules = [];
+    users.forEach(u => {
+        let uLower = u.toLowerCase();
+        cssRules.push(`
+        a[href*="/stories/${u}/"] canvas,
+        a[href*="/stories/${u}/"] svg:not([aria-label]),
+        :is([role="button"], button, li, header):has(img[alt*="${uLower}"]):not(:has(video)) canvas,
+        :is([role="button"], button, li, header):has(img[alt*="${uLower}"]):not(:has(video)) svg:not([aria-label]),
+        :is([role="button"], button, li):has(:is([title="${uLower}"], span, div):is([title="${uLower}"])):not(:has(video)) canvas,
+        :is([role="button"], button, li):has(:is([title="${uLower}"], span, div):is([title="${uLower}"])):not(:has(video)) svg:not([aria-label]) { 
             filter: grayscale(100%) contrast(0) brightness(1.6) !important; 
-            opacity: 0.15 !important;
+            opacity: 0.2 !important;
             transition: all 0.5s ease;
         }
-    `}).join('\n');
+        `);
+    });
     
+    let css = cssRules.join('\n');
     if (styleEl.textContent !== css) {
         styleEl.textContent = css;
     }
+
+    // Direct DOM inline pass for 100% reliable gray ring across all layouts and languages
+    try {
+        let images = document.querySelectorAll('img[alt]');
+        images.forEach(img => {
+            let alt = (img.getAttribute('alt') || "").toLowerCase();
+            for (let u of users) {
+                let uLower = u.toLowerCase();
+                let match = alt === uLower || 
+                            alt.includes(` ${uLower} `) || 
+                            alt.endsWith(` ${uLower}`) || 
+                            alt.endsWith(` ${uLower}.`) || 
+                            alt.includes(`de ${uLower}`) || 
+                            alt.includes(`${uLower}'s`) ||
+                            alt.includes(uLower);
+                if (match) {
+                    let container = img.closest('[role="button"], button, li, header, a') || img.parentElement;
+                    if (container) {
+                        let rings = container.querySelectorAll('canvas, svg:not([aria-label])');
+                        rings.forEach(r => {
+                            r.style.setProperty('filter', 'grayscale(100%) contrast(0) brightness(1.6)', 'important');
+                            r.style.setProperty('opacity', '0.2', 'important');
+                        });
+                    }
+                }
+            }
+        });
+    } catch(e) {}
 };
+
+// Periodic visual sync for single page application navigation and scroll
+setInterval(() => {
+    try { window.__md_applyGhostVisuals(); } catch(e) {}
+}, 1000);
+window.addEventListener('popstate', () => {
+    setTimeout(() => {
+        try { window.__md_applyGhostVisuals(); } catch(e) {}
+    }, 150);
+});
 
 function isViewingLastStorySegment() {
     return getStorySegmentInfo();
@@ -188,37 +232,33 @@ window.__md_markStoryAsGhostSeen = function(networkUsername = null) {
     }
     
     let segInfo = isViewingLastStorySegment();
-    if (!segInfo || !segInfo.ready || segInfo.total <= 0) {
-        return; // Story viewer is still mounting, do NOT prematurely complete or clear checkpoints
-    }
+    let cur = segInfo && segInfo.cur ? segInfo.cur : 1;
+    let total = segInfo && segInfo.total ? segInfo.total : 1;
+    let isLast = segInfo && segInfo.isLast !== undefined ? segInfo.isLast : (total <= 1 || cur >= total);
 
     let seenUsers = {};
     try {
         seenUsers = JSON.parse(localStorage.getItem('md_ghost_seen_users') || '{}');
     } catch(e) {}
 
-    // Only turn icon gray if the user has reached the final story of this author!
-    if (!segInfo.isLast) {
-        mdLog("👀 Story Protected", `@${username} slide (${segInfo.cur}/${segInfo.total}) viewed in stealth — Ring stays colorful`, "#3b82f6");
-        saveStoryCheckpoint(username, segInfo.cur, segInfo.total);
-        if (seenUsers[username]) {
-            delete seenUsers[username];
-            localStorage.setItem('md_ghost_seen_users', JSON.stringify(seenUsers));
-            window.__md_applyGhostVisuals();
-        }
-        return;
-    }
-    
+    // Mark as ghost-seen immediately
     seenUsers[username] = Date.now();
     localStorage.setItem('md_ghost_seen_users', JSON.stringify(seenUsers));
-    clearStoryCheckpoint(username);
-    
+
+    // Manage checkpoint: if partially viewed, save position; if finished, clear
+    if (!isLast && cur > 1 && cur < total) {
+        saveStoryCheckpoint(username, cur, total);
+    } else if (isLast) {
+        clearStoryCheckpoint(username);
+    }
+
     // Notify content script to save in extension storage
     window.postMessage({ type: 'MD_GHOST_HISTORY_ADD', username: username, timestamp: Date.now() }, '*');
 
     window.__md_applyGhostVisuals();
-    mdLog("👻 Story Completed", `All stories viewed (${segInfo.cur}/${segInfo.total}) for @${username} — Ring changed to gray`, "#8b5cf6");
+    mdLog("👻 Story Viewed in Stealth", `@${username} marked as ghost-seen (${cur}/${total}) — Ring turned gray`, "#8b5cf6");
 };
+
 
 window.__md_lastGhostBlock = 0;
 window.__md_handleGhostBlock = function(type, networkUsername = null) {

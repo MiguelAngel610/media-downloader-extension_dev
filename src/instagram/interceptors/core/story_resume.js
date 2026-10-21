@@ -120,7 +120,7 @@ export function getStorySegmentInfo() {
         for (let d of potentialContainers) {
             if (d.id === 'md-story-progress-container' || d.closest('#md-story-progress-container')) continue;
             let ch = Array.from(d.children).filter(c => c.id !== 'md-story-progress-container');
-            if (ch.length > 1 && ch.length <= 100) {
+            if (ch.length >= 1 && ch.length <= 100) {
                 let first = ch[0];
                 if (first.querySelector('button, img, svg, header, canvas')) continue;
                 let rect = d.getBoundingClientRect();
@@ -282,10 +282,21 @@ function attemptResumeForUser(username) {
 }
 
 function checkAndSaveProgress(username) {
-    if (resumeInProgress) return;
+    if (resumeInProgress || window.__md_resumeInProgress) return;
 
     let segInfo = getStorySegmentInfo();
-    if (!segInfo.ready || segInfo.total <= 1) return;
+    if (!segInfo.ready || segInfo.total < 1) return;
+
+    // Ensure user is registered as ghost-seen whenever they are actively viewing stories
+    if (window.__md_markStoryAsGhostSeen && !window.__md_resumeInProgress) {
+        let seenUsers = {};
+        try {
+            seenUsers = JSON.parse(localStorage.getItem('md_ghost_seen_users') || '{}');
+        } catch(e) {}
+        if (!seenUsers[username]) {
+            window.__md_markStoryAsGhostSeen(username);
+        }
+    }
 
     if (segInfo.isLast) {
         if (lastSavedSlide[username] !== 'CLEARED') {
