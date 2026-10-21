@@ -481,4 +481,9 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 4. `ghost_mode.js`: Eliminados `xdtstorylike` y `usepolarisstorylike`. Se blindó `__md_markStoryAsGhostSeen` con `window.__md_resumeInProgress` para evitar limpiar o sobreescribir checkpoints durante el avance activo.
 5. `media_parser.js`: Normalización estricta de marcas de tiempo (microsegundos, milisegundos y segundos) con margen de reloj de 10 segundos para descartar falsas alertas de historias nuevas.
 6. Compilación exitosa de ambos bundles (`dist/ig_interceptor.bundle.js` y `dist/video_progress.bundle.js`).
+7. **Aplicación Inmediata de Aro Gris:** Se eliminó la restricción que impedía poner el aro en gris hasta alcanzar la última diapositiva. Al abrir cualquier historia, el usuario se marca como visto de inmediato en `md_ghost_seen_users` y se aplica el estilo visual, conservando a la vez el checkpoint si la historia se vio de forma parcial.
+8. **Soporte de Cuentas con 1 Sola Historia:** Se ajustó la detección de segmentos a `ch.length >= 1`, permitiendo que cuentas con un único slide sean reconocidas y marcadas instantáneamente.
+9. **Selectores Multilingües y Barrido DOM Directo:** Soporte para Instagram en español (`"Foto del perfil de..."`), inglés y cualquier idioma en etiquetas `<img>`, cubriendo tanto elementos `<canvas>` como `<svg>`. Además de `#md-ghost-styles`, se inyecta directamente el filtro gris en los elementos del DOM.
+10. **Sincronización en SPA:** Sincronización visual periódica (cada 1s) y al navegar (`popstate`), garantizando que al regresar al feed los aros permanezcan grises sin requerir recargar la página.
+
 
