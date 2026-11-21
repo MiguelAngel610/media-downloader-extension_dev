@@ -487,3 +487,22 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 10. **Sincronización en SPA:** Sincronización visual periódica (cada 1s) y al navegar (`popstate`), garantizando que al regresar al feed los aros permanezcan grises sin requerir recargar la página.
 
 
+
+## Fix (21 de Noviembre 2026): Fugas del Ghost Mode (fail-open) y Canal de Configuración Inseguro
+**Estado:** RESUELTO (verificado con test de comportamiento sobre el bundle real: 13/13; el bundle anterior fallaba los escenarios de fuga)
+**Causas Raíz:**
+1. **Carrera de arranque (fail-open):** Los flags iniciaban en `false` (`logger.js`) hasta que `chrome.storage.local.get` respondía, y eso ocurría *después* de cargar el bundle vía `<script src>` asíncrono. Toda petición de presencia/visto emitida en ese intervalo salía sin filtrar. Además, el código de Instagram podía capturar la referencia original de `fetch` antes del parche.
+2. **Formas de petición no inspeccionadas:** `(url || "").toString()` convertía un `Request` en `"[object Request]"` y `FormData`/`Blob`/`ArrayBuffer` en `"[object ...]"`, así que esos seen requests nunca coincidían con los marcadores.
+3. **Canal sin validación:** Los listeners del MAIN world (`MD_VANISH_TOGGLE`, `MD_SPOOF_ZOOM`, `MD_REQUEST_FIBER`) no verificaban `event.source`: cualquier ventana con referencia (opener, iframe) podía apagar el modo fantasma. Con `event.data === null` lanzaban `TypeError`.
+4. **WebSocket roto:** `window.WebSocket = function(){}` eliminaba `WebSocket.OPEN/CLOSED` e `instanceof`, que el código de IG puede usar antes de enviar.
+5. **Historial fantasma muerto:** `MD_GHOST_HISTORY_ADD` se emitía pero nadie lo escuchaba desde que se eliminó `vanish_init.js`; el popup siempre mostraba la lista vacía.
+**Solución (verificada en docs oficiales vía Context7: `document_start` corre "before any other DOM is constructed or any other script is run"; `world: "MAIN"` es clave válida de `content_scripts`):**
+1. `manifest.json`: el bundle se inyecta como content script `"world": "MAIN"`, `run_at: document_start`, `all_frames: true`. Se quitó de `web_accessible_resources` (los sitios ya no pueden sondear la extensión por ese archivo).
+2. Nuevos módulos con responsabilidad única:
+   - `ghost_settings.js`: estado de flags, promesa `settingsReady`, mensaje tipado `MD_GHOST_SETTINGS` (valida booleanos, `event.source === window` y mismo origen), handshake `MD_GHOST_SETTINGS_REQUEST` y aviso si no llegan en 5s.
+   - `request_body.js`: normaliza URL (`string|URL|Request`) y cuerpo (`FormData`, `URLSearchParams`, `Blob` ≤256KB, `ArrayBuffer`, vistas, `Request` clonado).
+   - `ghost_policy.js`: clasificación y decisión puras (marcadores sin cambios respecto a la versión anterior).
+3. `network.js`: **fail-closed** — solo las peticiones *relevantes* para el modo fantasma esperan a la configuración; el resto pasa sin demora. XHR asíncrono se difiere; XHR síncrono relevante sin configuración se retiene. `sendBeacon` y WebSocket se movieron aquí; WebSocket ahora parchea `WebSocket.prototype.send`. Metadatos de XHR en `WeakMap` (sin propiedades expando visibles). El sniffing de respuestas se limita a content-types textuales (antes decodificaba segmentos de video como texto).
+4. `ig_interceptor_init.js`: ya no inyecta scripts; envía siempre el snapshot completo de los 3 flags (al cargar, al cambiar storage, al recibir handshake o `MD_UPDATE_SETTINGS`) y persiste `ghostHistory` validando el username (`^[A-Za-z0-9._]{1,30}$`) con retención de 48h.
+5. `logger.js`: `logError()` para cumplir Zero Silent Errors en el MAIN world.
+**Riesgo residual conocido:** el propio código de la página comparte `window` y podría falsificar `MD_GHOST_SETTINGS`; los frames WebSocket tipo `Blob` no se inspeccionan (los de presencia MQTT son `ArrayBuffer`).

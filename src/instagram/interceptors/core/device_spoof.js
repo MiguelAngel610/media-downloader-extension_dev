@@ -26,7 +26,9 @@ if (window.location.search.includes('__md_extract_hd=1')) {
 
 
 window.addEventListener('message', function(event) {
-if (event.data.type === 'MD_SPOOF_ZOOM') {
+    // Only our own window may trigger the zoom spoof (rejects openers/iframes; also avoids a TypeError on null data).
+    if (event.source !== window || !event.data) return;
+    if (event.data.type === 'MD_SPOOF_ZOOM') {
         try {
             window.__md_originalRatio = window.devicePixelRatio;
             Object.defineProperty(window, 'devicePixelRatio', {

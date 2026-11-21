@@ -35,6 +35,17 @@
         "*://*.instagram.com/*"
       ],
       "js": [
+        "dist/ig_interceptor.bundle.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "*://*.instagram.com/*"
+      ],
+      "js": [
         "src/shared/utils/toast_manager.js",
         "src/shared/utils/dom_observer.js",
         "src/shared/utils/shortcut_manager.js",
@@ -169,14 +180,6 @@
     "128": "assets/icons/icon128.png"
   },
   "web_accessible_resources": [
-    {
-      "resources": [
-        "dist/ig_interceptor.bundle.js"
-      ],
-      "matches": [
-        "*://*.instagram.com/*"
-      ]
-    },
     {
       "resources": [
         "src/x/interceptors/x_interceptor.js"

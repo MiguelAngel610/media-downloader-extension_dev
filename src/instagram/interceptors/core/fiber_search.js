@@ -1,6 +1,8 @@
 import { mdLog } from './logger.js';
 window.addEventListener('message', function(event) {
-if (event.data.type === 'MD_REQUEST_FIBER') {
+    // Only our own window may request a fiber walk (rejects openers/iframes; also avoids a TypeError on null data).
+    if (event.source !== window || !event.data) return;
+    if (event.data.type === 'MD_REQUEST_FIBER') {
         try {
             let id = event.data.id;
             let el = document.querySelector('[data-md-id="' + id + '"]');

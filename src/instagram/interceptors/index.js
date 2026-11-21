@@ -1,4 +1,6 @@
 import './core/logger.js';
+// Must stay first after the logger: it opens the settings channel and handshake.
+import './core/ghost_settings.js';
 import './core/device_spoof.js';
 import './core/ghost_mode.js';
 import './core/fiber_search.js';

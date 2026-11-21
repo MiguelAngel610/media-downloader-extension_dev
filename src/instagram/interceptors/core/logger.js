@@ -11,7 +11,20 @@ export function mdLog(badge, message, badgeColor = "#3b82f6") {
     );
 }
 
-// Funciones globales para recolectar URLs de 1080p en la memoria
+/**
+ * Zero Silent Errors: every caught failure in the MAIN world goes through here.
+ * @param {string} context
+ * @param {unknown} error
+ */
+export function logError(context, error) {
+    console.warn(
+        `%c ⚠️ ${context} %c ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)} `,
+        "background: #dc2626; color: #ffffff; font-weight: 700; font-size: 11px; border-radius: 4px 0 0 4px; padding: 2px 6px;",
+        "background: #1e293b; color: #f8fafc; font-size: 11px; border-radius: 0 4px 4px 0; padding: 2px 8px;"
+    );
+}
+
+// Global helpers that collect 1080p profile picture URLs from memory
 window.__md_pfps_list = window.__md_pfps_list || new Set();
 
 window.__md_sniffPfps = function(text) {
