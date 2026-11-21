@@ -103,3 +103,15 @@
 5. Hijo con `PYTHONIOENCODING=utf-8` y lectura `encoding="utf-8", errors="replace"`: nombres de archivo no ASCII ya no rompen la salida.
 6. El timeout (45s) ahora devuelve un error explícito en vez de un "failed" genérico.
 **Verificación:** test de regresión 7/7 (incluye baseline que demuestra la inyección con el estilo anterior).
+
+## Seguridad: Path Traversal, Bridge TCP sin Auth y Race en stdout (Host Python)
+**Fecha:** 21 de Noviembre 2026
+**Estado:** RESUELTO (test de regresión 20/20, incluye baseline que demuestra la corrupción de frames sin lock)
+**A — Path traversal:** `username`, `media_category`, `tweet_id`, `shortcode`, `user_id` y `platform` llegaban desde la página web y se usaban crudos en `os.path.join` y en `outtmpl` de yt-dlp. `..\..\` permitía escribir fuera de `~/gallery-dl/`.
+- **Fix:** `PathGuard.sanitize_metadata()` una sola vez en `MediaManager.process_request` (punto de entrada único; los handlers releen `direct_metadata` del msg ya saneado). Reemplaza separadores e inválidos de Windows, neutraliza nombres reservados (`CON`, `NUL`, `COM1`…), quita puntos/espacios finales y `%` (plantillas de yt-dlp). Whitelist de `platform`. Defensa en profundidad: `PathGuard.ensure_inside()` (`realpath` + `commonpath`) en cada carpeta de salida; si falla → `PathTraversalError` → respuesta de error.
+**B — Bridge TCP (127.0.0.1:65432) sin autenticación:** cualquier proceso local podía enviar `start_backup` y leer todos los logs.
+- **Cliente legítimo:** la app de escritorio `~/Documents/Projects/media_downloader` (`services/tcp_listener.py` lee logs; `stop_bot` envía `stop_backup`). Nadie envía ya `start_backup` (el bot nativo `background_bot.py` lo reemplazó).
+- **Fix:** `BridgeAuth`: token `secrets.token_urlsafe(32)` en `~/gallery-dl/md_bridge_token.txt` (fuera de los repos). Primer mensaje obligatorio `{"action":"auth","token":...}` comparado con `hmac.compare_digest`; timeout de 5s para autenticarse. Solo los clientes autenticados reciben logs. Whitelist `start_backup`/`stop_backup`. Lectura por líneas con límite de 64 KB; un mensaje final sin `\n` se procesa al cerrar.
+- **Port hijacking (Windows):** `SO_REUSEADDR` en Windows permite que otro proceso haga bind al mismo puerto; se usa `SO_EXCLUSIVEADDRUSE` cuando existe (verificado en docs de CPython vía Context7).
+**C — Race en stdout:** el loop principal y los threads TCP escribían frames (4 bytes de longitud + JSON) sin exclusión → frames intercalados → Chrome desconecta el host. **Fix:** `NativeMessaging._stdout_lock`; `Logger._clients_lock` para `active_tcp_clients`. Además, los mensajes mayores al límite de Chrome de 1 MB (docs oficiales) se recortan (cola del `log`) en vez de tumbar la conexión.
+**Zero Silent Errors:** los `except: pass` de `Logger` ahora registran (stderr como último recurso, nunca stdout).

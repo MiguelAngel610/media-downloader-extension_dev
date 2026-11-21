@@ -48,80 +48,203 @@ class NativeMessaging:
         message = sys.stdin.buffer.read(message_length).decode('utf-8')
         return json.loads(message)
 
-    @staticmethod
-    def send_message(message_content):
-        encoded_content = json.dumps(message_content).encode('utf-8')
+    # Chrome rejects host->extension messages above 1 MB and drops the connection.
+    MAX_MESSAGE_BYTES = 1024 * 1024
+    LOG_TAIL_CHARS = 4000
+    # The main loop and the TCP threads both write: each frame (length + body) must be atomic.
+    _stdout_lock = threading.Lock()
+
+    @classmethod
+    def _encode(cls, message_content: Dict[str, Any]) -> bytes:
+        encoded = json.dumps(message_content).encode('utf-8')
+        if len(encoded) <= cls.MAX_MESSAGE_BYTES:
+            return encoded
+        if isinstance(message_content.get("log"), str):
+            trimmed = dict(message_content, log=message_content["log"][-cls.LOG_TAIL_CHARS:], log_truncated=True)
+            encoded = json.dumps(trimmed).encode('utf-8')
+            if len(encoded) <= cls.MAX_MESSAGE_BYTES:
+                return encoded
+        return json.dumps({"status": message_content.get("status", "error"),
+                           "message": "Host response exceeded Chrome's 1 MB limit and was dropped"}).encode('utf-8')
+
+    @classmethod
+    def send_message(cls, message_content: Dict[str, Any]) -> None:
+        encoded_content = cls._encode(message_content)
         encoded_length = struct.pack('@I', len(encoded_content))
-        sys.stdout.buffer.write(encoded_length)
-        sys.stdout.buffer.write(encoded_content)
-        sys.stdout.buffer.flush()
+        with cls._stdout_lock:
+            sys.stdout.buffer.write(encoded_length)
+            sys.stdout.buffer.write(encoded_content)
+            sys.stdout.buffer.flush()
 
 class Logger:
-    active_tcp_clients = []
-    
+    active_tcp_clients: List[socket.socket] = []
+    _clients_lock = threading.Lock()
+
     @classmethod
-    def broadcast_log(cls, msg):
+    def add_client(cls, client: socket.socket) -> None:
+        with cls._clients_lock:
+            cls.active_tcp_clients.append(client)
+
+    @classmethod
+    def remove_client(cls, client: socket.socket) -> None:
+        with cls._clients_lock:
+            if client in cls.active_tcp_clients:
+                cls.active_tcp_clients.remove(client)
+
+    @classmethod
+    def broadcast_log(cls, msg: Any) -> None:
         cls.log_info(msg)
-        for client in list(cls.active_tcp_clients):
+        with cls._clients_lock:
+            clients = list(cls.active_tcp_clients)
+        payload = (str(msg) + "\n").encode('utf-8', errors='replace')
+        for client in clients:
             try:
-                client.sendall((str(msg) + "\n").encode('utf-8', errors='replace'))
-            except:
-                pass
+                client.sendall(payload)
+            except OSError as e:
+                # The client went away; drop it so later broadcasts skip it.
+                cls.remove_client(client)
+                cls.log_info(f"Dropped TCP log client after send failure: {e}")
 
     @staticmethod
-    def log_info(msg):
+    def log_info(msg: Any) -> None:
         try:
             log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "host.log")
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(str(msg) + "\n")
-        except:
-            pass
+        except OSError as e:
+            # stderr is never parsed by Chrome as protocol data, so it's the safe last resort.
+            print(f"[host] Could not write host.log: {e}", file=sys.stderr)
+
+class BridgeAuth:
+    """
+    Shared-secret auth for the local TCP bridge. The token is generated once and kept in
+    the user's private gallery-dl folder (next to the cookies), never in the repository.
+    """
+    TOKEN_FILENAME = "md_bridge_token.txt"
+
+    @classmethod
+    def token_path(cls) -> str:
+        return os.path.join(os.path.expanduser("~"), "gallery-dl", cls.TOKEN_FILENAME)
+
+    @classmethod
+    def load_or_create_token(cls) -> str:
+        path = cls.token_path()
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                token = f.read().strip()
+            if token:
+                return token
+        import secrets
+        token = secrets.token_urlsafe(32)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(token)
+        Logger.log_info(f"Generated new TCP bridge token at {path}")
+        return token
+
+    @staticmethod
+    def is_valid(candidate: Any, expected: str) -> bool:
+        import hmac
+        # compare_digest takes constant time, so the token can't be guessed byte by byte.
+        return isinstance(candidate, str) and hmac.compare_digest(candidate.encode('utf-8'), expected.encode('utf-8'))
 
 class TCPServer:
-    def __init__(self, host='127.0.0.1', port=65432):
+    """Local bridge used by the Media Downloader desktop app (log console + stop button)."""
+    ALLOWED_ACTIONS = frozenset({"start_backup", "stop_backup"})
+    AUTH_TIMEOUT_SECONDS = 5.0
+    MAX_LINE_BYTES = 64 * 1024
+
+    def __init__(self, host: str = '127.0.0.1', port: int = 65432):
         self.host = host
         self.port = port
-        
-    def start(self):
-        threading.Thread(target=self._server_thread, daemon=True).start()
-        
-    def _server_thread(self):
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.token = ""
+
+    def start(self) -> None:
         try:
-            server.bind((self.host, self.port))
-            server.listen(5)
+            self.token = BridgeAuth.load_or_create_token()
+        except OSError as e:
+            Logger.log_info(f"TCP bridge disabled: cannot load or create token: {e}")
+            return
+        threading.Thread(target=self._server_thread, daemon=True).start()
+
+    @staticmethod
+    def _create_listening_socket(host: str, port: int) -> socket.socket:
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            # Windows: SO_REUSEADDR would let another process bind the same port and
+            # intercept clients (and their token); exclusive use forbids that.
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        else:
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind((host, port))
+        server.listen(5)
+        return server
+
+    def _server_thread(self) -> None:
+        try:
+            server = self._create_listening_socket(self.host, self.port)
             Logger.log_info(f"TCP Server started on port {self.port}")
-        except Exception as e:
+        except OSError as e:
             Logger.log_info(f"Failed to start TCP Server: {e}")
             return
-            
+
         while True:
             try:
-                client, addr = server.accept()
+                client, _addr = server.accept()
                 threading.Thread(target=self._handle_client, args=(client,), daemon=True).start()
-            except Exception as e:
+            except OSError as e:
                 Logger.log_info(f"TCP Accept Error: {e}")
 
-    def _handle_client(self, client):
-        Logger.active_tcp_clients.append(client)
+    @classmethod
+    def _iter_lines(cls, client: socket.socket):
+        """Yields one decoded JSON line at a time; a trailing message without '\\n' is flushed on close."""
+        buffer = b""
+        while True:
+            data = client.recv(4096)
+            if not data:
+                break
+            buffer += data
+            if len(buffer) > cls.MAX_LINE_BYTES and b"\n" not in buffer:
+                raise ValueError(f"TCP message exceeded {cls.MAX_LINE_BYTES} bytes")
+            while b"\n" in buffer:
+                line, buffer = buffer.split(b"\n", 1)
+                if line.strip():
+                    yield line.decode('utf-8', errors='replace')
+        if buffer.strip():
+            yield buffer.decode('utf-8', errors='replace')
+
+    def _handle_client(self, client: socket.socket) -> None:
+        authenticated = False
+        client.settimeout(self.AUTH_TIMEOUT_SECONDS)
         try:
-            while True:
-                data = client.recv(4096)
-                if not data:
+            for line in self._iter_lines(client):
+                try:
+                    message = json.loads(line)
+                except json.JSONDecodeError as e:
+                    Logger.log_info(f"TCP bridge: invalid JSON rejected: {e}")
                     break
-                message = data.decode('utf-8').strip()
-                if message:
-                    try:
-                        msg_json = json.loads(message)
-                        NativeMessaging.send_message(msg_json)
-                    except Exception as e:
-                        Logger.log_info(f"TCP JSON parse error: {e}")
-        except Exception as e:
+                if not isinstance(message, dict):
+                    Logger.log_info("TCP bridge: non-object message rejected")
+                    break
+
+                if not authenticated:
+                    if message.get("action") != "auth" or not BridgeAuth.is_valid(message.get("token"), self.token):
+                        Logger.log_info("TCP bridge: connection rejected (missing or invalid token)")
+                        break
+                    authenticated = True
+                    client.settimeout(None)  # Log listeners stay connected indefinitely once trusted.
+                    Logger.add_client(client)
+                    continue
+
+                action = message.get("action")
+                if action not in self.ALLOWED_ACTIONS:
+                    Logger.log_info(f"TCP bridge: action not allowed: {action!r}")
+                    continue
+                NativeMessaging.send_message(message)
+        except (OSError, ValueError) as e:
             Logger.log_info(f"TCP Client Error: {e}")
         finally:
-            if client in Logger.active_tcp_clients:
-                Logger.active_tcp_clients.remove(client)
+            Logger.remove_client(client)
             client.close()
 
 class YTDLPLogger:
@@ -276,8 +399,60 @@ class DownloaderEngines:
         Logger.broadcast_log("STATUS: SUCCESS (Direct)")
         return {"status": "success", "message": "Downloaded via direct HTTP", "filename": os.path.basename(filepath)}
 
+class PathTraversalError(ValueError):
+    """Raised when a computed output path would leave the gallery-dl directory."""
+
+class PathGuard:
+    """Turns untrusted metadata (it comes from web pages) into safe single path segments."""
+    _INVALID_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+    _RESERVED_NAMES = frozenset({"CON", "PRN", "AUX", "NUL",
+                                 *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))})
+    MAX_SEGMENT_LENGTH = 120
+    # Metadata fields that end up in folder names, file names or yt-dlp output templates.
+    PATH_METADATA_KEYS = ("username", "media_category", "tweet_id", "shortcode", "user_id")
+
+    @classmethod
+    def sanitize_segment(cls, value: Any, fallback: str) -> str:
+        # Separators become '_', so the result can never contain '..\' or '/' traversal.
+        text = cls._INVALID_CHARS.sub("_", str(value)).strip()
+        text = text.rstrip(". ")  # Windows silently strips trailing dots/spaces from names
+        if not text or set(text) == {"."}:
+            return fallback
+        if text.split(".")[0].upper() in cls._RESERVED_NAMES:
+            text = "_" + text
+        # '%' would be expanded by yt-dlp's output template engine.
+        text = text.replace("%", "_")
+        return text[:cls.MAX_SEGMENT_LENGTH]
+
+    @classmethod
+    def sanitize_metadata(cls, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        sanitized = dict(metadata)
+        for key in cls.PATH_METADATA_KEYS:
+            value = sanitized.get(key)
+            if value is None or value == "":
+                continue
+            clean = cls.sanitize_segment(value, "unknown")
+            if clean != str(value):
+                Logger.broadcast_log(f"PathGuard: sanitized metadata '{key}': {value!r} -> {clean!r}")
+            sanitized[key] = clean
+        return sanitized
+
+    @staticmethod
+    def ensure_inside(base_dir: str, target: str) -> str:
+        """Defense in depth: resolve both paths and require target to live under base_dir."""
+        base_real = os.path.realpath(base_dir)
+        target_real = os.path.realpath(target)
+        try:
+            inside = os.path.commonpath([base_real, target_real]) == base_real
+        except ValueError:  # Different drives on Windows
+            inside = False
+        if not inside:
+            raise PathTraversalError(f"Refusing to write outside {base_real}: {target_real}")
+        return target
+
 class MediaManager:
     downloaded_urls_cache = {}
+    KNOWN_PLATFORMS = frozenset({"instagram", "facebook", "twitter", "auto"})
     
     @classmethod
     def check_cache(cls, url, shortcode, dash_manifest, metadata):
@@ -389,9 +564,27 @@ class MediaManager:
         return filepath, False, None
 
     @classmethod
-    def process_request(cls, msg, platform, account, mediaType="auto"):
+    def process_request(cls, msg: Dict[str, Any], platform: str, account: str, mediaType: str = "auto") -> Dict[str, Any]:
+        if platform not in cls.KNOWN_PLATFORMS:
+            Logger.broadcast_log(f"Rejected request with unknown platform: {platform!r}")
+            return {"status": "error", "message": "Unknown platform"}
+
+        # Sanitize once at the entry point: every handler below re-reads direct_metadata from msg.
+        raw_metadata = msg.get("direct_metadata") or msg.get("metadata") or {}
+        if not isinstance(raw_metadata, dict):
+            return {"status": "error", "message": "Invalid metadata"}
+        msg = dict(msg, direct_metadata=PathGuard.sanitize_metadata(raw_metadata))
+
+        try:
+            return cls._dispatch_request(msg, platform, account, mediaType)
+        except PathTraversalError as e:
+            Logger.broadcast_log(f"SECURITY: {e}")
+            return {"status": "error", "message": "Rejected unsafe output path"}
+
+    @classmethod
+    def _dispatch_request(cls, msg: Dict[str, Any], platform: str, account: str, mediaType: str) -> Dict[str, Any]:
         url = msg.get("url")
-        metadata = msg.get("direct_metadata") or msg.get("metadata") or {}
+        metadata = msg.get("direct_metadata") or {}
         dash_manifest = metadata.get("dash_manifest")
         shortcode = metadata.get("shortcode", "")
         
@@ -411,8 +604,8 @@ class MediaManager:
                 pfp_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pfp_downloader.py")
             bot_cookie = os.path.join(gallery_dir, "cookies_bot_pfp.txt")
             if not os.path.exists(bot_cookie): bot_cookie = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies_bot_pfp.txt")
-            dest_dir = os.path.join(gallery_dir, "instagram", username)
-            
+            dest_dir = PathGuard.ensure_inside(gallery_dir, os.path.join(gallery_dir, "instagram", username))
+
             cmd = [sys.executable, pfp_script, username, bot_cookie, dest_dir]
             CREATE_NO_WINDOW = 0x08000000
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW, cwd=home, text=True)
@@ -475,7 +668,7 @@ class MediaManager:
         media_category = metadata.get("media_category", "post")
         subfolder = "" if media_category == "pfp" else media_category
 
-        out_dir = cls.get_out_dir(gallery_dir, platform, username, is_backup, subfolder, is_video, ext)
+        out_dir = PathGuard.ensure_inside(gallery_dir, cls.get_out_dir(gallery_dir, platform, username, is_backup, subfolder, is_video, ext))
         if not os.path.exists(out_dir): os.makedirs(out_dir)
 
         user_id = metadata.get("user_id")
@@ -564,7 +757,7 @@ class MediaManager:
             cmd.extend(["--cookies", cookie_path])
         elif is_backup:
             Logger.broadcast_log("WARNING: Backup mode. Cookies DISABLED.")
-            backup_out = os.path.join(gallery_dir, "Bandeja_Favoritos", platform, "post", metadata.get("username", "Unknown"))
+            backup_out = PathGuard.ensure_inside(gallery_dir, os.path.join(gallery_dir, "Bandeja_Favoritos", platform, "post", metadata.get("username", "Unknown")))
             cmd.extend(["-d", backup_out])
             
         return DownloaderEngines.execute_gallery_dl(url, cmd)
@@ -617,7 +810,10 @@ class MediaManager:
         elif platform == "facebook":
             cookie_path = os.path.join(gallery_dir, "www.facebook.com_cookies.txt")
             if os.path.exists(cookie_path): ydl_opts['cookiefile'] = cookie_path
-                
+
+        if 'outtmpl' in ydl_opts:
+            PathGuard.ensure_inside(gallery_dir, os.path.dirname(ydl_opts['outtmpl']))
+
         res = DownloaderEngines.execute_ytdlp_native(actual_url, ydl_opts)
         
         if metadata.get("is_direct") and metadata.get("dash_manifest"):
