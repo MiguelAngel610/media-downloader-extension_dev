@@ -1,1 +1,16 @@
 ﻿node_modules/
+
+# --- Secrets: session cookies, tokens and device sessions (never commit) ---
+*cookies*.txt
+*_device.json
+*.session
+.env
+.env.*
+
+# --- Native host runtime artifacts (logs contain signed CDN URLs and viewed usernames) ---
+*.log
+__pycache__/
+*.py[cod]
+
+# --- Local scratch work ---
+scratch/

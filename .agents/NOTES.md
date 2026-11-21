@@ -80,3 +80,13 @@
 3. **Mapeo y Retrocompatibilidad:** Se preservaron intactos todos los identificadores de storage (`vanishMode`, `ghostOnline`, `ghostSeen`, `fb_ghost_seen`, `fb_ghost_presence`, `globalShortcutObj`, `ghostHistory`) y la mensajería hacia el Host Python y Service Worker.
 
 
+
+## Seguridad: Credenciales de sesión expuestas en el repositorio
+**Fecha:** 21 de Noviembre 2026
+**Problema:** `host/instagrapi_device.json` (con `sessionid` y `ds_user_id` de Instagram) y `host/host.log` (URLs firmadas del CDN y usuarios cuyas historias se vieron) estaban trackeados y publicados en `origin/main` desde el commit inicial `f1493da`. `host/cookies.txt` (cookies de Facebook generadas por yt-dlp) también estaba trackeado localmente.
+**Causa Raíz:** `.gitignore` solo excluía `node_modules/`. Ningún código usa `instagrapi_device.json` ni `host/cookies.txt` (restos de pruebas con instagrapi/yt-dlp).
+**Solución:**
+1. `git rm --cached` de los archivos (se conservan en disco).
+2. `.gitignore` endurecido: `*cookies*.txt`, `*_device.json`, `*.session`, `.env*`, `*.log`, `__pycache__/`, `scratch/`.
+3. Acción del usuario: revocar todas las sesiones de Instagram y cambiar contraseña (lo único que invalida el `sessionid` filtrado).
+**Regla:** Las cookies/sesiones de gallery-dl/yt-dlp viven en `~/gallery-dl/`, nunca dentro del repo. `host.log` jamás se commitea.
