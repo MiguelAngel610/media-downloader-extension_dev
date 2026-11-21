@@ -90,9 +90,13 @@
                         finalBlob = new Blob([remuxedBytes], { type: blob.type || "video/mp4" });
                         logger.info("Remuxed to flat MP4 for seek support", fileName);
                     } catch (remuxErr) {
-                        // Not fatal — the input may already be a flat MP4
-                        // (not fragmented), in which case remux wasn't
-                        // needed and the file is fully seekable as-is.
+                        // The original stream is still saved: its completeness was already verified
+                        // byte-by-byte against Content-Range in the main-world fetch.
+                        if (remuxErr && remuxErr.name === "NotFragmentedMp4") {
+                            logger.info("Already a regular MP4, remux not needed", fileName);
+                        } else {
+                            logger.error("Remux integrity check failed, saving the original stream (seeking may be limited): " + (remuxErr && remuxErr.message), fileName);
+                        }
                         finalBlob = blob;
                     }
                 }

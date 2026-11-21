@@ -232,3 +232,13 @@ Se integrA3 a la rutina de descarga de imágenes el mismo sistema de barra de pr
 ## Fix (9 de Septiembre 2026): Extraccion de Fechas Erroneas en Galerias y Canales Restringidos
 **Problema:** Al descargar desde el visor de galeria (MediaViewer), la fecha extraida a menudo era incorrecta (ej. siempre asignaba una fecha de un dia especifico de la semana). Esto sucedia porque querySelectorAll agarraba todos los 'span' o 'time' del modal, y al estar renderizado el sidebar u otros posts fuera de pantalla, el script robaba la primera fecha que encontraba en el DOM (a menudo de una miniatura oculta). Ademas, si se descargaba directo desde la burbuja del feed en canales privados, solo extraia la hora ('21:45') y asumia que el post era de hoy.
 **Solucion:** Se reescribio el motor de busqueda de fechas ('__md_tel_extract_post_date'). Ahora utiliza una lista de selectores estrictamente priorizados (buscando primero '.media-viewer-subtitle') y, crucialmente, aplica un filtro espacial (getBoundingClientRect) para rechazar cualquier elemento de fecha que este fisica o visualmente fuera de la ventana del navegador. Para los posts descargados desde el feed, ahora se priorizan los atributos 'title' ocultos y si falla, trepa por el DOM hasta el 'Date Divider' mas cercano.
+
+## Fix (21 de Noviembre 2026): Validación de Integridad MP4 en el Remux (§8)
+**Problema:** `readBoxes()` no verificaba que cada caja cupiera en su contenedor y los rangos de muestras no se comparaban con su `mdat`. Con una descarga truncada, `subarray()` recortaba en silencio y el remux "funcionaba" generando un archivo corrupto. Baseline real: el código anterior produjo 52 KB a partir de un fMP4 cortado al 70% sin ningún error. Además el `catch` del remux (fix del 29 de junio) silenciaba TODO error, no solo el caso esperado.
+**Solución (`mp4_remux.js`):**
+1. `readBoxes()` valida cabecera completa (incluido el `largesize` de 64 bits), `size >= header` y que la caja no exceda su contenedor.
+2. Cada `moof` debe ir seguido de su `mdat`; cada `traf` debe tener `tfhd` y `trun`; cada muestra debe caer dentro del cuerpo de SU `mdat`.
+3. Se rechaza un `mdat` que desbordaría la cabecera de 32 bits (>4 GB).
+4. `assertValidFlatMp4()` re-parsea la salida: exactamente `ftyp,moov,mdat`, tamaño del `mdat` igual a los bytes copiados y el mismo número de `trak`.
+5. Dos tipos de error: `NotFragmentedMp4` (esperado: ya es un MP4 normal, se registra como info) y `Mp4IntegrityError` (se registra como error y se guarda el stream original, cuya completitud ya validó `Content-Range`).
+**Verificación con archivos reales generados por ffmpeg:** remux de fMP4 → duración restaurada (4 s), 120/120 frames, audio + video, decodificación completa sin errores y seek a 2.5 s (ffprobe/ffmpeg) — 8/8.

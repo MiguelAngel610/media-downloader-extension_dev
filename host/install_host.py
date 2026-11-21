@@ -14,7 +14,7 @@ def install_host(extension_id):
     base_dir = os.path.dirname(os.path.abspath(__file__))
     bat_path = os.path.join(base_dir, "host.bat")
     
-    # Asegurar barras invertidas dobles para JSON en Windows
+    # Normalize to Windows backslashes (json.dump escapes them correctly)
     bat_path = bat_path.replace("/", "\\")
     
     manifest = {

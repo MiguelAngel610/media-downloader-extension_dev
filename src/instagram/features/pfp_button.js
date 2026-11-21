@@ -16,7 +16,7 @@ function injectPfpButton() {
         dlBtn.innerHTML = SVG_DOWNLOAD;
         dlBtn.title = "Download Profile Picture";
 
-        // --- Rediseño Premium (Efecto Glassmorphism/Cristal) ---
+        // --- Glassmorphism button style ---
         dlBtn.style.position = 'absolute';
         dlBtn.style.pointerEvents = 'auto';
         dlBtn.style.background = 'rgba(255, 255, 255, 0.2)';
@@ -84,7 +84,7 @@ function injectPfpButton() {
                 window.MDToastManager.showWarning("⚠️ No full-HD version found; downloading the largest available (≤320px).");
             }
 
-            // Descargar usando la fecha original del CDN
+            // Download using the original upload date reported by the CDN (Last-Modified)
             chrome.runtime.sendMessage({ action: "get_cdn_timestamp", url: hdUrl }, (res) => {
                 let finalTimestamp = (res && res.timestamp) ? res.timestamp : Math.floor(Date.now() / 1000);
                 

@@ -24,7 +24,7 @@
     -webkit-backdrop-filter: blur(16px) saturate(180%);
     pointer-events: auto !important;
     
-    /* Animación de entrada inicial suave */
+    /* Smooth initial entrance animation */
     opacity: 0;
     transform: translateY(20px) scale(0.95);
     transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -42,7 +42,7 @@ html:not(.night):not(.theme-dark) .tel-downloader-progress-toast {
     box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15), 0 0 20px -5px rgba(0, 0, 0, 0.05);
 }
 
-/* Encabezado (título + botón cerrar) */
+/* Header (title + close button) */
 .tel-downloader-progress-header {
     display: flex;
     justify-content: space-between;
@@ -122,14 +122,14 @@ html:not(.night):not(.theme-dark) .tel-downloader-progress-track {
     left: 0;
     height: 100%;
     width: 0%;
-    /* Gradiente moderno dinámico */
+    /* Animated gradient */
     background: linear-gradient(90deg, #38bdf8, #818cf8);
     border-radius: 999px;
     transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), background 0.4s ease;
     box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
 }
 
-/* Animación de shimmer (brillo pasivo) */
+/* Shimmer animation (passive glow) */
 .tel-downloader-progress-fill::after {
     content: "";
     position: absolute;

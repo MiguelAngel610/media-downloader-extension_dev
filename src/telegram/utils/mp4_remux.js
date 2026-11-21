@@ -19,10 +19,31 @@
 //    matches an `ffmpeg -c copy` reference remux (mean abs diff ~1.6/255,
 //    consistent with decoder rounding noise, not corruption).
 (function () {
+    const MAX_32BIT_BOX_SIZE = 0xFFFFFFFF;
+
+    /** Input is a regular (non-fragmented) MP4: expected, the file is already seekable. */
+    function notFragmentedError(message) {
+        const error = new Error(message);
+        error.name = "NotFragmentedMp4";
+        return error;
+    }
+
+    /** Structural damage (truncated download, corrupt boxes): never ship a remux built from it. */
+    function integrityError(message) {
+        const error = new Error(message);
+        error.name = "Mp4IntegrityError";
+        return error;
+    }
+
+    /**
+     * Parses sibling boxes in [start, end) and validates that every box header and body
+     * fits inside its container. Without this, subarray() silently clamps a truncated box
+     * and the remux "succeeds" with missing samples.
+     */
     function readBoxes(view, start, end) {
         const boxes = [];
         let offset = start;
-        while (offset < end - 8) {
+        while (offset + 8 <= end) {
             const size = view.getUint32(offset);
             const type = String.fromCharCode(
                 view.getUint8(offset + 4), view.getUint8(offset + 5),
@@ -31,6 +52,7 @@
             let headerSize = 8;
             let actualSize = size;
             if (size === 1) {
+                if (offset + 16 > end) throw integrityError(`Truncated 64-bit header of box '${type}' at ${offset}`);
                 const hi = view.getUint32(offset + 8);
                 const lo = view.getUint32(offset + 12);
                 actualSize = hi * 2 ** 32 + lo;
@@ -38,11 +60,35 @@
             } else if (size === 0) {
                 actualSize = end - offset;
             }
+            if (actualSize < headerSize) {
+                throw integrityError(`Box '${type}' at ${offset} declares size ${actualSize}, smaller than its header`);
+            }
+            if (offset + actualSize > end) {
+                throw integrityError(`Box '${type}' at ${offset} overruns its container (${offset + actualSize} > ${end}): truncated or corrupt file`);
+            }
             boxes.push({ type, start: offset, headerSize, size: actualSize, bodyStart: offset + headerSize, bodyEnd: offset + actualSize });
-            if (actualSize <= 0) break;
             offset += actualSize;
         }
+        // Fewer than 8 trailing bytes cannot form a box; muxers occasionally pad, so they are ignored.
         return boxes;
+    }
+
+    /**
+     * Re-parses the produced file: exactly ftyp + moov + mdat, mdat size equal to the copied
+     * sample bytes, every trak still parseable. Throws instead of letting a bad file be saved.
+     */
+    function assertValidFlatMp4(outputBytes, expectedPayloadLength, expectedTrackCount) {
+        const view = new DataView(outputBytes.buffer, outputBytes.byteOffset, outputBytes.byteLength);
+        const boxes = readBoxes(view, 0, outputBytes.byteLength);
+        const types = boxes.map(b => b.type).join(",");
+        if (types !== "ftyp,moov,mdat") throw integrityError(`Remux produced unexpected top-level layout: ${types}`);
+        const mdat = boxes[2];
+        if (mdat.bodyEnd - mdat.bodyStart !== expectedPayloadLength) {
+            throw integrityError(`Remuxed mdat holds ${mdat.bodyEnd - mdat.bodyStart} bytes, expected ${expectedPayloadLength}`);
+        }
+        const traks = findAllBoxes(readBoxes(view, boxes[1].bodyStart, boxes[1].bodyEnd), "trak");
+        if (traks.length !== expectedTrackCount) throw integrityError(`Remuxed moov has ${traks.length} trak(s), expected ${expectedTrackCount}`);
+        for (const trak of traks) readBoxes(view, trak.bodyStart, trak.bodyEnd);
     }
 
     function findBox(boxes, type) { return boxes.find(b => b.type === type); }
@@ -203,8 +249,10 @@
         const moofs = findAllBoxes(topBoxes, "moof");
         const mdats = findAllBoxes(topBoxes, "mdat");
 
-        if (!ftyp || !moov || moofs.length === 0 || mdats.length !== moofs.length) {
-            throw new Error("Input does not look like a supported fragmented MP4 (missing ftyp/moov, or moof/mdat count mismatch)");
+        if (!ftyp || !moov) throw integrityError("Missing ftyp or moov box");
+        if (moofs.length === 0) throw notFragmentedError("No moof boxes: already a regular MP4");
+        if (mdats.length !== moofs.length) {
+            throw integrityError(`moof/mdat count mismatch (${moofs.length} moof, ${mdats.length} mdat): incomplete fragment`);
         }
 
         const moovChildren = readBoxes(view, moov.bodyStart, moov.bodyEnd);
@@ -217,13 +265,17 @@
 
         for (let i = 0; i < moofs.length; i++) {
             const moof = moofs[i];
+            const mdat = mdats[i];
+            if (mdat.start < moof.bodyEnd) throw integrityError(`Fragment ${i}: mdat does not follow its moof`);
             const moofChildren = readBoxes(view, moof.bodyStart, moof.bodyEnd);
             const trafs = findAllBoxes(moofChildren, "traf");
 
             for (const traf of trafs) {
                 const trafChildren = readBoxes(view, traf.bodyStart, traf.bodyEnd);
-                const tfhd = parseTfhd(view, findBox(trafChildren, "tfhd"));
+                const tfhdBox = findBox(trafChildren, "tfhd");
                 const trunBox = findBox(trafChildren, "trun");
+                if (!tfhdBox || !trunBox) throw integrityError(`Fragment ${i}: traf without tfhd/trun`);
+                const tfhd = parseTfhd(view, tfhdBox);
                 const trun = parseTrun(view, trunBox);
 
                 if (!trackData.has(tfhd.trackId)) {
@@ -250,6 +302,11 @@
                     else if (si === 0 && trun.firstSampleFlags !== undefined) flags = trun.firstSampleFlags;
                     else flags = tfhd.defaultSampleFlags;
 
+                    if (!Number.isFinite(size) || size < 0) throw integrityError(`Fragment ${i}, sample ${si}: invalid size ${size}`);
+                    // Every sample must live inside THIS fragment's mdat body; otherwise the source is truncated.
+                    if (cursor < mdat.bodyStart || cursor + size > mdat.bodyEnd) {
+                        throw integrityError(`Fragment ${i}, sample ${si}: bytes [${cursor}, ${cursor + size}) fall outside its mdat [${mdat.bodyStart}, ${mdat.bodyEnd})`);
+                    }
                     track.samples.push({ size, duration, flags: flags || 0 });
                     track.byteRanges.push([cursor, cursor + size]);
                     cursor += size;
@@ -273,6 +330,11 @@
             trackByteOffsets.set(trackId, offsets);
         }
         const newMdatPayload = concatBytes(newMdatParts);
+        if (trackIds.length === 0 || newMdatPayload.length === 0) throw integrityError("No samples found in any fragment");
+        if (newMdatPayload.length + 8 > MAX_32BIT_BOX_SIZE) {
+            // A 32-bit mdat header would overflow and corrupt the file.
+            throw integrityError(`Video too large for a 32-bit mdat (${newMdatPayload.length} bytes)`);
+        }
 
         function rebuildTrak(trakBox, withBase, baseOffset) {
             const trakChildren = readBoxes(view, trakBox.bodyStart, trakBox.bodyEnd);
@@ -381,7 +443,9 @@
             throw new Error(`Remux offset mismatch (pass1=${baseOffset}, pass2=${finalBaseOffset}) — aborting to avoid producing a corrupt file`);
         }
 
-        return concatBytes([ftypBytes, finalMoov, mdatHeaderFull, newMdatPayload]);
+        const output = concatBytes([ftypBytes, finalMoov, mdatHeaderFull, newMdatPayload]);
+        assertValidFlatMp4(output, newMdatPayload.length, traks.length);
+        return output;
     }
 
     window.__md_tel_remux_fmp4 = remuxFragmentedMp4;
