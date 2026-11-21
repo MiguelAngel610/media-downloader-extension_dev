@@ -193,4 +193,3 @@ export function handleGhostBlock(type, networkUsername = null) {
         lastGhostBlockFeedbackAt = now;
     }
 }
-window.__md_handleGhostBlock = handleGhostBlock;

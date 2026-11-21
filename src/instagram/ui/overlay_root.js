@@ -1,8 +1,7 @@
 /* Media Downloader - Overlay Root: Creates and exposes the floating overlay container */
 
 // Prevent running UI in random iframes
-const isExtractionFrame = window.location.search.includes('__md_extract_hd=1');
-if (window.self !== window.top && !isExtractionFrame) {
+if (window.self !== window.top) {
     window.__md_blocked_frame = true;
 }
 

@@ -23,19 +23,3 @@ export function logError(context, error) {
         "background: #1e293b; color: #f8fafc; font-size: 11px; border-radius: 0 4px 4px 0; padding: 2px 8px;"
     );
 }
-
-// Global helpers that collect 1080p profile picture URLs from memory
-window.__md_pfps_list = window.__md_pfps_list || new Set();
-
-window.__md_sniffPfps = function(text) {
-    if (!text || typeof text !== 'string') return;
-    try {
-        let regex = /"profile_pic_url_hd":"([^"]+)"/g;
-        let match;
-        while ((match = regex.exec(text)) !== null) {
-            let url = match[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/');
-            window.__md_pfps_list.add(url);
-        }
-    } catch(e) {}
-};
-

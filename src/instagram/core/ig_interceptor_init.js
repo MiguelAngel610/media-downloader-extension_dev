@@ -121,11 +121,4 @@ window.addEventListener('message', function(event) {
             window.__md_pfpResults[username.toLowerCase()] = url;
         }
     }
-    if (event.data.type === 'MD_PFPS_DICT_UPDATE') {
-        try {
-            event.data.urls.forEach(url => window.__md_pfps_list.add(url));
-        } catch (err) {
-            console.error('[MD] Failed to merge HD profile picture URLs:', err);
-        }
-    }
 });

@@ -337,7 +337,6 @@ export function syncStoryProgressBar() {
             if (activeIndex > totalSegments) activeIndex = totalSegments;
             if (activeIndex === 0) activeIndex = 1;
 
-            window.__md_activeStorySegment = segmentElements[activeIndex - 1] || null;
 
             let counter = customContainer.querySelector('#md-story-counter');
             if (counter) {

@@ -126,3 +126,14 @@
 3. `showComplex`: `actionHtml` reemplazado por `action: { label, href }`. `href` solo se acepta si es `http(s)` (bloquea `javascript:`/`data:`), con `rel="noopener noreferrer"`. Estilos del botón movidos a `.md-toast-action-btn` (CSS Isolation).
 4. `popup.js`: historial con DOM APIs, username validado con `^[A-Za-z0-9._]{1,30}$` y `encodeURIComponent` en el link.
 **Regla:** nunca pasar HTML a `MDToastManager`. Texto dinámico → `message`/`detail`; enlaces → `action.href`.
+
+## Limpieza: Scratch y Código Muerto (Soft Delete)
+**Fecha:** 21 de Noviembre 2026
+**Método:** escaneo estático (símbolos definidos vs. referenciados en `src/` + `manifest.json`; mensajes enviados vs. manejados) y verificación manual de cada candidato. Todo lo eliminado se conserva en `.trash/` (ahora en `.gitignore`).
+- `scratch/` → `.trash/scratch_2026-11-21/` (scripts sueltos: append de notas, test_shortcode.py, tg_user_script.js).
+- `background.js`: handlers sin emisor `fetch_mobile_api`, `fetch_web_profile_info`, `fetch_mobile_usernameinfo` (este último enviaba un User-Agent falso de Android a la API privada de IG: riesgo para la cuenta), `open_hd_window`, `report_hd_url` y sus globals `activeHdTabId/WindowId` → `.trash/dead_code_2026-11-21/background_dead_handlers.js`.
+- Pestaña oculta de extracción HD (`?__md_extract_hd=1` en `device_spoof.js` y `overlay_root.js`): solo la abría `open_hd_window`.
+- Sniffer regex de fotos de perfil (`__md_sniffPfps`, `__md_pfps_list`, handler `MD_PFPS_DICT_UPDATE`): el Set nunca se leía; reemplazado por `profile_pic_collector.js`.
+- Símbolos sin uso: `FB_DOWNLOAD_SVG`, `window.__md_activeStorySegment` (solo escritura), alias `window.__md_handleGhostBlock`.
+- `.trash/` deja de estar trackeado (los 3 scripts antiguos siguen en disco).
+**Falsos positivos descartados:** `start_backup/stop_backup` (llegan por el puerto nativo), `host_response`, `get_photo_date_at_time`, `show_download_toast` (enviados con `chrome.tabs.sendMessage(tabId, …)`), `MD_UPDATE_SETTINGS` (vía `notifyInstagram`).

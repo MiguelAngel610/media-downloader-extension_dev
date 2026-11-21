@@ -1,7 +1,6 @@
 /* Media Downloader for Facebook - Story download button injection */
 
 // Clean download arrow SVG matching FB's icon stroke style
-const FB_DOWNLOAD_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
 
 function injectStoryButtons() {
     const allBtns = document.querySelectorAll('[role="button"], div[role="button"]');

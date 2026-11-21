@@ -57,7 +57,6 @@ function reportBlocked(decision, channel) {
  */
 function sniffResponseText(url, text) {
     if (!text) return;
-    window.__md_sniffPfps(text);
     const urlLower = url.toLowerCase();
     if (!SNIFFABLE_URL_MARKERS.some((marker) => urlLower.includes(marker))) return;
     try {
@@ -318,7 +317,6 @@ function scanServerRenderedData() {
     // 1. Standard JSON scripts
     document.querySelectorAll('script[type="application/json"]').forEach((scriptEl) => {
         const text = scriptEl.innerHTML;
-        window.__md_sniffPfps(text);
         try {
             processAndPostData(JSON.parse(text));
         } catch (err) {
@@ -330,7 +328,6 @@ function scanServerRenderedData() {
     // stuff any video_versions url or dash_manifest into the dictionary as a fallback.
     try {
         const html = document.documentElement.innerHTML;
-        window.__md_sniffPfps(html);
 
         const videoMatches = [...html.matchAll(/"video_versions":\[\{[^\}]*"url":"([^"]+)"/g)];
         const dashMatches = [...html.matchAll(/"video_dash_manifest":"([^"]+)"/g)];
