@@ -32,3 +32,6 @@ gb(83, 100, 113)) rompA3a la estA3tica en el modal negro (donde los botones nati
 - **La soluciA3n (Herencia CamaleA3nica):** Quitamos cualquier estilo quemado. Al usar svg.style.color = '' en estado normal, el SVG hereda automA3ticamente el color de texto de sus clases nativas de X (Gris en timeline, Blanco en el modal). Condicionamos el color del hover a 
 gba(255, 255, 255, 0.1) si estA3 en la barra inferior del modal para imitar el modo oscuro, y azul para el Timeline normal.
 
+
+## Calidad (21 de Noviembre 2026): Imágenes en `name=orig` sin forzar JPG
+`x_buttons.js` forzaba `format=jpg&name=4096x4096`: los PNG originales se re-codificaban a JPG. Ahora `toOriginalQualityImageUrl()` conserva el formato (incluye URLs legacy `media/ID.png`) y pide `name=orig`, el tamaño preferido por gallery-dl (`extractor.twitter.size` default `["orig","4096x4096",...]`, docs oficiales vía Context7). `main.js` reintenta con `4096x4096` si `orig` falla. Test jsdom 3/3. Hipótesis pendiente de confirmar en vivo: que el `format` del `<img>` refleje el formato original.

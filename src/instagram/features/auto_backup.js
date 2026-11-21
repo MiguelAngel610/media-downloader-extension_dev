@@ -42,51 +42,12 @@ async function finishPostsAndReels() {
         return;
     }
 
-    // THE IN-MEMORY ZOOM TRICK
-    console.log("MD PFP (Backup): Activating Zoom spoofing...");
-    
-    let hdUrl = src;
-    
-    if (hdUrl.includes('150x150')) {
-        let zoomData = await new Promise(resolve => {
-            let originalSrc = profilePic.src || profilePic.currentSrc;
-            
-            window.postMessage({ type: 'MD_SPOOF_ZOOM' }, '*');
-            
-            let checks = 0;
-            let checkInterval = setInterval(() => {
-                checks++;
-                let currentSrc = profilePic.src || profilePic.currentSrc;
-                let currentSrcset = profilePic.getAttribute('srcset') || "";
-                
-                let foundHd = null;
-                if (currentSrc !== originalSrc && !currentSrc.includes('150x150')) {
-                    foundHd = currentSrc;
-                } else if (currentSrcset.includes('1080')) {
-                    let urlsInSrcset = currentSrcset.match(/https:\/\/[^\s]+/g) || [];
-                    for (let u of urlsInSrcset) {
-                        if (u.endsWith(',')) u = u.slice(0, -1);
-                        if (!u.includes('150x150') && !u.includes('320x320')) {
-                            foundHd = u;
-                        }
-                    }
-                }
-                
-                if (foundHd || checks > 40) { // Max 4 seconds
-                    clearInterval(checkInterval);
-                    window.postMessage({ type: 'MD_RESTORE_ZOOM' }, '*');
-                    resolve(foundHd);
-                }
-            }, 100);
-        });
-        
-        if (zoomData && !zoomData.includes('150x150')) {
-            hdUrl = zoomData;
-        }
-    }
+    // Same resolver as the profile button: network HD URL > srcset > page source > zoom spoof
+    const resolution = await window.MDPfpResolver.resolveBestPfpUrl(profilePic, backupUsername, { zoomMaxChecks: 40 });
+    let hdUrl = resolution ? resolution.url : src;
 
-    if (hdUrl.includes('150x150')) {
-        console.warn("MD PFP (Backup): Fallo extracción 1080p. Usando miniatura.");
+    if (!resolution || resolution.isLowRes) {
+        console.warn("MD PFP (Backup): No full-HD avatar found. Using the largest available version.");
     }
 
     chrome.runtime.sendMessage({ action: "get_cdn_timestamp", url: hdUrl }, (res) => {

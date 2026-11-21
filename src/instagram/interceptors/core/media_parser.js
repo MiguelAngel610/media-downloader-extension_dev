@@ -1,5 +1,7 @@
 import { mdLog } from './logger.js';
 import { clearStoryCheckpoint } from './story_resume.js';
+import { pickBestImageUrl, pickBestVideoUrl } from './media_quality.js';
+import { recordProfilePic, flushProfilePics } from './profile_pic_collector.js';
 
 window.__md_storyMedia = window.__md_storyMedia || {};
 
@@ -16,6 +18,8 @@ export function extractSignatureFromUrl(url) {
 
 export function findStoryMedia(obj, parentUsername = "", parentTimestamp = null, checkResetFn = null) {
     if (!obj || typeof obj !== 'object') return;
+
+    recordProfilePic(obj);
 
     let currentUsername = parentUsername;
     let currentTimestamp = parentTimestamp;
@@ -63,35 +67,15 @@ export function findStoryMedia(obj, parentUsername = "", parentTimestamp = null,
         };
 
         if (obj.video_versions && obj.video_versions.length > 0) {
-            let bestVideo = obj.video_versions[0];
-            let maxScore = [bestVideo.width || 0, bestVideo.height || 0, bestVideo.type || 0];
-
             for (let v of obj.video_versions) {
                 if (v.url) signatures.push(extractSignatureFromUrl(v.url));
-
-                let score = [v.width || 0, v.height || 0, v.type || 0];
-                if (score[0] > maxScore[0] ||
-                    (score[0] === maxScore[0] && score[1] > maxScore[1]) ||
-                    (score[0] === maxScore[0] && score[1] === maxScore[1] && score[2] > maxScore[2])) {
-                    maxScore = score;
-                    bestVideo = v;
-                }
             }
-            mediaObj.url = bestVideo.url;
+            mediaObj.url = pickBestVideoUrl(obj.video_versions) || "";
         } else if (obj.image_versions2 && obj.image_versions2.candidates && obj.image_versions2.candidates.length > 0) {
-            let bestImg = obj.image_versions2.candidates[0];
-            let maxScore = [bestImg.width || 0, bestImg.height || 0];
-
             for (let c of obj.image_versions2.candidates) {
                 if (c.url) signatures.push(extractSignatureFromUrl(c.url));
-
-                let score = [c.width || 0, c.height || 0];
-                if (score[0] > maxScore[0] || (score[0] === maxScore[0] && score[1] > maxScore[1])) {
-                    maxScore = score;
-                    bestImg = c;
-                }
             }
-            mediaObj.url = bestImg.url;
+            mediaObj.url = pickBestImageUrl(obj.image_versions2.candidates) || "";
         }
 
         if (mediaObj.url) {
@@ -138,7 +122,8 @@ export function processAndPostData(data) {
     }
     
     findStoryMedia(data, "", null, checkResetFn);
-    
+    flushProfilePics();
+
     if (seenModified) {
         try {
             localStorage.setItem('md_ghost_seen_users', JSON.stringify(seenUsers));

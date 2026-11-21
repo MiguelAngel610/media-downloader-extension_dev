@@ -1,4 +1,5 @@
 import { mdLog } from './logger.js';
+import { pickBestImageUrl, pickBestVideoUrl } from './media_quality.js';
 window.addEventListener('message', function(event) {
     // Only our own window may request a fiber walk (rejects openers/iframes; also avoids a TypeError on null data).
     if (event.source !== window || !event.data) return;
@@ -171,9 +172,10 @@ window.addEventListener('message', function(event) {
                     if (possibleIndex >= 0) foundIndex = possibleIndex + 1;
                 }
 
-                // Extract video URL
-                if ((!foundUrl || (possibleIndex >= 0 && !foundIndex)) && obj.video_versions && Array.isArray(obj.video_versions) && obj.video_versions.length > 0 && obj.video_versions[0].url) {
-                    if (!foundUrl) foundUrl = obj.video_versions[0].url;
+                // Extract video URL (highest resolution, never blindly [0])
+                let bestVideoUrl = pickBestVideoUrl(obj.video_versions);
+                if ((!foundUrl || (possibleIndex >= 0 && !foundIndex)) && bestVideoUrl) {
+                    if (!foundUrl) foundUrl = bestVideoUrl;
                     if (possibleIndex >= 0) foundIndex = possibleIndex + 1;
                 }
                 if ((!foundUrl || (possibleIndex >= 0 && !foundIndex)) && obj.video_url && typeof obj.video_url === 'string' && obj.video_url.startsWith('http')) {
@@ -185,17 +187,11 @@ window.addEventListener('message', function(event) {
                 // CRITICAL: filter by posterSig so carousel slide 2+ picks the right image,
                 // not slide 1 which appears first in the array.
                 if ((!foundUrl || (possibleIndex >= 0 && !foundIndex)) && obj.image_versions2 && obj.image_versions2.candidates && Array.isArray(obj.image_versions2.candidates) && obj.image_versions2.candidates.length > 0) {
-                    let candidates = obj.image_versions2.candidates;
-                    let picked = null;
-                    if (posterSig) {
-                        picked = candidates.find(c => c.url && c.url.includes(posterSig));
-                        // If posterSig was provided but didn't match any candidate here, 
-                        // this is the wrong slide! We must NOT fallback.
-                    } else {
-                        picked = candidates.reduce((best, c) => ((c.width || 0) * (c.height || 0)) > ((best.width || 0) * (best.height || 0)) ? c : best, candidates[0]);
-                    }
-                    if (picked && picked.url) {
-                        if (!foundUrl) foundUrl = picked.url;
+                    // With posterSig only this slide's candidates are eligible (no match = wrong slide,
+                    // so no fallback); among them the LARGEST wins, not the first one listed.
+                    let pickedUrl = pickBestImageUrl(obj.image_versions2.candidates, posterSig || null);
+                    if (pickedUrl) {
+                        if (!foundUrl) foundUrl = pickedUrl;
                         if (possibleIndex >= 0) foundIndex = possibleIndex + 1;
                     }
                 }
@@ -294,19 +290,12 @@ window.addEventListener('message', function(event) {
 
                     if (!foundDash && obj.video_dash_manifest && typeof obj.video_dash_manifest === 'string') foundDash = obj.video_dash_manifest;
                     if (!foundDash && obj.dash_manifest && typeof obj.dash_manifest === 'string') foundDash = obj.dash_manifest;
-                    if (!foundUrl && obj.video_versions && Array.isArray(obj.video_versions) && obj.video_versions.length > 0 && obj.video_versions[0].url) foundUrl = obj.video_versions[0].url;
+                    if (!foundUrl) foundUrl = pickBestVideoUrl(obj.video_versions) || "";
                     if (!foundUrl && obj.video_url && typeof obj.video_url === 'string' && obj.video_url.startsWith('http')) foundUrl = obj.video_url;
                     // Extract image URL for carousel image slides.
-                    // CRITICAL: filter by posterSig so carousel slide 2+ picks the right image.
-                    if (!foundUrl && obj.image_versions2 && obj.image_versions2.candidates && Array.isArray(obj.image_versions2.candidates) && obj.image_versions2.candidates.length > 0) {
-                        let candidates = obj.image_versions2.candidates;
-                        let picked = null;
-                        if (posterSig) {
-                            picked = candidates.find(c => c.url && c.url.includes(posterSig));
-                        } else {
-                            picked = candidates.reduce((best, c) => ((c.width || 0) * (c.height || 0)) > ((best.width || 0) * (best.height || 0)) ? c : best, candidates[0]);
-                        }
-                        if (picked && picked.url) foundUrl = picked.url;
+                    // CRITICAL: filter by posterSig so carousel slide 2+ picks the right image; largest match wins.
+                    if (!foundUrl && obj.image_versions2 && Array.isArray(obj.image_versions2.candidates)) {
+                        foundUrl = pickBestImageUrl(obj.image_versions2.candidates, posterSig || null) || "";
                     }
 
                     let objId = obj.pk || obj.media_id || obj.item_id;
@@ -369,8 +358,9 @@ window.addEventListener('message', function(event) {
                 if (foundObj) {
                     if (foundObj.video_dash_manifest) foundDash = foundObj.video_dash_manifest;
                     else if (foundObj.dash_manifest) foundDash = foundObj.dash_manifest;
-                    if (foundObj.video_versions && Array.isArray(foundObj.video_versions) && foundObj.video_versions.length > 0) {
-                        foundUrl = foundObj.video_versions[0].url;
+                    let bestInitialVideoUrl = pickBestVideoUrl(foundObj.video_versions);
+                    if (bestInitialVideoUrl) {
+                        foundUrl = bestInitialVideoUrl;
                     } else if (foundObj.video_url) {
                         foundUrl = foundObj.video_url;
                     }

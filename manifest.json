@@ -58,6 +58,7 @@
         "src/instagram/ui/overlay_root.js",
         "src/instagram/utils/username_resolver.js",
         "src/instagram/utils/media_resolver.js",
+        "src/instagram/utils/pfp_resolver.js",
         "src/instagram/ui/button_state.js",
         "src/instagram/features/pfp_button.js",
         "src/instagram/features/story_button.js",

@@ -114,8 +114,12 @@ window.addEventListener('message', function(event) {
         window.__md_fiberResults[event.data.id] = { url: event.data.url, dash_manifest: event.data.dash, media_id: event.data.media_id, index: event.data.index, shortcode: event.data.shortcode, user: event.data.user, time: event.data.time };
     }
     if (event.data.type === 'MD_PFP_RESULT') {
-        window.__md_pfpResults = window.__md_pfpResults || {};
-        window.__md_pfpResults[event.data.username] = event.data.url;
+        // Full-HD avatars captured from Instagram's API responses (profile_pic_collector.js).
+        const { username, url } = event.data;
+        if (typeof username === 'string' && typeof url === 'string' && url.startsWith('https://')) {
+            window.__md_pfpResults = window.__md_pfpResults || {};
+            window.__md_pfpResults[username.toLowerCase()] = url;
+        }
     }
     if (event.data.type === 'MD_PFPS_DICT_UPDATE') {
         try {

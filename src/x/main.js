@@ -44,10 +44,16 @@ window.addEventListener("message", (event) => {
         const prefix = tweetDate ? `${tweetDate}_` : '';
         console.log(`Downloading X image (Tweet: ${tweetId}):`, imgUrl);
 
-        fetch(imgUrl)
-            .then(res => {
-                if (!res.ok) throw new Error("Fetch failed: " + res.status);
-                return res.blob();
+        // "orig" is the best size; a few very old images only exist up to 4096x4096 (next in X's size ladder).
+        const fetchImage = (url) => fetch(url).then(res => {
+            if (!res.ok) throw new Error("Fetch failed: " + res.status);
+            return res.blob();
+        });
+        fetchImage(imgUrl)
+            .catch(err => {
+                if (!imgUrl.includes('name=orig')) throw err;
+                console.warn("Original X image unavailable, retrying with 4096x4096:", err);
+                return fetchImage(imgUrl.replace('name=orig', 'name=4096x4096'));
             })
             .then(blob => {
                 const ext = blob.type.split("/")[1] || "jpg";

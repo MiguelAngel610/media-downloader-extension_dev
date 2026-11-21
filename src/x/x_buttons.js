@@ -1,7 +1,36 @@
 /* Media Downloader for X - Download button injection */
 
+/** Size ladder used by X's CDN; "orig" is the untouched upload (official gallery-dl twitter.size default). */
+const X_IMAGE_SIZE_ORIGINAL = 'orig';
+
+/**
+ * Rewrites a pbs.twimg.com image URL to its original upload.
+ * The format is preserved (a PNG stays PNG); the old code forced format=jpg, which re-encoded PNGs.
+ * @param {string} src
+ * @returns {string | null}
+ */
+function toOriginalQualityImageUrl(src) {
+    let url;
+    try {
+        url = new URL(src);
+    } catch (err) {
+        console.warn('[MD X] Skipping image with invalid URL:', src, err);
+        return null;
+    }
+    // Legacy URLs carry the format as a path extension (media/ID.png) instead of ?format=.
+    if (!url.searchParams.has('format')) {
+        const extMatch = url.pathname.match(/\.(jpe?g|png|webp|gif)$/i);
+        if (extMatch) {
+            url.pathname = url.pathname.slice(0, -extMatch[0].length);
+            url.searchParams.set('format', extMatch[1].toLowerCase());
+        }
+    }
+    url.searchParams.set('name', X_IMAGE_SIZE_ORIGINAL);
+    return url.href;
+}
+
 // Download arrow SVG matching X's icon style (outline arrow + tray)
-const downloadSvgPath = 'M12 15.51l-5.7-5.7 1.41-1.42L11 11.59V2h2v9.59l3.3-3.3 1.41 1.42L12 15.51zM3 15v3.5c0 1.38 1.12 2.5 2.5 2.5h13c1.38 0 2.5-1.12 2.5-2.5V15h-2v3.5c0 .28-.22.5-.5.5h-13c-.28 0-.5-.22-.5-.5V15H3z';
+const downloadSvgPath ='M12 15.51l-5.7-5.7 1.41-1.42L11 11.59V2h2v9.59l3.3-3.3 1.41 1.42L12 15.51zM3 15v3.5c0 1.38 1.12 2.5 2.5 2.5h13c1.38 0 2.5-1.12 2.5-2.5V15h-2v3.5c0 .28-.22.5-.5.5h-13c-.28 0-.5-.22-.5-.5V15H3z';
 
 function injectDownloadButtons() {
     // Inject into all tweet action groups (Timeline, Status Page, and Modal Bottom Bar)
@@ -271,11 +300,8 @@ function injectDownloadButtons() {
                 // Filter out tiny UI icons (if loaded)
                 if (img.naturalWidth > 0 && (img.naturalWidth < 100 || img.naturalHeight < 100)) continue;
 
-                let imgUrl = src;
-                // Upgrade to maximum resolution
-                imgUrl = imgUrl.replace(/[?&]name=\w+/g, '');
-                imgUrl = imgUrl.replace(/format=\w+/, 'format=jpg');
-                imgUrl += (imgUrl.includes('?') ? '&' : '?') + 'name=4096x4096';
+                const imgUrl = toOriginalQualityImageUrl(src);
+                if (!imgUrl) continue;
                 
                 if (!uniqueUrls.has(imgUrl)) {
                     uniqueUrls.add(imgUrl);

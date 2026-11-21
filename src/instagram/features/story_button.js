@@ -388,7 +388,10 @@ function injectStoryButton() {
                     if (res) {
                         let extractedUrl = res.url;
                         let extractedDash = res.dash;
-                        if (extractedUrl && extractedUrl.length > 0) { bestUrl = extractedUrl; bestMetadata.url = bestUrl; }
+                        // The dictionary entry (matched by exact story id) already holds the best version;
+                        // Fiber only fills the gap when that URL is missing or an unusable blob.
+                        let dictionaryHasRealUrl = bestUrl && !bestUrl.startsWith('blob:') && bestMetadata.url === bestUrl;
+                        if (extractedUrl && extractedUrl.length > 0 && !dictionaryHasRealUrl) { bestUrl = extractedUrl; bestMetadata.url = bestUrl; }
                         if (extractedDash && extractedDash.length > 50) {
                             let decoded = extractedDash;
                             try { if (extractedDash.includes('%3C') || extractedDash.includes('%3c')) decoded = decodeURIComponent(extractedDash); } catch(e) {}

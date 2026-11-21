@@ -509,3 +509,13 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 
 ## Seguridad (21 de Noviembre 2026): Toast de "Shared Reel/Post" sin HTML
 `story_button.js → showSharedReelWarning` armaba `<a href="${info.href}">` con un `href` leído del DOM de Instagram (posible `javascript:`). Ahora usa `showComplex({ action: { label, href } })`; el toast valida `http(s)` y crea el enlace con DOM APIs. Los toasts de descarga de `ig_interceptor_init.js` pasan el `filename` como `detail` (texto plano). Ver `NOTES.md` → "HTML Injection (XSS) en Toasts y Popup".
+
+## Calidad Máxima (21 de Noviembre 2026): Auditoría con Evidencia Real + 4 Fixes
+**Evidencia (host.log, 1,950 descargas reales):** 1,541/1,541 videos de stories y 9/9 de posts usaron DASH; los manifests llegan a 1080×1920 (1080p) y yt-dlp elige `bv*+ba/b` (mayor resolución, docs oficiales vía Context7). Las imágenes usaban `stp=dst-jpg_e35` sin tamaño (la versión más grande del CDN). gallery-dl `instagram.videos` default `true` = DASH. Requiere ffmpeg: sin él yt-dlp cae a `best/bestvideo+bestaudio` y los DASH de IG fallarían.
+**Fixes (caminos de código que podían bajar calidad):**
+1. **Q1 Foto de perfil:** solo se buscaba HD si la URL visible era `150x150`; con `320x320` se descargaba 320. Además, `profile_pic_url_hd` interceptado nunca se usaba. Nuevo `profile_pic_collector.js` (MAIN world, dentro del recorrido de `media_parser.js`) guarda por username lo mejor de `hd_profile_pic_url_info` > `hd_profile_pic_versions` > `profile_pic_url_hd` y lo envía como `MD_PFP_RESULT` → `window.__md_pfpResults` (clave en minúsculas). Nuevo `utils/pfp_resolver.js` (compartido por `pfp_button.js` y `auto_backup.js`, DRY): red → srcset (mayor descriptor) → código fuente → zoom spoof. "Low-res" = tamaño declarado ≤320px (solo lee `stp` y el path, no `efg`). Si solo hay ≤320 se descarga con aviso; 150x150 sigue abortando.
+2. **Q2 Videos sin DASH (Fiber):** `video_versions[0]` → `pickBestVideoUrl()` (mayor área, desempate por `type`).
+3. **Q3 Stories:** el resultado de Fiber sobrescribía la mejor URL del diccionario (match exacto por story id); ahora solo rellena si falta o es `blob:`.
+4. **Q4 Imágenes de carrusel (Fiber):** `candidates.find()` por `posterSig` tomaba el primero → `pickBestImageUrl(candidates, posterSig)` toma el más grande entre los de esa misma imagen.
+**Módulo único:** `interceptors/core/media_quality.js` (`pickBestVideoUrl`, `pickBestImageUrl`, `pickBestProfilePicUrl`); `media_parser.js` y `fiber_search.js` lo usan. Regla: nunca usar `[0]` ni "primer match" para elegir una versión.
+**Verificación:** 13/13 (MAIN world, bundle esbuild real) + 9/9 (jsdom: resolver y X). Baseline: el `fiber_search.js` anterior falla Q2e y Q4c.
