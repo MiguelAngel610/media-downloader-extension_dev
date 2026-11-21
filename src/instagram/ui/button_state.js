@@ -169,9 +169,7 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
         let mediaType = "auto";
 
         if (getPlatform() === "instagram") {
-            if (metadata && metadata.is_pfp_bot) {
-                mediaType = "pfp_bot";
-            } else if (url && url.startsWith('blob:') && (!metadata || !metadata.dash_manifest)) {
+            if (url && url.startsWith('blob:') && (!metadata || !metadata.dash_manifest)) {
                 let isStoryBtn = btn && btn.classList.contains('md-story-dl-btn-inline');
 
                 if (isStoryBtn || window.location.href.includes('/stories/')) {

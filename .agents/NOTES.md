@@ -153,3 +153,12 @@
 - `download_url`: el popup pega una URL y el worker detecta la plataforma (instagram/facebook/twitter).
 - `button_state.js` y `facebook/main.js` muestran el error real (toast + `md-error`) en vez del ✅.
 - Permiso nuevo `alarms` en `manifest.json`. Los nombres de usuario del backup se validan (`^[A-Za-z0-9._]{1,30}$`).
+
+## Host: Descargas Atómicas, Timestamps y Rutas Muertas
+**Fecha:** 21 de Noviembre 2026
+**Estado:** RESUELTO (test con servidor HTTP local real 13/13: descarga completa, conexión cortada a mitad, cuerpo vacío)
+1. **Archivos corruptos permanentes:** `execute_direct_http` escribía directo al nombre final y cargaba todo en RAM. Un corte de red dejaba un archivo truncado que el modo backup consideraba "ya descargado" para siempre. Ahora: streaming en bloques de 1 MB a `<archivo>.part`, verificación contra `Content-Length` (y cuerpo no vacío), `os.replace` atómico; ante fallo se borra el `.part` y se devuelve error.
+2. **Fecha silenciosa / crash:** `metadata.get("timestamp", now)` usaba la fecha de descarga sin avisar y fallaba con `None` o microsegundos. `resolve_timestamp()` acepta s/ms/µs y registra explícitamente cuando cae a "ahora".
+3. **Zero Silent Errors:** los 8 `except:` desnudos/`except Exception: pass` restantes se reemplazaron por excepciones específicas con log (`remove_if_exists()` para limpiezas: solo `FileNotFoundError` se ignora).
+4. **Código muerto (soft delete a `.trash/dead_code_2026-11-21/host_dead_paths.py`):** rama `pfp_bot` (nadie setea `is_pfp_bot`; apuntaba a `Downloads/Carpetas_Mixtas`, que no existe) y el hook de progreso de yt-dlp (la extensión descarta todo `progress`).
+5. Strings y comentarios restantes en español traducidos al inglés.

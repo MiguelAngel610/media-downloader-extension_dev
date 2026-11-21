@@ -519,3 +519,7 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 4. **Q4 Imágenes de carrusel (Fiber):** `candidates.find()` por `posterSig` tomaba el primero → `pickBestImageUrl(candidates, posterSig)` toma el más grande entre los de esa misma imagen.
 **Módulo único:** `interceptors/core/media_quality.js` (`pickBestVideoUrl`, `pickBestImageUrl`, `pickBestProfilePicUrl`); `media_parser.js` y `fiber_search.js` lo usan. Regla: nunca usar `[0]` ni "primer match" para elegir una versión.
 **Verificación:** 13/13 (MAIN world, bundle esbuild real) + 9/9 (jsdom: resolver y X). Baseline: el `fiber_search.js` anterior falla Q2e y Q4c.
+
+## Fix (21 de Noviembre 2026): Fiber Perdía Usuario y Fecha + Timestamps en Microsegundos
+**Causa:** `fiber_search.js` nunca enviaba `user`/`time` en `MD_FIBER_RESULT`; `media_resolver.js` leía `result.timestamp` y `story_button.js` leía `res.username`/`res.timestamp`, nombres que no existían en el puente (`ig_interceptor_init.js` guarda `user`/`time`). Resultado: reels/stories sin `<time>` en el DOM se nombraban con la fecha de descarga. Además `device_timestamp` llega en microsegundos (~1.7e15) y se pasaba tal cual como segundos (el host fallaba con "year out of range").
+**Solución:** nuevo `interceptors/core/time_utils.js` (`toUnixSeconds`, `extractMediaTimestamp`) usado por `media_parser.js` y `fiber_search.js` (DRY). Fiber publica `user` y `time` normalizados (y con `targetOrigin '/'`). Consumidores corregidos. Rama muerta `is_pfp_bot` eliminada de `button_state.js`. Test 16/16.

@@ -86,7 +86,7 @@ async function resolveMediaUrl(media, article, knownShortcode = null, carouselIn
         bestMetadata.dash_manifest = result.dash_manifest || null;
         bestMetadata.shortcode = result.shortcode || expectedShortcode || null;
         bestMetadata.username = result.user || null;
-        bestMetadata.timestamp = result.timestamp || null;
+        bestMetadata.timestamp = result.time || null; // bridge field is 'time' (see ig_interceptor_init.js)
         bestMetadata.media_id = result.media_id || null;
         if (result.index) bestMetadata.index = result.index;
         // Determine is_video from result URL or dash manifest, not from the DOM element type

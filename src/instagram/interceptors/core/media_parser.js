@@ -2,6 +2,7 @@ import { mdLog } from './logger.js';
 import { clearStoryCheckpoint } from './story_resume.js';
 import { pickBestImageUrl, pickBestVideoUrl } from './media_quality.js';
 import { recordProfilePic, flushProfilePics } from './profile_pic_collector.js';
+import { extractMediaTimestamp } from './time_utils.js';
 
 window.__md_storyMedia = window.__md_storyMedia || {};
 
@@ -30,9 +31,9 @@ export function findStoryMedia(obj, parentUsername = "", parentTimestamp = null,
     else if (obj.username && typeof obj.username === 'string' && !obj.username.includes(' ')) currentUsername = obj.username;
 
     if (obj.latest_reel_media && checkResetFn) checkResetFn(currentUsername, obj.latest_reel_media);
-    if (obj.taken_at) currentTimestamp = obj.taken_at;
-    else if (obj.taken_at_timestamp) currentTimestamp = obj.taken_at_timestamp;
-    else if (obj.device_timestamp) currentTimestamp = obj.device_timestamp;
+    // Normalized to Unix seconds: device_timestamp is often in microseconds.
+    let ownTimestamp = extractMediaTimestamp(obj);
+    if (ownTimestamp) currentTimestamp = ownTimestamp;
 
     if (currentUsername && currentTimestamp && checkResetFn) {
         checkResetFn(currentUsername, currentTimestamp);

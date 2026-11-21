@@ -12,6 +12,8 @@ import socket
 import tempfile
 import importlib.util
 import urllib.parse
+import urllib.error
+import http.client
 from typing import Any, Dict, List, Optional
 
 try:
@@ -247,6 +249,36 @@ class TCPServer:
             Logger.remove_client(client)
             client.close()
 
+class IncompleteDownloadError(Exception):
+    """The response ended before the declared size (or was empty)."""
+
+def remove_if_exists(path: str) -> None:
+    """Cleanup helper: a missing file is fine, any other failure is logged."""
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass  # Nothing to clean up
+    except OSError as e:
+        Logger.log_info(f"Could not remove temporary file {path}: {e}")
+
+def resolve_timestamp(metadata: Dict[str, Any]) -> int:
+    """
+    Unix seconds from metadata. Accepts seconds, milliseconds or microseconds (Instagram's
+    device_timestamp). Falls back to 'now' only when absent/invalid, and logs it so a wrong
+    date in a filename is never silent.
+    """
+    raw = metadata.get("timestamp")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        Logger.broadcast_log(f"WARNING: no valid original timestamp ({raw!r}); filename uses the download date")
+        return int(time.time())
+    if value > 1e14:
+        value /= 1_000_000
+    elif value > 1e11:
+        value /= 1000
+    return int(value)
+
 class YTDLPLogger:
     def debug(self, msg): pass
     def info(self, msg): pass
@@ -255,37 +287,12 @@ class YTDLPLogger:
         Logger.log_info(f"yt-dlp error output: {msg}")
 
 class DownloaderEngines:
-    @staticmethod
-    def yt_dlp_progress_hook(d):
-        if d['status'] == 'downloading':
-            try:
-                percent_str = d.get('_percent_str', '').strip()
-                speed_str = d.get('_speed_str', '').strip()
-                eta_str = d.get('_eta_str', '').strip()
-                
-                if percent_str:
-                    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                    clean_percent = ansi_escape.sub('', percent_str).strip()
-                    clean_speed = ansi_escape.sub('', speed_str).strip()
-                    
-                    NativeMessaging.send_message({
-                        "status": "progress",
-                        "percent": clean_percent,
-                        "speed": clean_speed,
-                        "eta": eta_str
-                    })
-            except Exception:
-                pass
-
     @classmethod
     def execute_ytdlp_native(cls, url, ydl_opts):
         if not HAS_YTDLP:
             raise Exception("yt-dlp is not installed as a python module. Please 'pip install yt-dlp'")
             
-        Logger.broadcast_log(f"Ejecutando yt-dlp nativo para URL: {url}")
-        if 'progress_hooks' not in ydl_opts:
-            ydl_opts['progress_hooks'] = [cls.yt_dlp_progress_hook]
-            
+        Logger.broadcast_log(f"Running native yt-dlp for URL: {url}")
         ydl_opts['quiet'] = True
         ydl_opts['no_warnings'] = True
         ydl_opts['logger'] = YTDLPLogger()
@@ -298,10 +305,10 @@ class DownloaderEngines:
                         filename = os.path.basename(ydl.prepare_filename(info['entries'][0]))
                     else:
                         filename = os.path.basename(ydl.prepare_filename(info))
-                    return {"status": "success", "message": "Descargado nativamente con yt-dlp", "filename": filename}
-                return {"status": "success", "message": "Descargado nativamente con yt-dlp"}
+                    return {"status": "success", "message": "Downloaded natively with yt-dlp", "filename": filename}
+                return {"status": "success", "message": "Downloaded natively with yt-dlp"}
         except Exception as e:
-            Logger.broadcast_log(f"Error en yt-dlp nativo: {str(e)}")
+            Logger.broadcast_log(f"Native yt-dlp error: {e}")
             return {"status": "error", "message": str(e)}
             
     GALLERY_DL_TIMEOUT_SECONDS = 45
@@ -366,13 +373,10 @@ class DownloaderEngines:
                 return {"status": "skipped", "message": "Skipped by gallery-dl output"}
                 
             filename = None
-            try:
-                lines = [line.strip() for line in stdout.strip().split('\n') if line.strip()]
-                if lines:
-                    last_line = lines[-1]
-                    if last_line.startswith('# '): last_line = last_line[2:]
-                    filename = os.path.basename(last_line)
-            except: pass
+            lines = [line.strip() for line in stdout.strip().split('\n') if line.strip()]
+            if lines:
+                last_line = lines[-1][2:] if lines[-1].startswith('# ') else lines[-1]
+                filename = os.path.basename(last_line)
             
             res = {"status": "success", "message": "IG downloaded (gallery-dl)", "log": stdout}
             if filename: res["filename"] = filename
@@ -391,11 +395,38 @@ class DownloaderEngines:
             if clean_line.startswith('#'): return True
         return False
 
-    @staticmethod
-    def execute_direct_http(url, filepath):
+    DIRECT_HTTP_TIMEOUT_SECONDS = 30
+    DIRECT_HTTP_CHUNK_BYTES = 1024 * 1024
+
+    @classmethod
+    def execute_direct_http(cls, url: str, filepath: str) -> Dict[str, Any]:
+        """
+        Streams into '<file>.part' and renames only once the byte count matches Content-Length.
+        Writing straight to the final name left truncated files that later runs treated as
+        "already downloaded" (backups skip any existing file) and never repaired.
+        """
+        if not cls.is_safe_http_url(url):
+            return {"status": "error", "message": "Rejected unsafe URL"}
+        part_path = filepath + ".part"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
-        with urllib.request.urlopen(req, timeout=15) as response, open(filepath, 'wb') as out_file:
-            out_file.write(response.read())
+        try:
+            with urllib.request.urlopen(req, timeout=cls.DIRECT_HTTP_TIMEOUT_SECONDS) as response, open(part_path, 'wb') as out_file:
+                declared = response.getheader('Content-Length')
+                expected_bytes = int(declared) if declared and declared.isdigit() else None
+                written = 0
+                while chunk := response.read(cls.DIRECT_HTTP_CHUNK_BYTES):
+                    out_file.write(chunk)
+                    written += len(chunk)
+            if written == 0:
+                raise IncompleteDownloadError("server returned an empty body")
+            if expected_bytes is not None and written != expected_bytes:
+                raise IncompleteDownloadError(f"received {written} of {expected_bytes} bytes")
+            os.replace(part_path, filepath)
+        except (OSError, http.client.HTTPException, IncompleteDownloadError) as e:
+            # urllib.error.URLError and socket timeouts are OSError subclasses.
+            remove_if_exists(part_path)
+            Logger.broadcast_log(f"STATUS: FAILED (Direct) {e}")
+            return {"status": "error", "message": f"Direct download failed: {e}"}
         Logger.broadcast_log("STATUS: SUCCESS (Direct)")
         return {"status": "success", "message": "Downloaded via direct HTTP", "filename": os.path.basename(filepath)}
 
@@ -481,7 +512,9 @@ class MediaManager:
             req = urllib.request.Request(check_url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=3) as resp:
                 return int(resp.getheader('Content-Length', -1))
-        except: return -1
+        except (OSError, ValueError, http.client.HTTPException) as e:
+            Logger.log_info(f"Could not read remote size of {check_url[:80]}: {e}")
+            return -1
 
     @staticmethod
     def get_out_dir(gallery_dir, platform, username, is_backup, subfolder, is_video, ext):
@@ -514,9 +547,9 @@ class MediaManager:
             
             if slice_str:
                 try:
-                    length = int(slice_str.strip("[:]"))
-                    val = val[:length]
-                except: pass
+                    val = val[:int(slice_str.strip("[:]"))]
+                except ValueError:
+                    Logger.log_info(f"Ignored invalid filename template slice {slice_str!r}")
             return val
 
         filename = re.sub(r'\{(shortcode|extension|id|num)(\[:\d+\])?\}', format_var, filename)
@@ -595,23 +628,6 @@ class MediaManager:
         gallery_dir = os.path.join(home, "gallery-dl")
         if not os.path.exists(gallery_dir): os.makedirs(gallery_dir)
 
-        # 1. PFP BOT
-        if mediaType == "pfp_bot":
-            username = metadata.get("username")
-            if not username: return {"status": "error"}
-            pfp_script = os.path.join(home, "Downloads", "Carpetas_Mixtas", "Media Downloader", "pfp_downloader.py")
-            if not os.path.exists(pfp_script):
-                pfp_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pfp_downloader.py")
-            bot_cookie = os.path.join(gallery_dir, "cookies_bot_pfp.txt")
-            if not os.path.exists(bot_cookie): bot_cookie = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies_bot_pfp.txt")
-            dest_dir = PathGuard.ensure_inside(gallery_dir, os.path.join(gallery_dir, "instagram", username))
-
-            cmd = [sys.executable, pfp_script, username, bot_cookie, dest_dir]
-            CREATE_NO_WINDOW = 0x08000000
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW, cwd=home, text=True)
-            stdout, stderr = process.communicate()
-            return {"status": "success", "message": "PFP bot finished", "log": stdout}
-
         # 2. DIRECT STORY HANDLING
         if mediaType == "direct_story":
             return cls._handle_direct_story(msg, platform, gallery_dir, url, dash_manifest, account)
@@ -647,7 +663,7 @@ class MediaManager:
                 Logger.broadcast_log(f"Failed to read config: {e}")
 
         username = metadata.get("username", "Direct_Stories")
-        timestamp = metadata.get("timestamp", int(time.time()))
+        timestamp = resolve_timestamp(metadata)
         shortcode = metadata.get("shortcode")
         media_id = metadata.get("media_id")
         
@@ -679,7 +695,8 @@ class MediaManager:
                 try:
                     with open(id_file_path, "w", encoding="utf-8") as f:
                         f.write(f"Username: {username}\nPermanent ID: {user_id}\nProfile URL: https://www.facebook.com/profile.php?id={user_id}\n")
-                except: pass
+                except OSError as e:
+                    Logger.broadcast_log(f"Could not write user ID file {id_file_path}: {e}")
 
         filepath = os.path.join(out_dir, filename)
         Logger.broadcast_log(f"--- NEW DIRECT DOWNLOAD REQUEST ---")
@@ -705,22 +722,24 @@ class MediaManager:
                 'enable_file_urls': True,
                 'outtmpl': filepath_no_ext + '.%(ext)s',
                 'merge_output_format': 'mp4',
-                'updatetime': False  # Previene Error 22 en Windows por fechas de modificación inválidas
+                'updatetime': False  # Avoids Windows Errno 22 when the server sends an invalid modification date
             }
             res = DownloaderEngines.execute_ytdlp_native(manifest_url, ydl_opts)
-            try: os.remove(manifest_path); os.remove(filepath_no_ext + ".mpd")
-            except: pass
+            remove_if_exists(manifest_path)
+            remove_if_exists(filepath_no_ext + ".mpd")
             
             if res['status'] == 'success': return res
             
-            # Limpiar archivos .part huérfanos generados por fallo de yt-dlp
+            # Remove orphaned .part files left by the failed yt-dlp run
+            out_dir_path = os.path.dirname(filepath)
+            base_name = os.path.basename(filepath_no_ext)
             try:
-                out_dir_path = os.path.dirname(filepath)
-                base_name = os.path.basename(filepath_no_ext)
-                for f in os.listdir(out_dir_path):
-                    if f.startswith(base_name) and f.endswith(".part"):
-                        os.remove(os.path.join(out_dir_path, f))
-            except: pass
+                leftovers = [f for f in os.listdir(out_dir_path) if f.startswith(base_name) and f.endswith(".part")]
+            except OSError as e:
+                Logger.log_info(f"Could not list {out_dir_path} for .part cleanup: {e}")
+                leftovers = []
+            for leftover in leftovers:
+                remove_if_exists(os.path.join(out_dir_path, leftover))
 
             Logger.broadcast_log("NATIVE DASH fallback failed. Continuing to direct URL fallback...")
 
@@ -786,7 +805,7 @@ class MediaManager:
             ydl_opts['outtmpl'] = os.path.join(out_dir, f"X_{metadata.get('tweet_id')}.%(ext)s")
 
         if platform == "facebook":
-            timestamp = metadata.get("timestamp", int(time.time()))
+            timestamp = resolve_timestamp(metadata)
             shortcode = metadata.get("shortcode", "")
             try: date_str = datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
             except Exception: date_str = datetime.datetime.now().strftime('%Y-%m-%d')
@@ -817,8 +836,7 @@ class MediaManager:
         res = DownloaderEngines.execute_ytdlp_native(actual_url, ydl_opts)
         
         if metadata.get("is_direct") and metadata.get("dash_manifest"):
-            try: os.remove(actual_url)
-            except: pass
+            remove_if_exists(actual_url)
             
         return res
 

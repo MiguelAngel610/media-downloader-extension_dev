@@ -400,8 +400,9 @@ function injectStoryButton() {
                             }
                         }
                         if (res.shortcode && res.shortcode.length > 0) { bestMetadata.shortcode = res.shortcode; }
-                        if (res.username && res.username.length > 0) { bestMetadata.username = res.username; }
-                        if (res.timestamp) { bestMetadata.timestamp = res.timestamp; }
+                        // Bridge fields are 'user' and 'time' (ig_interceptor_init.js); the old names were always undefined.
+                        if (res.user && res.user.length > 0) { bestMetadata.username = res.user; }
+                        if (res.time) { bestMetadata.timestamp = res.time; }
                         if (res.media_id && res.media_id.length > 0) {
                             bestMetadata.media_id = res.media_id;
                             if (window.__md_storyMediaDict && window.__md_storyMediaDict[res.media_id]) {

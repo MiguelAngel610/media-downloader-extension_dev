@@ -1,5 +1,6 @@
 import { mdLog } from './logger.js';
 import { pickBestImageUrl, pickBestVideoUrl } from './media_quality.js';
+import { extractMediaTimestamp } from './time_utils.js';
 window.addEventListener('message', function(event) {
     // Only our own window may request a fiber walk (rejects openers/iframes; also avoids a TypeError on null data).
     if (event.source !== window || !event.data) return;
@@ -68,13 +69,7 @@ window.addEventListener('message', function(event) {
                     foundUser = obj.username;
                 }
                 
-                if (!foundTime && obj.taken_at) {
-                    foundTime = obj.taken_at;
-                } else if (!foundTime && obj.taken_at_timestamp) {
-                    foundTime = obj.taken_at_timestamp;
-                } else if (!foundTime && obj.device_timestamp) {
-                    foundTime = obj.device_timestamp;
-                }
+                if (!foundTime) foundTime = extractMediaTimestamp(obj);
 
                 // ABSOLUTE MATHEMATICAL GUARD (For Feed Carousels)
                 let carouselArray = null;
@@ -310,9 +305,7 @@ window.addEventListener('message', function(event) {
                     else if (!foundUser && obj.author && obj.author.username) foundUser = obj.author.username;
                     else if (!foundUser && obj.username && typeof obj.username === 'string' && !obj.username.includes(' ')) foundUser = obj.username;
 
-                    if (!foundTime && obj.taken_at) foundTime = obj.taken_at;
-                    else if (!foundTime && obj.taken_at_timestamp) foundTime = obj.taken_at_timestamp;
-                    else if (!foundTime && obj.device_timestamp) foundTime = obj.device_timestamp;
+                    if (!foundTime) foundTime = extractMediaTimestamp(obj);
 
                     if ((foundDash && foundUser && foundTime) || (foundUrl && foundUser && foundTime)) return;
                     for (let k of Object.keys(obj)) { try { if (obj[k] && typeof obj[k] === 'object') { searchObjStrict(obj[k], depth + 1); if ((foundDash && foundUser && foundTime) || (foundUrl && foundUser && foundTime)) return; } } catch (e) { } }
@@ -369,9 +362,9 @@ window.addEventListener('message', function(event) {
             }
 
             if (foundUrl || foundDash) {
-                window.postMessage({ type: 'MD_FIBER_RESULT', id: id, url: foundUrl, dash: foundDash, media_id: foundId, shortcode: foundCode, index: foundIndex }, '*');
+                window.postMessage({ type: 'MD_FIBER_RESULT', id: id, url: foundUrl, dash: foundDash, media_id: foundId, shortcode: foundCode, index: foundIndex, user: foundUser || null, time: foundTime || null }, '/');
             } else {
-                window.postMessage({ type: 'MD_FIBER_RESULT', id: id, error: true, media_id: foundId, shortcode: foundCode }, '*');
+                window.postMessage({ type: 'MD_FIBER_RESULT', id: id, error: true, media_id: foundId, shortcode: foundCode }, '/');
             }
         } catch (e) { }
     }
