@@ -10,6 +10,9 @@ import urllib.request
 import threading
 import socket
 import tempfile
+import importlib.util
+import urllib.parse
+from typing import Any, Dict, List, Optional
 
 try:
     import yt_dlp
@@ -178,18 +181,63 @@ class DownloaderEngines:
             Logger.broadcast_log(f"Error en yt-dlp nativo: {str(e)}")
             return {"status": "error", "message": str(e)}
             
+    GALLERY_DL_TIMEOUT_SECONDS = 45
+
     @staticmethod
-    def execute_gallery_dl(url, cmd_args):
-        Logger.broadcast_log(f"Executing gallery-dl: {' '.join(cmd_args)}")
+    def is_safe_http_url(url: Any) -> bool:
+        """Only absolute http(s) URLs may reach an external downloader."""
+        if not isinstance(url, str) or not url:
+            return False
+        try:
+            parsed = urllib.parse.urlsplit(url)
+        except ValueError:
+            return False
+        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
+    @staticmethod
+    def resolve_gallery_dl_command() -> Optional[List[str]]:
+        """
+        Prefer `python -m gallery_dl` from this same interpreter: it needs no PATH
+        lookup and never goes through a .bat/.cmd shim, which Windows would run via
+        cmd.exe even with shell=False (see CPython gh-114539).
+        """
+        if importlib.util.find_spec("gallery_dl") is not None:
+            return [sys.executable, "-m", "gallery_dl"]
+        import shutil
+        executable = shutil.which("gallery-dl")
+        if executable and executable.lower().endswith(".exe"):
+            return [executable]
+        return None
+
+    @classmethod
+    def execute_gallery_dl(cls, url: str, option_args: List[str]) -> Dict[str, Any]:
+        if not cls.is_safe_http_url(url):
+            Logger.broadcast_log(f"Rejected non-http(s) URL for gallery-dl: {url!r}")
+            return {"status": "error", "message": "Rejected unsafe URL"}
+
+        base_command = cls.resolve_gallery_dl_command()
+        if base_command is None:
+            return {"status": "error", "message": "gallery-dl is not installed. Run 'pip install gallery-dl'"}
+
+        # shell=False: arguments go straight to CreateProcess, so '&', '|' or '>' in a URL
+        # can never become shell commands. '--' stops option parsing, so a URL such as
+        # '--exec=...' is treated as a URL and never as a gallery-dl option.
+        cmd_args = base_command + option_args + ["--", url]
+        Logger.broadcast_log(f"Executing gallery-dl: {cmd_args!r}")
+
+        child_env = dict(os.environ, PYTHONIOENCODING="utf-8")  # Non-ASCII filenames must not crash the child
         CREATE_NO_WINDOW = 0x08000000
-        process = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-                                   creationflags=CREATE_NO_WINDOW, cwd=os.path.expanduser("~"), text=True, shell=True)
-        try: 
-            stdout, stderr = process.communicate(timeout=45)
+        process = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   creationflags=CREATE_NO_WINDOW, cwd=os.path.expanduser("~"),
+                                   text=True, encoding="utf-8", errors="replace", env=child_env, shell=False)
+        try:
+            stdout, stderr = process.communicate(timeout=cls.GALLERY_DL_TIMEOUT_SECONDS)
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate()
-        
+            Logger.broadcast_log(f"gallery-dl timed out after {cls.GALLERY_DL_TIMEOUT_SECONDS}s and was killed")
+            return {"status": "error", "message": f"gallery-dl timed out after {cls.GALLERY_DL_TIMEOUT_SECONDS}s", "log": stderr}
+
         if process.returncode == 0:
             if DownloaderEngines.is_skipped(stdout + stderr): 
                 return {"status": "skipped", "message": "Skipped by gallery-dl output"}
@@ -502,8 +550,9 @@ class MediaManager:
         return DownloaderEngines.execute_direct_http(url, filepath)
 
     @classmethod
-    def _handle_gallery_dl(cls, url, account, gallery_dir, metadata, platform):
-        cmd = ["gallery-dl", url]
+    def _handle_gallery_dl(cls, url: str, account: str, gallery_dir: str, metadata: Dict[str, Any], platform: str) -> Dict[str, Any]:
+        # Options only: execute_gallery_dl appends '--' and the URL itself.
+        cmd: List[str] = []
         config_path = os.path.join(gallery_dir, "config.json")
         if os.path.exists(config_path): cmd.extend(["--config", config_path])
         

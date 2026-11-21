@@ -90,3 +90,16 @@
 2. `.gitignore` endurecido: `*cookies*.txt`, `*_device.json`, `*.session`, `.env*`, `*.log`, `__pycache__/`, `scratch/`.
 3. Acción del usuario: revocar todas las sesiones de Instagram y cambiar contraseña (lo único que invalida el `sessionid` filtrado).
 **Regla:** Las cookies/sesiones de gallery-dl/yt-dlp viven en `~/gallery-dl/`, nunca dentro del repo. `host.log` jamás se commitea.
+
+## Seguridad: Inyección de Comandos en el Host Python (gallery-dl)
+**Fecha:** 21 de Noviembre 2026
+**Problema:** `DownloaderEngines.execute_gallery_dl` lanzaba gallery-dl con `subprocess.Popen(lista, shell=True)`. En Windows, CPython convierte la lista con `list2cmdline`, que solo pone comillas si el argumento tiene espacios o tabs (verificado en el código fuente oficial vía Context7). Un `&` en la URL llegaba sin escapar a `cmd.exe` y se ejecutaba como otro comando. Reproducido: la URL `https://example.invalid/p/X/?a=1&echo.>archivo` creaba el archivo. Efecto secundario: toda URL con `&` (ej. `?igsh=..&utm=..`) se partía y fallaba.
+**Segundo hueco (argument injection):** aun sin shell, una "URL" como `--exec=calc` sería interpretada por gallery-dl como su opción `--exec` (ejecuta comandos).
+**Solución (`host/host.py`):**
+1. `shell=False` siempre.
+2. Se ejecuta `sys.executable -m gallery_dl` (mismo intérprete del host): no depende del PATH y nunca pasa por un shim `.bat/.cmd`, que Windows correría por `cmd.exe` incluso con `shell=False` (CPython gh-114539).
+3. `--` antes de la URL: gallery-dl la trata como URL, nunca como opción (verificado: `Unsupported URL '--exec=calc'`).
+4. `is_safe_http_url()`: solo URLs absolutas `http(s)` llegan al descargador.
+5. Hijo con `PYTHONIOENCODING=utf-8` y lectura `encoding="utf-8", errors="replace"`: nombres de archivo no ASCII ya no rompen la salida.
+6. El timeout (45s) ahora devuelve un error explícito en vez de un "failed" genérico.
+**Verificación:** test de regresión 7/7 (incluye baseline que demuestra la inyección con el estilo anterior).
