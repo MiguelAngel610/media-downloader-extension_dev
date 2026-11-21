@@ -124,7 +124,6 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
     if (namespace === 'local') {
         if (changes.fb_ghost_seen !== undefined) {
             window.postMessage({ type: 'FB_GHOST_SEEN_TOGGLE', enabled: changes.fb_ghost_seen.newValue }, '*');
-            let btn = document.querySelector('#fb-ghost-seen-btn'); // Need to set ID on create
         }
         if (changes.fb_ghost_presence !== undefined) {
             window.postMessage({ type: 'FB_GHOST_PRESENCE_TOGGLE', enabled: changes.fb_ghost_presence.newValue }, '*');

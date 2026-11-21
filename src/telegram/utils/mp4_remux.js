@@ -103,7 +103,7 @@
         if (flags & 0x000002) { result.sampleDescIndex = view.getUint32(p); p += 4; }
         if (flags & 0x000008) { result.defaultSampleDuration = view.getUint32(p); p += 4; }
         if (flags & 0x000010) { result.defaultSampleSize = view.getUint32(p); p += 4; }
-        if (flags & 0x000020) { result.defaultSampleFlags = view.getUint32(p); p += 4; }
+        if (flags & 0x000020) { result.defaultSampleFlags = view.getUint32(p); }
         return result;
     }
 

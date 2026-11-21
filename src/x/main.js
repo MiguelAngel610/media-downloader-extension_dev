@@ -41,7 +41,6 @@ window.addEventListener("message", (event) => {
         const imgUrl = event.data.url;
         const tweetId = event.data.tweetId;
         const tweetDate = event.data.tweetDate;
-        const prefix = tweetDate ? `${tweetDate}_` : '';
         console.log(`Downloading X image (Tweet: ${tweetId}):`, imgUrl);
 
         // "orig" is the best size; a few very old images only exist up to 4096x4096 (next in X's size ladder).

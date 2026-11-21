@@ -250,7 +250,8 @@
                         let json = JSON.parse(cleanText);
                         window.__FB_JSON_CACHE__.push(json);
                         if (window.__FB_JSON_CACHE__.length > 30) window.__FB_JSON_CACHE__.shift();
-                    } catch (e) {
+                    } catch {
+                        // Not a single JSON document: Facebook streams one JSON object per line.
                         let lines = cleanText.split('\n');
                         for (let line of lines) {
                             if (!line.trim()) continue;
@@ -282,7 +283,8 @@
                                 let json = JSON.parse(cleanText);
                                 window.__FB_JSON_CACHE__.push(json);
                                 if (window.__FB_JSON_CACHE__.length > 30) window.__FB_JSON_CACHE__.shift();
-                            } catch (e) {
+                            } catch {
+                                // Not a single JSON document: Facebook streams one JSON object per line.
                                 let lines = cleanText.split('\n');
                                 for (let line of lines) {
                                     if (!line.trim()) continue;
@@ -335,7 +337,7 @@
             let targetMediaObj = findStoryNode(window.__FB_JSON_CACHE__[i], currentStoryId);
             if (!targetMediaObj) continue;
 
-            let mediaUrl = null;
+            let mediaUrl;
             let mediaType = "video";
 
             if (targetMediaObj.__typename === "Photo") {

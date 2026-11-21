@@ -32,7 +32,7 @@ function injectFeedButtons() {
         }
     });
 
-    bookmarkSvgs.forEach((svg, index) => {
+    bookmarkSvgs.forEach((svg) => {
         if (svg.__md_processed) return;
         // CRITICAL: Never process SVGs that are inside our own overlay root (the clone's bookmark icon)
         if (svg.closest('#md-overlay-root')) return;
@@ -98,7 +98,7 @@ function injectFeedButtons() {
         }
 
         // Detect native layout orientation
-        let isVertical = false;
+        let isVertical;
         let targetVisualGapX = 16; // Standard IG horizontal spacing between SVGs
         let targetVisualGapY = 24; // Standard IG vertical spacing
 
@@ -133,8 +133,8 @@ function injectFeedButtons() {
         // Calculate exact margin needed by subtracting the native padding/margins the clone will inherently provide
         let wRect = wrapper.getBoundingClientRect();
         let wSvg = wrapper.querySelector('svg');
-        let builtInVisualGapX = 0;
-        let builtInVisualGapY = 0;
+        let builtInVisualGapX;
+        let builtInVisualGapY;
 
         let wStyle = window.getComputedStyle(wrapper);
         let wMarLeft = parseFloat(wStyle.marginLeft) || 0;

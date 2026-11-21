@@ -8,7 +8,8 @@ function extractSignature(url) {
         // Extract filename without extension (e.g., "467003456_123_456_n")
         // This is unique to the specific slide, but ignores format differences (.jpg vs .webp)
         return filename.replace(/\.[a-zA-Z0-9]+$/, '');
-    } catch (e) {
+    } catch {
+        // Relative or escaped URL: fall back to a plain filename match.
         let match = url.match(/\/([^\/]+)\.(?:jpg|webp|mp4)/);
         return match ? match[1] : null;
     }

@@ -1,4 +1,4 @@
-import { mdLog, logError, logErrorOnce } from './logger.js';
+import { logError, logErrorOnce } from './logger.js';
 import { pickBestImageUrl, pickBestVideoUrl } from './media_quality.js';
 import { extractMediaTimestamp } from './time_utils.js';
 window.addEventListener('message', function(event) {

@@ -175,3 +175,17 @@
 - MAIN world IG: `logErrorOnce()` en `interceptors/core/logger.js`.
 - Interceptores MAIN de FB/X/Google Photos (scripts sueltos sin acceso al reporter): `console.warn` con prefijo de plataforma.
 **Mejora colateral:** si `fiber_search.js` falla, ahora responde `MD_FIBER_RESULT { error: true }` al instante en vez de dejar al resolver esperando su timeout.
+
+## Calidad Auditable: ESLint, `npm test` y Métricas (Red de Seguridad para Refactorizar)
+**Fecha:** 21 de Noviembre 2026
+**Estándares verificados con Context7:** límites por defecto de ESLint (`complexity` 20, `max-depth` 4, `max-lines-per-function` 50, `max-lines` 300); Google JavaScript Style Guide (archivos `lowercase_with_underscores.js`, `lowerCamelCase`, `UpperCamelCase`, `CONSTANT_CASE`, JSDoc); PEP 8 para Python.
+**Comandos:**
+- `npm run lint`: ESLint (flat config `eslint.config.mjs`). Código legacy: límites de mantenibilidad como *warning* (deuda medible). Módulos en `REFACTORED_MODULES`: como *error* (no pueden regresar). Corrección (`no-empty`, `no-undef`, `no-unused-vars`, `camelcase`, `eqeqeq`, `no-var`): *error* en todo `src/`.
+- `npm test`: build + 10 suites (JS y host Python) desde `tests/` (`tests/run_all.mjs` localiza `py`/`ffmpeg` en el PATH; `FFMPEG_DIR` opcional).
+- `npm run audit`: `tools/code_metrics.js` (acorn) lista cada función que supera los límites.
+**Línea base medida (antes de refactorizar):** 85 funciones fuera de límites, 12 archivos > 300 líneas. Peores: `progress/feed.js syncOverlays` (complejidad 127, anidación 13, 392 líneas), `fiber_search.js searchProps` (173), `feed_buttons.js onclick` (102, 362 líneas). Python: `host.py` con 11 clases en 874 líneas, `_handle_direct_story` complejidad 44, `mediaType` viola PEP 8.
+**Bugs encontrados por ESLint en la primera pasada:**
+1. `story_button.js`: `clickStoryKey` declarado con `let` dentro del `try` y usado en el `catch` → ante cualquier error de descarga el propio `catch` lanzaba `ReferenceError`; el botón quedaba congelado en "loading" y nunca se mostraba el toast de error.
+2. ~20 asignaciones muertas (`isVertical`, `builtInVisualGapX/Y`, `FORWARD_ICON`, `postId`, `hint`, `dateStr`, `prefix`, `iconContainer`, `mediaUrl`, import `mdLog`…) eliminadas.
+3. `catch` con fallback silencioso que el escaneo regex no veía (no estaban vacíos): `story_resume` (lectura de checkpoints), portapapeles del popup, clonado de respuestas en Google Photos → ahora registran; los fallbacks intencionales usan `catch {` con el motivo documentado.
+**Deuda estructural restante (siguiente fase):** 70 `no-undef` + 13 `no-unused-vars` provienen de funciones globales implícitas compartidas entre content scripts (`injectFeedButtons`, `getOverlayRoot`, `SVG_DOWNLOAD`…): el acoplamiento depende del orden de `manifest.json`. Solución objetivo: módulos ES con `import` explícitos empaquetados por esbuild por plataforma.

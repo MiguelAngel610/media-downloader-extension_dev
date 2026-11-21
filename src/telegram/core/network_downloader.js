@@ -42,7 +42,7 @@
     // any reason, we transparently fall back to the capture-based method.
     window.__md_tel_download_video_smart = async (videoElement, fileNameHint, stableIdHint) => {
         const sources = Array.from(videoElement.querySelectorAll("source"));
-        let bestUrl = null;
+        let bestUrl;
         if (sources.length > 0) {
             const withWidth = sources.map(s => ({ s, w: parseInt(s.getAttribute("width") || "0") }));
             withWidth.sort((a, b) => b.w - a.w);

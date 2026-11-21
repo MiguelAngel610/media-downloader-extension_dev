@@ -37,8 +37,8 @@ function detectPlatform(url) {
     let hostname;
     try {
         hostname = new URL(url).hostname.toLowerCase();
-    } catch (err) {
-        return null;
+    } catch {
+        return null; // Not a URL: the caller reports it as an unsupported link
     }
     const match = SUPPORTED_PLATFORMS.find(({ hosts }) => hosts.some((h) => hostname === h || hostname.endsWith(`.${h}`)));
     return match ? match.platform : null;

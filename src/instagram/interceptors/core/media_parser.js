@@ -11,7 +11,8 @@ export function extractSignatureFromUrl(url) {
     try {
         let parts = new URL(url).pathname.split('/');
         return parts[parts.length - 1];
-    } catch (e) {
+    } catch {
+        // Relative or escaped URL: fall back to a plain filename match.
         let match = url.match(/\/([^\/]+\.(jpg|webp|mp4))/);
         return match ? match[1] : null;
     }

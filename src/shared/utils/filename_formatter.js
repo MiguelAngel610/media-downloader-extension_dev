@@ -9,7 +9,7 @@ class MDFilenameFormatter {
      * @returns {string} The standardized filename.
      */
     static format(dateInput, id, extension, index = null) {
-        let dateStr = "YYYY-MM-DD";
+        let dateStr;
         
         try {
             if (!dateInput) {

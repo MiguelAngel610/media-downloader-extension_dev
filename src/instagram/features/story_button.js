@@ -276,13 +276,14 @@ function injectStoryButton() {
                 e.preventDefault();
                 e.stopPropagation();
 
+                // Declared outside try: the catch block below needs it to reset the button state.
+                const clickStoryKey = (typeof getStoryKey === 'function') ? getStoryKey() : window.location.pathname;
                 try {
                     if (window.MDToastManager) window.MDToastManager.showInfo("Starting download...");
                     dlBtn.style.background = 'rgba(255, 255, 255, 0.3)'; // Visual feedback immediately
                     dlBtn.classList.add('md-loading');
                     dlBtn.style.opacity = '0.5';
 
-                    let clickStoryKey = (typeof getStoryKey === 'function') ? getStoryKey() : window.location.pathname;
                     document.body.__md_download_state = {
                         time: Date.now(),
                         class: 'md-loading',

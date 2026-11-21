@@ -201,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     setTimeout(() => { statusMsg.classList.add('hidden'); }, 1200);
                 }
             } catch (err) {
+                console.warn('[Popup] Clipboard read failed (permission denied or empty):', err);
                 urlInput.focus();
                 document.execCommand('paste');
             }

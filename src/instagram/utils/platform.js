@@ -18,7 +18,7 @@ function idToShortcode(idStr) {
             num /= 64n;
         }
         return res;
-    } catch(e) {
-        return idStr; // fallback to original if parsing fails
+    } catch {
+        return idStr; // Not a numeric media id (BigInt throws): it already is a shortcode
     }
 }

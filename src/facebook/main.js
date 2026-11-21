@@ -64,7 +64,7 @@ window.addEventListener("message", (event) => {
 });
 
 // Listen for actual results from Python host
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request) => {
     if (request.action === "host_response" && request.response) {
         let msg = request.response;
         if (msg.status === "success") {

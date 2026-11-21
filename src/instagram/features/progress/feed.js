@@ -88,7 +88,7 @@ export function syncOverlays() {
             }
 
             // First pass: Calculate all positions (READ)
-            for (let { item, clone, rect } of candidates) {
+            for (let { item, rect } of candidates) {
                 let wrapper = item.wrapper;
                 let baseW = wrapper.offsetWidth || rect.width;
                 let baseH = wrapper.offsetHeight || rect.height;

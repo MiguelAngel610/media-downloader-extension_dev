@@ -26,7 +26,8 @@ export function getStoryCheckpoints() {
             localStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(parsed));
         }
         return parsed;
-    } catch (e) {
+    } catch (err) {
+        logErrorOnce('Story Checkpoint (read)', err);
         return {};
     }
 }
@@ -78,7 +79,8 @@ export function getCurrentStoryUsername() {
         let u = match[1].toLowerCase().trim();
         if (['highlights', 'direct', 'explore'].includes(u)) return null;
         return u;
-    } catch (e) {
+    } catch (err) {
+        logErrorOnce('Story Resume: current username', err);
         return null;
     }
 }

@@ -193,7 +193,6 @@ function injectDownloadButtons() {
 
         // Custom hover effects (Blue circle and tooltip)
         const hoverOverlay = clone.querySelector('.r-1p0dtai') || clone.querySelector('.r-zchlnj');
-        const iconContainer = clone.querySelector('svg').parentElement;
         
         // Create custom tooltip matching X native
         const tooltip = document.createElement('div');

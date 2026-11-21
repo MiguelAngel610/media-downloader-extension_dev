@@ -20,7 +20,7 @@ function getPfpDeclaredSize(url) {
     try {
         const parsed = new URL(url);
         haystack = `${parsed.searchParams.get('stp') || ''} ${parsed.pathname}`;
-    } catch (err) {
+    } catch {
         // Not an absolute URL (e.g. escaped JSON fragment): scan the raw string instead.
     }
     const match = haystack.match(/[_\-sp](\d{2,4})x(\d{2,4})/);
@@ -75,7 +75,7 @@ function pickLargestFromSrcset(srcset) {
  * @returns {string | null}
  */
 function findLargestInPageSource(src) {
-    let fileId = '';
+    let fileId;
     try {
         const pathParts = new URL(src).pathname.split('/');
         fileId = pathParts[pathParts.length - 1].split('.')[0];
