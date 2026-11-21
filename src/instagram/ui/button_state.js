@@ -239,24 +239,34 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
         }, (response) => {
             btn.classList.remove('md-loading');
 
+            // "queued" only means the request reached the host; the real result arrives later as host_response.
+            let failed = Boolean(chrome.runtime.lastError) || !response || response.status === 'error';
+            if (failed) {
+                let reason = chrome.runtime.lastError ? chrome.runtime.lastError.message : (response && response.message) || "Unknown error";
+                console.error("Media Downloader: download request rejected:", reason);
+                if (window.MDToastManager) window.MDToastManager.showError("❌ Download not started", 5000, reason);
+            }
+            let stateClass = failed ? 'md-error' : 'md-success';
+            let stateIcon = failed ? SVG_DOWNLOAD : SVG_CHECK;
+
             let activeStoryKey = (isStoryBtn || window.location.href.includes('/stories/')) ?
                 (typeof getStoryKey === 'function' ? getStoryKey() : window.location.pathname) : null;
 
             let isSameStory = !requestStoryKey || (activeStoryKey === requestStoryKey);
 
             if (isSameStory) {
-                btn.classList.add('md-success');
-                updateButtonIcon(btn, SVG_CHECK, isFloating);
+                btn.classList.add(stateClass);
+                updateButtonIcon(btn, stateIcon, isFloating);
             } else {
-                btn.classList.remove('md-success');
+                btn.classList.remove('md-success', 'md-error');
                 updateButtonIcon(btn, SVG_DOWNLOAD, isFloating);
             }
 
             if (parentArticle) {
                 parentArticle.__md_download_state = {
                     time: Date.now(),
-                    class: 'md-success',
-                    html: SVG_CHECK,
+                    class: stateClass,
+                    html: stateIcon,
                     isFloating: isFloating,
                     storyKey: requestStoryKey
                 };
@@ -264,7 +274,7 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
 
             setTimeout(() => {
                 if (isSameStory) {
-                    btn.classList.remove('md-success');
+                    btn.classList.remove('md-success', 'md-error');
                     updateButtonIcon(btn, SVG_DOWNLOAD, isFloating);
                 }
                 if (parentArticle && (!parentArticle.__md_download_state || parentArticle.__md_download_state.storyKey === requestStoryKey)) {

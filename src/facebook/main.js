@@ -48,9 +48,10 @@ window.addEventListener("message", (event) => {
             }, (response) => {
                 if (response && response.status === "queued") {
                     console.log("[FB-MD] Download queued in background:", shortcode);
-                } else if (response && response.status === "error") {
-                    console.error("[FB-MD] Queue error:", response);
-                    if (window.MDToastManager) window.MDToastManager.showError("❌ Error queuing download");
+                } else {
+                    const reason = chrome.runtime.lastError ? chrome.runtime.lastError.message : (response && response.message) || "Unknown error";
+                    console.error("[FB-MD] Queue error:", reason);
+                    if (window.MDToastManager) window.MDToastManager.showError("❌ Download not started", 5000, reason);
                 }
             });
         } else {

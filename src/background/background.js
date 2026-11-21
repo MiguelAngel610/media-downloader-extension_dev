@@ -1,308 +1,158 @@
-importScripts('/src/shared/utils/filename_formatter.js');
+/* Media Downloader - Service Worker entry point.
+ * Only wiring lives here: every event listener is registered synchronously at top level
+ * (required so Chrome can wake the worker for them); the work is delegated to modules. */
 
-const NATIVE_HOST = "com.media.downloader";
+importScripts(
+    '/src/shared/utils/filename_formatter.js',
+    '/src/background/session_store.js',
+    '/src/background/native_host.js',
+    '/src/background/backup_coordinator.js',
+    '/src/background/photo_date_namer.js'
+);
 
-// Disable Chrome's intrusive download tray/bubble/shelf UI during downloads
+const CDN_TIMESTAMP_TIMEOUT_MS = 3000;
+const SUPPORTED_PLATFORMS = Object.freeze([
+    { platform: 'instagram', hosts: ['instagram.com'] },
+    { platform: 'facebook', hosts: ['facebook.com', 'fb.watch'] },
+    { platform: 'twitter', hosts: ['x.com', 'twitter.com'] },
+]);
+
+const backupCoordinator = self.createBackupCoordinator(MDNativeHost.postHostLog);
+
+/** Disables Chrome's download bubble/shelf so downloads don't interrupt browsing. */
 function disableChromeDownloadUI() {
+    if (chrome.downloads && typeof chrome.downloads.setUiOptions === 'function') {
+        chrome.downloads.setUiOptions({ enabled: false })
+            .catch((err) => console.warn('Could not disable download UI via setUiOptions:', err.message));
+    } else if (chrome.downloads && typeof chrome.downloads.setShelfEnabled === 'function') {
+        chrome.downloads.setShelfEnabled(false);
+    }
+}
+
+/**
+ * @param {string} url
+ * @returns {string | null}
+ */
+function detectPlatform(url) {
+    let hostname;
     try {
-        if (chrome.downloads && typeof chrome.downloads.setUiOptions === "function") {
-            chrome.downloads.setUiOptions({ enabled: false }, () => {
-                if (chrome.runtime.lastError) {
-                    console.warn("Could not disable download UI via setUiOptions:", chrome.runtime.lastError.message);
-                } else {
-                    console.log("Chrome download UI successfully silenced.");
-                }
-            });
-        } else if (chrome.downloads && typeof chrome.downloads.setShelfEnabled === "function") {
-            chrome.downloads.setShelfEnabled(false);
-            console.log("Chrome download shelf silenced via legacy API.");
-        }
-    } catch (e) {
-        console.warn("Error trying to silence Chrome download UI:", e);
+        hostname = new URL(url).hostname.toLowerCase();
+    } catch (err) {
+        return null;
+    }
+    const match = SUPPORTED_PLATFORMS.find(({ hosts }) => hosts.some((h) => hostname === h || hostname.endsWith(`.${h}`)));
+    return match ? match.platform : null;
+}
+
+/**
+ * Last-Modified of a CDN file (upload date for profile pictures). Aborts right after the headers.
+ * @param {unknown} url
+ * @returns {Promise<{ timestamp: number }>}
+ */
+async function fetchCdnTimestamp(url) {
+    const now = Math.floor(Date.now() / 1000);
+    if (typeof url !== 'string' || !url.startsWith('https://')) return { timestamp: now };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CDN_TIMESTAMP_TIMEOUT_MS);
+    try {
+        const response = await fetch(url, { method: 'GET', signal: controller.signal });
+        const lastModified = response.headers.get('Last-Modified');
+        controller.abort(); // only the headers were needed: skip downloading the image body
+        const date = lastModified ? new Date(lastModified) : null;
+        return { timestamp: date && !isNaN(date.getTime()) ? Math.floor(date.getTime() / 1000) : now };
+    } catch (err) {
+        console.warn('[CDN] Could not read Last-Modified, using current time:', err.message);
+        return { timestamp: now };
+    } finally {
+        clearTimeout(timeoutId);
     }
 }
 
-disableChromeDownloadUI();
-
-let downloadQueue = [];
-let isProcessing = false;
-let nativePort = null;
-let backupQueue = [];
-let isBackingUp = false;
-let currentBackupTabId = null;
-
-function connectToNativeHost() {
-    console.log("Connecting to Native Host...");
-    nativePort = chrome.runtime.connectNative(NATIVE_HOST);
-
-    nativePort.onMessage.addListener((message) => {
-        console.log("Received from host via port:", message);
-        if (message.action === "start_backup") {
-            console.log("Starting backup for users:", message.users);
-            backupQueue = backupQueue.concat(message.users);
-            processBackupQueue();
-        } else if (message.action === "stop_backup") {
-            console.log("Stopping backup...");
-            backupQueue = [];
-            isBackingUp = false;
-            if (currentBackupTabId) {
-                try {
-                    chrome.tabs.remove(currentBackupTabId);
-                } catch (e) { }
-                currentBackupTabId = null;
-            }
-            if (nativePort) {
-                nativePort.postMessage({ action: "backup_log", status: "error", message: `\n[Backup] 🛑 Stopped manually by user.` });
-            }
-        } else if (message.status) {
-            // Drop progress updates completely as requested by the user to avoid yt-dlp bugs and IPC spam
-            if (message.status === 'progress') {
-                return;
-            }
-
-            // General response from host (e.g. success or error for a download)
-            chrome.tabs.query({}, (tabs) => {
-                for (let tab of tabs) {
-                    chrome.tabs.sendMessage(tab.id, { action: "host_response", response: message }).catch(() => {});
-                }
-            });
-        }
-    });
-
-    nativePort.onDisconnect.addListener(() => {
-        console.error("Native host disconnected", chrome.runtime.lastError);
-        nativePort = null;
-        setTimeout(connectToNativeHost, 5000);
-    });
-}
-
-connectToNativeHost();
-
-let currentBackupCuenta = "M";
-let currentBackupUsername = null;
-
-function processBackupQueue() {
-    if (isBackingUp || backupQueue.length === 0) return;
-
-    isBackingUp = true;
-    let target = backupQueue.shift();
-    let username = typeof target === 'object' ? target.username : target;
-    currentBackupCuenta = typeof target === 'object' ? (target.cuenta || "M") : "M";
-    currentBackupUsername = username;
-
-    console.log(`Processing backup for: ${username} (Account: ${currentBackupCuenta})`);
-
-    // Tell TCP clients we started
-    if (nativePort) {
-        nativePort.postMessage({ action: "backup_log", status: "info", message: `\n[Backup] Starting backup for @${username}...` });
+/**
+ * @param {{ url?: string, filename?: string }} request
+ * @returns {Promise<{ success: boolean, downloadId?: number, error?: string }>}
+ */
+async function downloadInBrowser(request) {
+    disableChromeDownloadUI();
+    try {
+        const downloadId = await chrome.downloads.download({
+            url: request.url,
+            filename: request.filename || 'download.jpeg',
+            conflictAction: 'uniquify',
+        });
+        return { success: true, downloadId };
+    } catch (err) {
+        return { success: false, error: err.message };
     }
-
-    chrome.tabs.create({ url: `https://www.instagram.com/${username}/`, active: false }, (tab) => {
-        currentBackupTabId = tab.id;
-        // Content script auto_backup.js will take over in this tab.
-        // It will signal back when done via "backup_user_done"
-    });
 }
+
+/**
+ * @param {Record<string, any>} request
+ * @returns {import('./native_host.js').HostRequest}
+ */
+function toHostRequest(request) {
+    return {
+        url: request.url,
+        account: request.account,
+        mediaType: request.mediaType,
+        platform: request.platform || 'auto',
+        direct_metadata: request.direct_metadata || null,
+    };
+}
+
+/** Quick Download from the popup: the platform is detected from the pasted URL. */
+async function downloadPastedUrl(request) {
+    const url = typeof request.url === 'string' ? request.url.trim() : '';
+    const platform = detectPlatform(url);
+    if (!platform) {
+        return { status: 'error', message: 'Unsupported link. Paste an Instagram, Facebook or X URL.' };
+    }
+    const { selectedAccount } = await chrome.storage.local.get('selectedAccount');
+    return MDNativeHost.sendDownloadRequest(
+        toHostRequest({ url, platform, mediaType: 'auto', account: selectedAccount || 'M' }), null);
+}
+
+/** @type {Record<string, (request: Record<string, any>, sender: chrome.runtime.MessageSender) => unknown>} */
+const messageRoutes = {
+    queue_download: (request, sender) => MDNativeHost.sendDownloadRequest(toHostRequest(request), sender.tab ? sender.tab.id : null),
+    download_url: (request) => downloadPastedUrl(request),
+    browser_download: (request) => downloadInBrowser(request),
+    get_cdn_timestamp: (request) => fetchCdnTimestamp(request.url),
+    backup_user_done: (request, sender) => backupCoordinator.onUserDone(sender.tab.id, request.username),
+    backup_log: (request) => {
+        MDNativeHost.postHostLog('info', String(request.message || ''));
+        return { ok: true };
+    },
+    check_backup_status: (request, sender) => backupCoordinator.getStatusForTab(sender.tab ? sender.tab.id : undefined),
+};
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    const route = request && messageRoutes[request.action];
+    if (!route) return false;
+    Promise.resolve()
+        .then(() => route(request, sender))
+        .then(sendResponse, (err) => {
+            console.error(`[Background] '${request.action}' failed:`, err);
+            sendResponse({ status: 'error', message: err && err.message ? err.message : String(err) });
+        });
+    return true; // keep the channel open for the async response
+});
+
+MDNativeHost.onHostCommand((message) => {
+    const task = message.action === 'start_backup' ? backupCoordinator.enqueue(message.users) : backupCoordinator.stop();
+    task.catch((err) => console.error(`[Background] ${message.action} failed:`, err));
+});
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-    if (isBackingUp && tabId === currentBackupTabId) {
-        console.log(`Backup tab ${tabId} was closed externally.`);
-        currentBackupTabId = null;
-        isBackingUp = false;
-
-        if (nativePort) {
-            nativePort.postMessage({ action: "backup_log", status: "error", message: `\n[Backup] ⚠️ Tab was closed externally. Moving to next user...` });
-        }
-
-        setTimeout(processBackupQueue, 1000);
-    }
+    backupCoordinator.onTabRemoved(tabId).catch((err) => console.error('[Background] onTabRemoved failed:', err));
 });
 
-// Listen for messages from content.js or popup.js
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "queue_download") {
-        downloadQueue.push(request);
-        sendResponse({ status: "queued" });
-        processQueue();
-        return true;
-    } else if (request.action === "browser_download") {
-        disableChromeDownloadUI();
-        chrome.downloads.download({
-            url: request.url,
-            filename: request.filename || "download.jpeg",
-            conflictAction: "uniquify"
-        }, (downloadId) => {
-            if (chrome.runtime.lastError) {
-                sendResponse({ success: false, error: chrome.runtime.lastError.message });
-            } else {
-                sendResponse({ success: true, downloadId: downloadId });
-            }
-        });
-        return true;
-    } else if (request.action === "get_cdn_timestamp") {
-        let hdUrl = request.url;
-        if (!hdUrl) {
-            sendResponse({ timestamp: Math.floor(Date.now() / 1000) });
-            return true;
-        }
-
-        let controller = new AbortController();
-        let timeoutId = setTimeout(() => controller.abort(), 3000); // 3 sec timeout
-
-        fetch(hdUrl, { method: 'GET', signal: controller.signal })
-            .then(res => {
-                clearTimeout(timeoutId);
-                let lastMod = res.headers.get('Last-Modified');
-
-                // Abortar la descarga del cuerpo de la imagen inmediatamente (solo queriamos las cabeceras)
-                controller.abort();
-
-                let d = lastMod ? new Date(lastMod) : new Date();
-                let unixTime = Math.floor(d.getTime() / 1000);
-                sendResponse({ timestamp: unixTime });
-            })
-            .catch(err => {
-                // Fetch aborted intentionally or network error
-                clearTimeout(timeoutId);
-                let unixTime = Math.floor(Date.now() / 1000);
-                sendResponse({ timestamp: unixTime });
-            });
-
-        return true;
-    }
+chrome.alarms.onAlarm.addListener((alarm) => {
+    MDNativeHost.handleAlarm(alarm);
+    backupCoordinator.handleAlarm(alarm);
 });
 
-function processQueue() {
-    if (isProcessing || downloadQueue.length === 0) return;
+chrome.downloads.onDeterminingFilename.addListener(MDPhotoDateNamer.handleDeterminingFilename);
 
-    isProcessing = true;
-    const request = downloadQueue.shift();
-
-    sendToNativeHost(request, (response) => {
-        isProcessing = false;
-        processQueue();
-    });
-}
-
-function sendToNativeHost(request, sendResponse) {
-    console.log(`Sending to host: ${request.url} using account ${request.account} with mediaType ${request.mediaType}`);
-
-    try {
-        let message = {
-            url: request.url,
-            account: request.account,
-            mediaType: request.mediaType,
-            platform: request.platform || "auto",
-            direct_metadata: request.direct_metadata || null
-        };
-
-        if (nativePort) {
-            nativePort.postMessage(message);
-            sendResponse({ status: "success", message: "Sent via persistent port" });
-        } else {
-            console.warn("Native port not connected, attempting to reconnect...");
-            connectToNativeHost();
-            // Retry sending in 1 second
-            setTimeout(() => {
-                if (nativePort) nativePort.postMessage(message);
-            }, 1000);
-            sendResponse({ status: "queued", message: "Waiting for port reconnect" });
-        }
-    } catch (e) {
-        console.error("Failed to connect to native host:", e);
-        sendResponse({ status: "error", message: e.toString() });
-    }
-}
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    // Other existing listeners handled above
-    if (request.action === "backup_user_done") {
-        console.log(`Finished backup for tab ${sender.tab.id}. Closing tab.`);
-        if (nativePort) {
-            nativePort.postMessage({ action: "backup_log", status: "success", message: `[Backup] Finished processing @${request.username}.` });
-        }
-        chrome.tabs.remove(sender.tab.id);
-        isBackingUp = false;
-        setTimeout(processBackupQueue, 2000); // 2 second delay between users to avoid ratelimits
-        return true;
-    }
-
-    if (request.action === "backup_log") {
-        if (nativePort) {
-            nativePort.postMessage({ action: "backup_log", status: "info", message: request.message });
-        }
-        return true;
-    }
-
-    if (request.action === "check_backup_status") {
-        if (isBackingUp && sender.tab && sender.tab.id === currentBackupTabId) {
-            // Find username from URL
-            let usernameMatch = sender.tab.url.match(/instagram\.com\/([^\/?#]+)/);
-            let username = usernameMatch ? usernameMatch[1] : "unknown";
-            sendResponse({ isBackingUp: true, username: currentBackupUsername || username, cuenta: currentBackupCuenta });
-        } else {
-            sendResponse({ isBackingUp: false });
-        }
-        return true;
-    }
-});
-
-// Intercept downloads from Google Photos and iCloud to format their filenames
-chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
-    const url = (item.url || "").toLowerCase();
-    const referrer = (item.referrer || "").toLowerCase();
-    
-    const isGooglePhotos = url.includes('googleusercontent.com') || url.includes('photos.google.com') || referrer.includes('photos.google.com');
-    const isICloud = url.includes('icloud-content.com') || url.includes('icloud.com') || referrer.includes('icloud.com');
-
-    if (isGooglePhotos || isICloud) {
-        const extMatch = item.filename.match(/\.([^.]+)$/);
-        const ext = extMatch ? `.${extMatch[1]}` : "";
-        const baseName = item.filename.replace(/\.[^.]+$/, "");
-        const hasDateAlready = /^\d{8}_\d{6}/.test(baseName);
-         chrome.tabs.query({}, (tabs) => {
-            const targetTime = new Date(item.startTime).getTime();
-            let responded = false;
-            let pendingRequests = tabs.length;
-            
-            if (tabs.length === 0) {
-                if (!hasDateAlready) {
-                    const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(item.startTime));
-                    suggest({ filename: `${datePrefix}_${baseName}${ext}`, conflictAction: "uniquify" });
-                } else {
-                    suggest();
-                }
-                return;
-            }
-
-            for (let tab of tabs) {
-                chrome.tabs.sendMessage(tab.id, { action: "get_photo_date_at_time", time: targetTime }, (response) => {
-                    pendingRequests--;
-                    if (chrome.runtime.lastError) {
-                        // ignore error for tabs without our script
-                    } else if (!responded && response && response.success && response.timestamp) {
-                        responded = true;
-                        const includeSeconds = response.hasSeconds !== false;
-                        const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(response.timestamp), includeSeconds);
-                        const finalName = `${datePrefix}_${baseName}${ext}`;
-                        suggest({ filename: finalName, conflictAction: "uniquify" });
-                        chrome.tabs.sendMessage(tab.id, { action: "show_download_toast", filename: finalName, hasSeconds: includeSeconds });
-                    }
-                    
-                    if (pendingRequests === 0 && !responded) {
-                        if (!hasDateAlready) {
-                            const datePrefix = self.MDFilenameFormatter.formatDateTime(new Date(item.startTime));
-                            const finalName = `${datePrefix}_${baseName}${ext}`;
-                            suggest({ filename: finalName, conflictAction: "uniquify" });
-                            chrome.tabs.sendMessage(tab.id, { action: "show_download_toast", filename: finalName, hasSeconds: true });
-                        } else {
-                            suggest();
-                        }
-                    }
-                });
-            }
-        });
-        
-        return true; // Indicates suggest() is called asynchronously
-    }
-});
+disableChromeDownloadUI();
+MDNativeHost.connectNativeHost();

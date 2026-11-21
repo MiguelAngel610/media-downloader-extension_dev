@@ -822,24 +822,35 @@ class MediaManager:
             
         return res
 
-def main():
+def _with_request_id(result: Dict[str, Any], request_id: Any) -> Dict[str, Any]:
+    """The extension routes each result to the tab that asked for it by this id."""
+    if isinstance(request_id, str) and request_id:
+        return dict(result, request_id=request_id)
+    return result
+
+def main() -> None:
     EnvironmentSetup.inject_paths()
     tcp_server = TCPServer()
     tcp_server.start()
-    
+    # Lets the extension flush requests it queued while this process was starting.
+    NativeMessaging.send_message({"action": "host_ready"})
+
     while True:
+        msg: Dict[str, Any] = {}
         try:
             msg = NativeMessaging.get_message()
             if "url" in msg:
                 mediaType = msg.get("mediaType", "auto")
                 result = MediaManager.process_request(msg, msg.get("platform", "auto"), msg.get("account", "M"), mediaType)
-                NativeMessaging.send_message(result)
+                NativeMessaging.send_message(_with_request_id(result, msg.get("request_id")))
             elif "status" in msg and msg.get("action") == "backup_log":
                 Logger.broadcast_log(msg.get("message", ""))
             else:
-                NativeMessaging.send_message({"status": "error", "message": "No URL provided"})
+                Logger.log_info(f"Ignored native message without url/action: {list(msg.keys())}")
         except Exception as e:
-            NativeMessaging.send_message({"status": "error", "message": str(e)})
+            # Last-resort isolation: one bad request must never kill the host loop.
+            Logger.log_info(f"Unhandled error while processing request: {e!r}")
+            NativeMessaging.send_message(_with_request_id({"status": "error", "message": str(e)}, msg.get("request_id")))
 
 if __name__ == '__main__':
     main()

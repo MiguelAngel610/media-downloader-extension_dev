@@ -247,12 +247,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>Procesando...</span>
         `;
 
-        chrome.runtime.sendMessage({
-            action: "download",
-            url: url,
-            mediaType: "auto",
-            platform: "auto"
-        }, (response) => {
+        // The service worker detects the platform from the URL and forwards it to the Python host.
+        chrome.runtime.sendMessage({ action: "download_url", url: url }, (response) => {
             downloadBtn.disabled = false;
             downloadBtn.innerHTML = `
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -263,12 +259,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span>Descargar Ahora</span>
             `;
 
-            if (chrome.runtime.lastError || !response || response.status === "error") {
+            if (chrome.runtime.lastError) {
+                console.error("[Popup] Quick download message failed:", chrome.runtime.lastError.message);
+                showStatus("Error al conectar con la extensión.", "error");
+            } else if (!response || response.status === "error") {
                 showStatus(response?.message || "Error al conectar con el Host Nativo.", "error");
-            } else if (response.status === "skipped") {
-                showStatus("El archivo ya existe en tu PC.", "success");
             } else {
-                showStatus("Descarga iniciada con éxito.", "success");
+                showStatus("Descarga enviada. Revisa tu carpeta gallery-dl.", "success");
             }
         });
     });

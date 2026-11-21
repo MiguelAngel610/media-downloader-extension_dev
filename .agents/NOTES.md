@@ -137,3 +137,19 @@
 - Símbolos sin uso: `FB_DOWNLOAD_SVG`, `window.__md_activeStorySegment` (solo escritura), alias `window.__md_handleGhostBlock`.
 - `.trash/` deja de estar trackeado (los 3 scripts antiguos siguen en disco).
 **Falsos positivos descartados:** `start_backup/stop_backup` (llegan por el puerto nativo), `host_response`, `get_photo_date_at_time`, `show_download_toast` (enviados con `chrome.tabs.sendMessage(tabId, …)`), `MD_UPDATE_SETTINGS` (vía `notifyInstagram`).
+
+## Service Worker sin Estado, Fallback del Host y Respuestas por Pestaña (§6, §9)
+**Fecha:** 21 de Noviembre 2026
+**Estado:** RESUELTO (test de comportamiento 20/20 con APIs chrome.* simuladas, incluye reinicio del worker a mitad de un backup; protocolo real stdin/stdout del host 4/4)
+**Problemas:**
+1. **Quick Download del popup roto (bug silencioso):** enviaba `action: "download"` y ningún listener lo manejaba → siempre "Error al conectar con el Host Nativo".
+2. **Estado en globals (§6):** `downloadQueue`, `backupQueue`, `isBackingUp`, `currentBackupTabId`… se perdían al suspenderse el worker (según docs oficiales: 30s inactivo o al cerrarse el puerto nativo), dejando backups colgados. Reintentos con `setTimeout`.
+3. **Sin fallback del host (§9):** si el host no estaba instalado reintentaba cada 5s para siempre y el mensaje se perdía tras 1s; el usuario no se enteraba.
+4. **✅ falso y toasts en pestañas ajenas:** el resultado del host se enviaba a TODAS las pestañas; el botón marcaba éxito con solo encolar.
+**Solución (APIs verificadas con Context7):**
+- `background.js` queda solo como cableado (listeners top-level + tabla de rutas `messageRoutes`). Módulos: `session_store.js` (read/update atómico sobre `chrome.storage.session`), `native_host.js` (puerto, outbox, `request_id`, reconexión con `chrome.alarms`), `backup_coordinator.js` (cola persistida + pausas con alarms), `photo_date_namer.js` (lógica movida sin cambios de comportamiento).
+- Protocolo: el host envía `{"action":"host_ready"}` al arrancar y devuelve `request_id` en cada resultado; el worker entrega el resultado solo a la pestaña que lo pidió.
+- Host no instalado ("not found"/"forbidden"): error explícito con instrucciones de instalación al instante, outbox vaciado (sin descargas sorpresa), reintento cada 60s. Caída del host: solo fallan las peticiones en vuelo; las del outbox se reenvían al reconectar.
+- `download_url`: el popup pega una URL y el worker detecta la plataforma (instagram/facebook/twitter).
+- `button_state.js` y `facebook/main.js` muestran el error real (toast + `md-error`) en vez del ✅.
+- Permiso nuevo `alarms` en `manifest.json`. Los nombres de usuario del backup se validan (`^[A-Za-z0-9._]{1,30}$`).
