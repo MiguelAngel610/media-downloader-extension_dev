@@ -46,7 +46,7 @@
                 const clone = response.clone();
                 clone.text().then(text => {
                     extractTimestampsAndNotify(text);
-                }).catch(e => {});
+                }).catch((err) => console.warn('[GP-MD] Could not read intercepted response body:', err));
             } catch(e) {
                 // Ignore clone errors
             }

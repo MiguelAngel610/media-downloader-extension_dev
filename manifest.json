@@ -47,6 +47,7 @@
         "*://*.instagram.com/*"
       ],
       "js": [
+        "src/shared/utils/error_reporter.js",
         "src/shared/utils/toast_manager.js",
         "src/shared/utils/dom_observer.js",
         "src/shared/utils/shortcut_manager.js",
@@ -80,6 +81,7 @@
         "*://*.twitter.com/*"
       ],
       "js": [
+        "src/shared/utils/error_reporter.js",
         "src/shared/utils/toast_manager.js",
         "src/shared/utils/dom_observer.js",
         "src/shared/utils/shortcut_manager.js",
@@ -97,6 +99,7 @@
         "*://*.facebook.com/*"
       ],
       "js": [
+        "src/shared/utils/error_reporter.js",
         "src/shared/utils/toast_manager.js",
         "src/shared/utils/dom_observer.js",
         "src/shared/utils/shortcut_manager.js",
@@ -119,6 +122,7 @@
         "*://webz.telegram.org/*"
       ],
       "js": [
+        "src/shared/utils/error_reporter.js",
         "src/shared/utils/toast_manager.js",
         "src/shared/utils/dom_observer.js",
         "src/shared/utils/shortcut_manager.js",
@@ -146,6 +150,7 @@
         "*://photos.google.com/*"
       ],
       "js": [
+        "src/shared/utils/error_reporter.js",
         "src/shared/utils/toast_manager.js",
         "src/shared/utils/date_parser.js",
         "src/google_photos/main.js"
@@ -160,6 +165,7 @@
         "*://*.icloud.com/*"
       ],
       "js": [
+        "src/shared/utils/error_reporter.js",
         "src/shared/utils/toast_manager.js",
         "src/shared/utils/shortcut_manager.js",
         "src/shared/utils/date_parser.js",

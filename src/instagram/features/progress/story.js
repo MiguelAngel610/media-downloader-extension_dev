@@ -247,7 +247,7 @@ export function syncStoryProgressBar() {
                                 }
                                 anim.currentTime = (pct / 100) * dur;
                                 if (anim.playState === 'finished' && pct < 99) {
-                                    try { anim.play(); } catch(e) {}
+                                    try { anim.play(); } catch (err) { window.MDErrorReporter.reportError('IG Story Progress: resume animation', err); }
                                 }
                             }
                         }

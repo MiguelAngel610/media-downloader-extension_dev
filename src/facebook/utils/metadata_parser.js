@@ -96,7 +96,7 @@ class FBMetadataParser {
                                         }
                                     }
                                 }
-                            } catch (e) {}
+                            } catch (err) { window.MDErrorReporter.reportError('FB Metadata: handle lookup', err); }
                         }
                         
                         if (foundHandle) {
@@ -213,7 +213,7 @@ class FBMetadataParser {
                 let decoded = atob(metadata.shortcode);
                 let numMatch = decoded.match(/\d+/);
                 if (numMatch) metadata.shortcode = numMatch[0];
-            } catch(e) {}
+            } catch (err) { if (err.name !== 'InvalidCharacterError') window.MDErrorReporter.reportError('FB Metadata: shortcode decode', err); /* not base64: keep as-is */ }
         }
 
         return metadata;

@@ -1,4 +1,4 @@
-import { mdLog } from './logger.js';
+import { mdLog, logErrorOnce } from './logger.js';
 import { clearStoryCheckpoint } from './story_resume.js';
 import { pickBestImageUrl, pickBestVideoUrl } from './media_quality.js';
 import { recordProfilePic, flushProfilePics } from './profile_pic_collector.js';
@@ -98,7 +98,7 @@ export function processAndPostData(data) {
     let seenModified = false;
     try {
         seenUsers = JSON.parse(localStorage.getItem('md_ghost_seen_users') || '{}');
-    } catch(e) {}
+    } catch (err) { logErrorOnce('Ghost Seen Store (read)', err); }
     
     let seenKeys = Object.keys(seenUsers);
     let checkResetFn = null;
@@ -129,7 +129,7 @@ export function processAndPostData(data) {
         try {
             localStorage.setItem('md_ghost_seen_users', JSON.stringify(seenUsers));
             if (window.__md_applyGhostVisuals) window.__md_applyGhostVisuals();
-        } catch(e) {}
+        } catch (err) { logErrorOnce('Ghost Seen Store (write)', err); }
     }
     
     window.postMessage({ type: 'MD_STORY_MEDIA_UPDATE', media: window.__md_storyMedia }, '*');

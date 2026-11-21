@@ -23,3 +23,20 @@ export function logError(context, error) {
         "background: #1e293b; color: #f8fafc; font-size: 11px; border-radius: 0 4px 4px 0; padding: 2px 8px;"
     );
 }
+
+const MAX_DISTINCT_ERRORS = 200;
+/** @type {Set<string>} */
+const reportedErrorKeys = new Set();
+
+/**
+ * Same as logError, but each distinct (context, message) is logged once: for recursive
+ * React/JSON walks and timers, where a single bad object would otherwise flood the console.
+ * @param {string} context
+ * @param {unknown} error
+ */
+export function logErrorOnce(context, error) {
+    const key = `${context}|${error instanceof Error ? error.message : String(error)}`;
+    if (reportedErrorKeys.has(key) || reportedErrorKeys.size >= MAX_DISTINCT_ERRORS) return;
+    reportedErrorKeys.add(key);
+    logError(context, error);
+}

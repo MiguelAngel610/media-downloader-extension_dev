@@ -162,3 +162,16 @@
 3. **Zero Silent Errors:** los 8 `except:` desnudos/`except Exception: pass` restantes se reemplazaron por excepciones específicas con log (`remove_if_exists()` para limpiezas: solo `FileNotFoundError` se ignora).
 4. **Código muerto (soft delete a `.trash/dead_code_2026-11-21/host_dead_paths.py`):** rama `pfp_bot` (nadie setea `is_pfp_bot`; apuntaba a `Downloads/Carpetas_Mixtas`, que no existe) y el hook de progreso de yt-dlp (la extensión descarta todo `progress`).
 5. Strings y comentarios restantes en español traducidos al inglés.
+
+## Zero Silent Errors: 45 `catch {}` Vacíos Eliminados
+**Fecha:** 21 de Noviembre 2026
+**Estado:** RESUELTO (0 catch vacíos en `src/`; 5 suites de regresión en verde)
+**Criterio aplicado:**
+1. **Errores esperados** → se ignora SOLO ese tipo y se documenta por qué: `SyntaxError` de `JSON.parse` en líneas parciales de streams (FB/X), `InvalidCharacterError` de `atob` en ids que no son base64 (FB), `URIError` de `decodeURIComponent` en manifests no codificados (IG). Cualquier otro error se registra.
+2. **Bucles calientes** (rAF a 60fps, recorridos recursivos de React/JSON) → log deduplicado: cada par (contexto, mensaje) se muestra una vez por página.
+3. **Resto** → log con contexto.
+**Infraestructura (DRY):**
+- `src/shared/utils/error_reporter.js` → `window.MDErrorReporter.reportError(context, err)`; se carga primero en cada grupo ISOLATED del manifest.
+- MAIN world IG: `logErrorOnce()` en `interceptors/core/logger.js`.
+- Interceptores MAIN de FB/X/Google Photos (scripts sueltos sin acceso al reporter): `console.warn` con prefijo de plataforma.
+**Mejora colateral:** si `fiber_search.js` falla, ahora responde `MD_FIBER_RESULT { error: true }` al instante en vez de dejar al resolver esperando su timeout.

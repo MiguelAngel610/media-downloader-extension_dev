@@ -30,7 +30,7 @@ function getStoryKey() {
             let params = new URLSearchParams(window.location.search);
             let queryMediaId = params.get('story_media_id');
             if (queryMediaId) storyId = queryMediaId;
-        } catch (e) {}
+        } catch (err) { window.MDErrorReporter.reportError('IG: story_media_id query param', err); }
         if (storyId) return userOrType + '/' + storyId;
         return userOrType;
     }
@@ -153,7 +153,7 @@ function sendDownloadRequest(btn, url, metadata, isFloating = false, originalEle
             if (urlFilename && urlFilename.includes('_')) {
                 metadata.media_id = urlFilename.split('.')[0];
             }
-        } catch (e) {}
+        } catch (err) { window.MDErrorReporter.reportError('IG: media id from URL', err); }
     }
 
     if (!chrome.runtime || !chrome.runtime.id) {

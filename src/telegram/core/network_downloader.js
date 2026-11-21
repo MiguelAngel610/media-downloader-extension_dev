@@ -145,14 +145,14 @@
             if (metadata.fileName) {
                 fileName = metadata.fileName;
             }
-        } catch (e) {}
+        } catch (err) { window.MDErrorReporter.reportError('TG Download: metadata filename', err); }
 
         logger.info(`URL: ${url}`, fileName);
 
         // Cleans up a partially-written file so we never leave a truncated artifact on disk.
         const abortWritable = (_writable) => {
             if (_writable && typeof _writable.abort === "function") {
-                _writable.abort().catch(() => {});
+                _writable.abort().catch((err) => window.MDErrorReporter.reportError('TG Download: abort partial file', err));
             }
         };
 

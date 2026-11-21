@@ -172,7 +172,7 @@ function injectFeedButtons() {
                         if (style.overflow === 'hidden' || style.overflowX === 'hidden' || style.overflowY === 'hidden' || style.clipPath !== 'none') {
                             break;
                         }
-                    } catch(e) {}
+                    } catch (err) { window.MDErrorReporter.reportError('IG Feed: clip parent style', err); }
                     clipParent = clipParent.parentElement;
                 }
                 carouselContainer = clipParent || carouselUl.parentElement;

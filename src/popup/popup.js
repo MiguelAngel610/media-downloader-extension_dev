@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function notifyInstagram(msg) {
         chrome.tabs.query({ url: "*://*.instagram.com/*" }, function(tabs) {
             for (const tab of tabs) {
-                chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
+                chrome.tabs.sendMessage(tab.id, msg).catch((err) => console.warn(`[Popup] Instagram tab ${tab.id} did not receive settings (reload it):`, err.message));
             }
         });
     }

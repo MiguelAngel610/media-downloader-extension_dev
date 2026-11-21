@@ -1,4 +1,4 @@
-import { mdLog } from './logger.js';
+import { mdLog, logError, logErrorOnce } from './logger.js';
 import { pickBestImageUrl, pickBestVideoUrl } from './media_quality.js';
 import { extractMediaTimestamp } from './time_utils.js';
 window.addEventListener('message', function(event) {
@@ -97,7 +97,7 @@ window.addEventListener('message', function(event) {
                                 searchProps(carouselArray[i], depth + 1, visited, myCode, i);
                                 if (foundDash && foundUser && foundTime) return;
                             }
-                        } catch (e) { }
+                        } catch (err) { logErrorOnce('Fiber: carousel item', err); /* exotic React props can throw on access */ }
                     }
                     // Continue recursing other properties to ensure we don't miss deeply nested user/time
                     for (let k of Object.keys(obj)) {
@@ -108,7 +108,7 @@ window.addEventListener('message', function(event) {
                                     if (foundDash && foundUser && foundTime) return;
                                 }
                             }
-                        } catch (e) { }
+                        } catch (err) { logErrorOnce('Fiber: carousel sibling prop', err); }
                     }
                     return; // Skip media extraction for the container itself
                 }
@@ -205,7 +205,7 @@ window.addEventListener('message', function(event) {
                             searchProps(obj[k], depth + 1, visited, myCode, possibleIndex);
                             if (foundDash && foundUser && foundTime) return;
                         }
-                    } catch (e) { }
+                    } catch (err) { logErrorOnce('Fiber: prop walk', err); }
                 }
             }
 
@@ -308,7 +308,7 @@ window.addEventListener('message', function(event) {
                     if (!foundTime) foundTime = extractMediaTimestamp(obj);
 
                     if ((foundDash && foundUser && foundTime) || (foundUrl && foundUser && foundTime)) return;
-                    for (let k of Object.keys(obj)) { try { if (obj[k] && typeof obj[k] === 'object') { searchObjStrict(obj[k], depth + 1); if ((foundDash && foundUser && foundTime) || (foundUrl && foundUser && foundTime)) return; } } catch (e) { } }
+                    for (let k of Object.keys(obj)) { try { if (obj[k] && typeof obj[k] === 'object') { searchObjStrict(obj[k], depth + 1); if ((foundDash && foundUser && foundTime) || (foundUrl && foundUser && foundTime)) return; } } catch (err) { logErrorOnce('Fiber: DOM props walk', err); } }
                 }
 
                 let current = el;
@@ -342,7 +342,7 @@ window.addEventListener('message', function(event) {
                     }
 
                     let keys = Object.keys(obj);
-                    for (let k of keys) { try { if (obj[k] && typeof obj[k] === 'object') searchInitial(obj[k], depth + 1); } catch (e) { } }
+                    for (let k of keys) { try { if (obj[k] && typeof obj[k] === 'object') searchInitial(obj[k], depth + 1); } catch (err) { logErrorOnce('Fiber: initial data walk', err); } }
                 }
 
                 if (window.__initialData) searchInitial(window.__initialData, 0);
@@ -366,7 +366,7 @@ window.addEventListener('message', function(event) {
             } else {
                 window.postMessage({ type: 'MD_FIBER_RESULT', id: id, error: true, media_id: foundId, shortcode: foundCode }, '/');
             }
-        } catch (e) { }
+        } catch (err) { logError('Fiber: request', err); window.postMessage({ type: 'MD_FIBER_RESULT', id: event.data.id, error: true }, '/'); }
     }
 });
 

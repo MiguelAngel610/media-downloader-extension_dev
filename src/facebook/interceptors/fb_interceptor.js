@@ -258,12 +258,12 @@
                                 let json = JSON.parse(line);
                                 window.__FB_JSON_CACHE__.push(json);
                                 if (window.__FB_JSON_CACHE__.length > 30) window.__FB_JSON_CACHE__.shift();
-                            } catch (err) {}
+                            } catch (err) { if (!(err instanceof SyntaxError)) console.warn('[FB-MD] Stream line handling failed:', err); /* partial/non-JSON lines are expected */ }
                         }
                     }
-                }).catch(() => { });
+                }).catch((err) => console.warn('[FB-MD] Could not read intercepted response body:', err));
             }
-        } catch (e) { }
+        } catch (err) { console.warn('[FB-MD] Fetch interception failed:', err); }
         return response;
     };
 
@@ -290,11 +290,11 @@
                                         let json = JSON.parse(line);
                                         window.__FB_JSON_CACHE__.push(json);
                                         if (window.__FB_JSON_CACHE__.length > 30) window.__FB_JSON_CACHE__.shift();
-                                    } catch (err) {}
+                                    } catch (err) { if (!(err instanceof SyntaxError)) console.warn('[FB-MD] Stream line handling failed:', err); /* partial/non-JSON lines are expected */ }
                                 }
                             }
                         }
-                    } catch (e) { }
+                    } catch (err) { console.warn('[FB-MD] XHR interception failed:', err); }
                 });
             }
         }
@@ -392,7 +392,7 @@
                     let decoded = atob(currentStoryId);
                     let numMatch = decoded.match(/\d+/);
                     if (numMatch) finalMetadata.shortcode = numMatch[0];
-                } catch(e) {}
+                } catch (err) { if (err.name !== 'InvalidCharacterError') console.warn('[FB-MD] Story id decode failed:', err); /* not base64: keep the id as-is */ }
             } else if (currentStoryId) {
                 finalMetadata.shortcode = currentStoryId;
             }

@@ -49,7 +49,7 @@
                 const clone = response.clone();
                 clone.json().then(data => {
                     extractVideos(data);
-                }).catch(e => {});
+                }).catch((err) => { if (!(err instanceof SyntaxError)) console.warn('[X-MD] Could not parse intercepted response:', err); /* non-JSON bodies are expected */ });
             }
         } catch (e) {
             console.error("Fetch intercept error", e);
@@ -69,7 +69,7 @@
                         extractVideos(data);
                     }
                 }
-            } catch (e) {}
+            } catch (err) { if (!(err instanceof SyntaxError)) console.warn('[X-MD] XHR response handling failed:', err); }
         });
         originalOpen.call(this, method, url, ...rest);
     };

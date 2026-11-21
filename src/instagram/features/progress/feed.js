@@ -169,7 +169,7 @@ export function syncOverlays() {
                             let vStyle = window.getComputedStyle(v);
                             if (parseFloat(vStyle.borderBottomLeftRadius) > 0) bRadL = vStyle.borderBottomLeftRadius;
                             if (parseFloat(vStyle.borderBottomRightRadius) > 0) bRadR = vStyle.borderBottomRightRadius;
-                        } catch(e) {}
+                        } catch (err) { window.MDErrorReporter.reportError('IG Feed Progress: video radius', err); }
 
                         while(parent && parent !== document.body && parent !== document.documentElement) {
                             try {
@@ -180,7 +180,7 @@ export function syncOverlays() {
                                     if (parseFloat(style.borderBottomRightRadius) > 0) bRadR = style.borderBottomRightRadius;
                                     break;
                                 }
-                            } catch(e) {}
+                            } catch (err) { window.MDErrorReporter.reportError('IG Feed Progress: ancestor radius', err); }
                             parent = parent.parentElement;
                         }
                         v.__md_clip_parent = clipParent;
@@ -256,7 +256,7 @@ export function syncOverlays() {
                                 try {
                                     let s = window.getComputedStyle(v);
                                     if (s.opacity === '0' || s.visibility === 'hidden' || s.display === 'none') isVisuallyHidden = true;
-                                } catch(e) {}
+                                } catch (err) { window.MDErrorReporter.reportError('IG Feed Progress: visibility check', err); }
                             }
 
                             let isCarouselInactive = false;
@@ -312,7 +312,7 @@ export function syncOverlays() {
                                             }
                                         }
                                     }
-                                } catch(e) {}
+                                } catch (err) { window.MDErrorReporter.reportError('IG Feed Progress: overlay sync', err); }
                             }
 
                             let CCTop = actualTop + actualHeight - 16;

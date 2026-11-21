@@ -394,7 +394,7 @@ function injectStoryButton() {
                         if (extractedUrl && extractedUrl.length > 0 && !dictionaryHasRealUrl) { bestUrl = extractedUrl; bestMetadata.url = bestUrl; }
                         if (extractedDash && extractedDash.length > 50) {
                             let decoded = extractedDash;
-                            try { if (extractedDash.includes('%3C') || extractedDash.includes('%3c')) decoded = decodeURIComponent(extractedDash); } catch(e) {}
+                            try { if (extractedDash.includes('%3C') || extractedDash.includes('%3c')) decoded = decodeURIComponent(extractedDash); } catch (err) { if (!(err instanceof URIError)) window.MDErrorReporter.reportError('IG Story: DASH manifest decode', err); /* not URI-encoded: use as-is */ }
                             if (decoded.includes('<MPD') || decoded.includes('<Period')) {
                                 bestMetadata.dash_manifest = decoded;
                             }

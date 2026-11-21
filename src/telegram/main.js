@@ -130,7 +130,7 @@
             if (allVisibleBtns.length > 0) {
                 // 4a. Check if the mouse is hovering over a specific message/media container
                 let hoveredElements = [];
-                try { hoveredElements = Array.from(document.querySelectorAll(':hover')); } catch(e) {}
+                try { hoveredElements = Array.from(document.querySelectorAll(':hover')); } catch (err) { window.MDErrorReporter.reportError('TG: hover lookup', err); }
                 let hoveredContainer = hoveredElements.reverse().find(el => el.closest && el.closest('.Message, .message, .Album, .media-photo, .media-video, .bubble, .SharedMediaItem, .media-grid-item, .Profile-media, .Avatar, .avatar-viewer'));
                 
                 if (hoveredContainer) {

@@ -84,7 +84,7 @@ if (window.ShortcutManager) {
                     if (innerBtn) {
                         innerBtn.click();
                     }
-                } catch(e) {}
+                } catch (err) { window.MDErrorReporter.reportError('iCloud: inner download button', err); /* cross-origin frames throw SecurityError */ }
             }
         }
     });

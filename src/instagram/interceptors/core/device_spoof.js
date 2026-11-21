@@ -1,4 +1,5 @@
 /* Media Downloader - Device Spoof (MAIN world): temporary devicePixelRatio zoom used by pfp_resolver.js */
+import { logError } from './logger.js';
 
 window.addEventListener('message', function(event) {
     // Only our own window may trigger the zoom spoof (rejects openers/iframes; also avoids a TypeError on null data).
@@ -11,7 +12,7 @@ window.addEventListener('message', function(event) {
                 configurable: true
             });
             window.dispatchEvent(new Event('resize'));
-        } catch(e) {}
+        } catch (err) { logError('Zoom Spoof', err); }
     }
 
     if (event.data.type === 'MD_RESTORE_ZOOM') {
@@ -23,7 +24,7 @@ window.addEventListener('message', function(event) {
                 });
             }
             window.dispatchEvent(new Event('resize'));
-        } catch(e) {}
+        } catch (err) { logError('Zoom Restore', err); }
     }
 
 

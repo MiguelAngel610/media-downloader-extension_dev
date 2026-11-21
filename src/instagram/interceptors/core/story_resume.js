@@ -1,4 +1,4 @@
-import { mdLog } from './logger.js';
+import { mdLog, logErrorOnce } from './logger.js';
 
 /* Media Downloader - Story Resume Guard: Prevents Ghost Mode from forcing stories to restart at slide 1 */
 
@@ -55,7 +55,7 @@ export function saveStoryCheckpoint(username, slideIndex, total = 0) {
             ts: Date.now()
         };
         localStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(checkpoints));
-    } catch (e) {}
+    } catch (err) { logErrorOnce('Story Checkpoint (save)', err); }
 }
 
 export function clearStoryCheckpoint(username) {
@@ -67,7 +67,7 @@ export function clearStoryCheckpoint(username) {
             delete checkpoints[cleanUser];
             localStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(checkpoints));
         }
-    } catch (e) {}
+    } catch (err) { logErrorOnce('Story Checkpoint (clear)', err); }
 }
 
 export function getCurrentStoryUsername() {
@@ -172,7 +172,7 @@ export function triggerNextStorySlide() {
             targetEl.dispatchEvent(evt);
         });
 
-        try { targetEl.click(); } catch(e) {}
+        try { targetEl.click(); } catch (err) { logErrorOnce('Story Resume: advance click', err); }
     }
 
     ['keydown', 'keyup'].forEach(evtType => {
@@ -292,7 +292,7 @@ function checkAndSaveProgress(username) {
         let seenUsers = {};
         try {
             seenUsers = JSON.parse(localStorage.getItem('md_ghost_seen_users') || '{}');
-        } catch(e) {}
+        } catch (err) { logErrorOnce('Ghost Seen Store (read)', err); }
         if (!seenUsers[username]) {
             window.__md_markStoryAsGhostSeen(username);
         }

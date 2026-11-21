@@ -38,7 +38,7 @@ class MDObserverManager {
         
         // Initial manual trigger
         requestAnimationFrame(() => {
-            try { callback(); } catch (e) {}
+            try { callback(); } catch (err) { console.error("[MDObserverManager] Error in initial observeDOM callback:", err); }
         });
     }
 
@@ -63,7 +63,7 @@ class MDObserverManager {
         }, intervalMs);
 
         // Initial manual trigger
-        try { callback(); } catch (e) {}
+        try { callback(); } catch (err) { console.error("[MDObserverManager] Error in initial pollDOM callback:", err); }
     }
 
     disconnect() {

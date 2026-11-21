@@ -120,7 +120,7 @@ function injectStoryButtons() {
                         }
                     }
                 }
-            } catch (e) {}
+            } catch (err) { window.MDErrorReporter.reportError('FB Stories: media scan', err); }
         }
 
         if (window.MDToastManager) window.MDToastManager.showInfo("🔍 Scanning Facebook state for media...");

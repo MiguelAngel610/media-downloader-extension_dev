@@ -36,7 +36,7 @@
             try {
                 const src = videoElement.currentSrc || videoElement.src || videoElement.querySelector("source")?.src;
                 if (src) hash = window.__md_tel_hashCode ? window.__md_tel_hashCode(src).toString(36) : Date.now().toString();
-            } catch(e){}
+            } catch (err) { window.MDErrorReporter.reportError('TG Capture: source hash', err); }
         }
         const fileName = window.FilenameFormatter ? window.FilenameFormatter.format(fileNameHint, hash, outputExt) : `${fileNameHint || hash}.${outputExt}`;
 
@@ -89,7 +89,7 @@
                 videoElement.currentTime = originalTime;
                 videoElement.muted = originalMuted;
                 if (wasPaused) videoElement.pause();
-            } catch (e) {}
+            } catch (err) { window.MDErrorReporter.reportError('TG Capture: restore playback state', err); }
         };
 
         recorder.ondataavailable = (e) => {
@@ -155,7 +155,7 @@
             videoElement.muted = true;
             recorder.start();
             const playPromise = videoElement.play();
-            if (playPromise && playPromise.catch) playPromise.catch(() => {});
+            if (playPromise && playPromise.catch) playPromise.catch((err) => window.MDErrorReporter.reportError('TG Capture: autoplay', err));
         } catch (e) {
             logger.error("Failed to start capture: " + e, fileName);
             if (window.__md_tel_AbortProgress) window.__md_tel_AbortProgress(videoId);
