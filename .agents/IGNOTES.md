@@ -506,3 +506,6 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 4. `ig_interceptor_init.js`: ya no inyecta scripts; envía siempre el snapshot completo de los 3 flags (al cargar, al cambiar storage, al recibir handshake o `MD_UPDATE_SETTINGS`) y persiste `ghostHistory` validando el username (`^[A-Za-z0-9._]{1,30}$`) con retención de 48h.
 5. `logger.js`: `logError()` para cumplir Zero Silent Errors en el MAIN world.
 **Riesgo residual conocido:** el propio código de la página comparte `window` y podría falsificar `MD_GHOST_SETTINGS`; los frames WebSocket tipo `Blob` no se inspeccionan (los de presencia MQTT son `ArrayBuffer`).
+
+## Seguridad (21 de Noviembre 2026): Toast de "Shared Reel/Post" sin HTML
+`story_button.js → showSharedReelWarning` armaba `<a href="${info.href}">` con un `href` leído del DOM de Instagram (posible `javascript:`). Ahora usa `showComplex({ action: { label, href } })`; el toast valida `http(s)` y crea el enlace con DOM APIs. Los toasts de descarga de `ig_interceptor_init.js` pasan el `filename` como `detail` (texto plano). Ver `NOTES.md` → "HTML Injection (XSS) en Toasts y Popup".

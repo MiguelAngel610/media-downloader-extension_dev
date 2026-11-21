@@ -89,13 +89,10 @@ chrome.runtime.onMessage.addListener((msg) => {
         if (msg.response.status === 'error' && window.MDToastManager) {
             window.MDToastManager.showError("Host Error: " + (msg.response.message || "Unknown error"));
         } else if (msg.response.status === 'success' && window.MDToastManager) {
-            let text = "✅ Download completed!";
-            if (msg.response.filename) text += "<br><strong style='font-size:1.1em; opacity:0.9;'>" + msg.response.filename + "</strong>";
-            window.MDToastManager.showSuccess(text, 4000);
+            // The filename comes from the host (and ultimately from page metadata): passed as plain-text detail.
+            window.MDToastManager.showSuccess("✅ Download completed!", 4000, msg.response.filename);
         } else if (msg.response.status === 'skipped' && window.MDToastManager) {
-            let text = "⏭️ File already exists";
-            if (msg.response.filename) text += "<br><strong style='font-size:1.1em; opacity:0.9;'>" + msg.response.filename + "</strong>";
-            window.MDToastManager.showInfo(text, 3000);
+            window.MDToastManager.showInfo("⏭️ File already exists", 3000, msg.response.filename);
         }
     }
 });

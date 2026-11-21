@@ -255,6 +255,15 @@
     line-height: 1.2 !important;
 }
 
+/* Secondary bold line (e.g. downloaded filename); replaces the old inline <br><strong> markup */
+.md-toast-detail {
+    display: block !important;
+    font-size: 1.1em !important;
+    font-weight: 700 !important;
+    opacity: 0.9 !important;
+    word-break: break-all !important;
+}
+
 
 /* Complex Modal/Toast (e.g., IG Shared Reel Warning) */
 .md-toast-complex {
@@ -318,4 +327,26 @@
 
 .md-toast-action-section {
     display: block !important;
+}
+
+/* Action button of complex toasts (previously inline styles inside story_button.js markup) */
+.md-toast-action-btn {
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    background: #2563eb !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    padding: 10px 14px !important;
+    border-radius: 8px !important;
+    text-decoration: none !important;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25) !important;
+    transition: background 0.2s !important;
+}
+
+.md-toast-action-btn:hover {
+    background: #1d4ed8 !important;
 }

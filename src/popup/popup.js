@@ -1,3 +1,6 @@
+/** Instagram's own username rules: letters, digits, dots and underscores, max 30 chars. */
+const INSTAGRAM_USERNAME_PATTERN = /^[A-Za-z0-9._]{1,30}$/;
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- Elements ---
     const downloadBtn = document.getElementById('download-btn');
@@ -291,17 +294,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 const users = Object.keys(history).sort((a, b) => history[b] - history[a]);
                 updateGhostHistoryBadge(history);
 
-                if (users.length === 0) {
-                    historyList.innerHTML = '<div style="text-align:center; padding: 12px; color: var(--text-muted); font-size: 11px;">No hay historias vistas en sigilo.</div>';
+                // Usernames come from storage written by a content script: render with DOM APIs, never innerHTML.
+                const validUsers = users.filter((u) => INSTAGRAM_USERNAME_PATTERN.test(u));
+                historyList.replaceChildren();
+
+                if (validUsers.length === 0) {
+                    const emptyEl = document.createElement('div');
+                    emptyEl.style.cssText = 'text-align:center; padding: 12px; color: var(--text-muted); font-size: 11px;';
+                    emptyEl.textContent = 'No hay historias vistas en sigilo.';
+                    historyList.appendChild(emptyEl);
                     return;
                 }
 
-                historyList.innerHTML = users.map(u => `
-                    <div class="history-item">
-                        <a href="https://www.instagram.com/${u}/" target="_blank">@${u}</a>
-                        <span class="history-time">${new Date(history[u]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                `).join('');
+                for (const username of validUsers) {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'history-item';
+
+                    const linkEl = document.createElement('a');
+                    linkEl.href = `https://www.instagram.com/${encodeURIComponent(username)}/`;
+                    linkEl.target = '_blank';
+                    linkEl.rel = 'noopener noreferrer';
+                    linkEl.textContent = `@${username}`;
+
+                    const timeEl = document.createElement('span');
+                    timeEl.className = 'history-time';
+                    timeEl.textContent = new Date(history[username]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                    itemEl.append(linkEl, timeEl);
+                    historyList.appendChild(itemEl);
+                }
             });
         }
 

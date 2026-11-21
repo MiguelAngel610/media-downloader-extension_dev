@@ -115,3 +115,14 @@
 - **Port hijacking (Windows):** `SO_REUSEADDR` en Windows permite que otro proceso haga bind al mismo puerto; se usa `SO_EXCLUSIVEADDRUSE` cuando existe (verificado en docs de CPython vía Context7).
 **C — Race en stdout:** el loop principal y los threads TCP escribían frames (4 bytes de longitud + JSON) sin exclusión → frames intercalados → Chrome desconecta el host. **Fix:** `NativeMessaging._stdout_lock`; `Logger._clients_lock` para `active_tcp_clients`. Además, los mensajes mayores al límite de Chrome de 1 MB (docs oficiales) se recortan (cola del `log`) en vez de tumbar la conexión.
 **Zero Silent Errors:** los `except: pass` de `Logger` ahora registran (stderr como último recurso, nunca stdout).
+
+## Seguridad: HTML Injection (XSS) en Toasts y Popup
+**Fecha:** 21 de Noviembre 2026
+**Estado:** RESUELTO (test jsdom 12/12; baseline: el código anterior creaba un `<img>` real a partir del texto de un error)
+**Problema:** `MDToastManager` (`src/shared/utils/toast_manager.js`) insertaba todo mensaje con `innerHTML`. Recibía textos externos: errores del host (`str(e)` de yt-dlp/gallery-dl), nombres de archivo y usernames. Un `<img src=x onerror=...>` se ejecutaba **dentro de la página** (instagram.com, facebook.com…) con la sesión del usuario. El popup renderizaba usernames de `ghostHistory` con `innerHTML`.
+**Solución:**
+1. `toast_manager.js` construye el DOM con `createElement` + `textContent`. El único HTML parseado son los SVG estáticos (`MD_TOAST_ICON_SVGS`).
+2. API compatible: `showInfo/Error/Success/Warning(message, duration, detail?)`. `detail` es una segunda línea en negrita (`.md-toast-detail` en `content.css`), reemplaza el viejo `<br><strong>`.
+3. `showComplex`: `actionHtml` reemplazado por `action: { label, href }`. `href` solo se acepta si es `http(s)` (bloquea `javascript:`/`data:`), con `rel="noopener noreferrer"`. Estilos del botón movidos a `.md-toast-action-btn` (CSS Isolation).
+4. `popup.js`: historial con DOM APIs, username validado con `^[A-Za-z0-9._]{1,30}$` y `encodeURIComponent` en el link.
+**Regla:** nunca pasar HTML a `MDToastManager`. Texto dinámico → `message`/`detail`; enlaces → `action.href`.

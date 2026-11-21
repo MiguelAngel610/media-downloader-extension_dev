@@ -120,26 +120,21 @@ function showSharedReelWarning(info) {
     if (!window.MDToastManager) return;
 
     let typeText = info.isReel ? 'Reel' : 'Post';
-    let typeIcon = info.isReel ? '🎬' : '🖼️';
 
-    let btnActionHtml = info.href ? `
-        <a href="${info.href}" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 6px; background: #2563eb; color: #ffffff; font-weight: 600; font-size: 13px; padding: 10px 14px; border-radius: 8px; text-decoration: none; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25); transition: background 0.2s;">
-            <span>Open Full ${typeText}</span>
-        </a>
-    ` : `
-        <div style="cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; background: #2563eb; color: #ffffff; font-weight: 600; font-size: 13px; padding: 10px 14px; border-radius: 8px; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);">
-            <span>Open Full ${typeText}</span>
-        </div>
-    `;
-
+    // info.href is read from Instagram's DOM: the toast validates it (http/https only) and
+    // builds the link with DOM APIs, so it can never inject markup or a javascript: URL.
     window.MDToastManager.showComplex({
         title: `Shared ${typeText} Detected`,
         icon: '⚠️',
         body: `To preserve studio FHD quality and aesthetics, downloading shared ${typeText.toLowerCase()}s directly from stories is disabled to prevent cropped media, re-compression, and baked-in interface overlays.`,
-        actionHtml: btnActionHtml,
-        onAction: (e) => {
+        action: { label: `Open Full ${typeText}`, href: info.href || null },
+        onAction: () => {
             if (!info.href && info.element) {
-                try { info.element.click(); } catch(err) {}
+                try {
+                    info.element.click();
+                } catch (err) {
+                    console.error('[MD] Could not open the shared media element:', err);
+                }
             }
         },
         duration: 8000
