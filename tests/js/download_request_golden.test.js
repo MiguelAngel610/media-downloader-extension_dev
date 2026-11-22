@@ -3,9 +3,9 @@
 const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
+const { loadContentScripts } = require('./helpers/content_scripts.js');
 const CASES = require('./download_request_cases.js');
 
-const repoRoot = path.resolve(__dirname, '..', '..');
 const FIXED_NOW = 1800000000000;
 // Same order as manifest.json; files that do not exist (yet) are skipped.
 const SCRIPTS = [
@@ -17,7 +17,7 @@ const SCRIPTS = [
     'src/instagram/download/download_target.js',
     'src/instagram/download/download_feedback.js',
     'src/instagram/ui/button_state.js',
-].filter((file) => fs.existsSync(path.join(repoRoot, file)));
+];
 
 function createButton(window, testCase) {
     const button = window.document.createElement('button');
@@ -51,12 +51,7 @@ function runCase(testCase) {
         },
         storage: { local: { get: (_keys, callback) => callback({ selectedAccount: testCase.account }) } },
     };
-    // Real <script> elements, like Chrome's classic content scripts: top-level const/let are shared between files.
-    for (const file of SCRIPTS) {
-        const script = window.document.createElement('script');
-        script.textContent = fs.readFileSync(path.join(repoRoot, file), 'utf8') + `\n//# sourceURL=${file}`;
-        window.document.head.appendChild(script);
-    }
+    loadContentScripts(window, SCRIPTS);
 
     const button = createButton(window, testCase);
     const origin = testCase.origin ? window.document.getElementById(testCase.origin) : (testCase.button === 'overlay' ? window.document.getElementById('post') : null);

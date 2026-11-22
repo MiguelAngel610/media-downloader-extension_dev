@@ -1,7 +1,6 @@
 /**
  * @fileoverview Finds the <video>/<img> of the story on screen (Instagram content script).
  * First near the download button (same story card), then the largest centred media of the page.
- * Classic content script: names are global and must stay unique across src/instagram.
  */
 
 const STORY_MEDIA_MAX_ANCESTOR_CLIMBS = 12;
@@ -54,7 +53,7 @@ function findCenteredPageMedia() {
 }
 
 /** @param {HTMLElement} button @returns {HTMLElement | null} */
-function findStoryMediaElement(button) {
+export function findStoryMediaElement(button) {
     return findMediaNearButton(button) || findCenteredPageMedia();
 }
 
@@ -62,7 +61,7 @@ function findStoryMediaElement(button) {
  * @param {HTMLElement} media
  * @returns {string | undefined} the URL the element plays/shows (often a blob: URL for videos)
  */
-function directMediaUrl(media) {
+export function directMediaUrl(media) {
     const url = media.src || media.currentSrc;
     if (media.tagName === 'VIDEO' && !url) {
         const source = media.querySelector('source');

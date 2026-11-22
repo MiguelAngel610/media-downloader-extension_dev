@@ -2,22 +2,23 @@
  * @fileoverview Visual state of the story download button (Instagram content script).
  * Instagram re-renders the story header on every slide, so the loading/success state is kept on
  * document.body.__md_download_state (keyed by story) and re-applied to whichever button exists.
- * Classic content script: names are global and must stay unique across src/instagram.
  */
+import { SVG_DOWNLOAD } from '../ui/svgs.js';
+import { getStoryKey } from '../ui/button_state.js';
 
-const STORY_BUTTON_BASE_CLASS = 'md-native-btn md-story-dl-btn-inline';
+export const STORY_BUTTON_BASE_CLASS = 'md-native-btn md-story-dl-btn-inline';
 const STORY_BUTTON_STATE_TTL_MS = 2000;
 const STORY_BUTTON_LOADING_BACKGROUND = 'rgba(255, 255, 255, 0.3)';
 
 /** @returns {string} key of the story slide on screen */
-function currentStoryKey() {
-    return typeof getStoryKey === 'function' ? getStoryKey() : window.location.pathname;
+export function currentStoryKey() {
+    return getStoryKey();
 }
 
 /** Back to the idle download icon. @param {HTMLElement} button */
 function resetStoryButton(button) {
     button.className = STORY_BUTTON_BASE_CLASS;
-    if (typeof SVG_DOWNLOAD !== 'undefined') button.innerHTML = SVG_DOWNLOAD;
+    button.innerHTML = SVG_DOWNLOAD;
     button.style.opacity = '1';
     button.style.background = 'transparent';
 }
@@ -28,7 +29,7 @@ function hasFinishedOrPendingState(button) {
 }
 
 /** A new story slide is on screen: the previous slide's ✅ or spinner no longer applies. */
-function resetFinishedStoryButtons() {
+export function resetFinishedStoryButtons() {
     for (const button of document.querySelectorAll('.md-story-dl-btn-inline')) {
         if (hasFinishedOrPendingState(button)) resetStoryButton(button);
     }
@@ -38,7 +39,7 @@ function resetFinishedStoryButtons() {
  * @param {HTMLElement} button
  * @param {string} storyKey - story the click belongs to
  */
-function markStoryButtonLoading(button, storyKey) {
+export function markStoryButtonLoading(button, storyKey) {
     button.style.background = STORY_BUTTON_LOADING_BACKGROUND;
     button.classList.add('md-loading');
     button.style.opacity = '0.5';
@@ -50,7 +51,7 @@ function markStoryButtonLoading(button, storyKey) {
  * @param {HTMLElement} button
  * @param {string} storyKey - story the click belonged to; another story's state is left alone
  */
-function clearStoryButtonLoading(button, storyKey) {
+export function clearStoryButtonLoading(button, storyKey) {
     button.classList.remove('md-loading');
     button.style.opacity = '1';
     button.style.background = 'transparent';
@@ -76,7 +77,7 @@ function applyStoryButtonState(button, state) {
 }
 
 /** Re-applies a recent state of this story, or resets a stale one. @param {HTMLElement} button */
-function syncStoryButtonState(button) {
+export function syncStoryButtonState(button) {
     const storyKey = currentStoryKey();
     const state = document.body && document.body.__md_download_state;
     const isThisStory = Boolean(state) && state.storyKey === storyKey;

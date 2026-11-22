@@ -1,4 +1,8 @@
 /* Media Downloader - Main Instagram Entry Point: Orchestrates all feature injections */
+import { injectFeedButtons } from './features/feed_buttons.js';
+import { injectPfpButton } from './features/pfp_button.js';
+import { injectStoryButton } from './features/story_button.js';
+import { startSyncLoop } from './features/progress/loop.js';
 
 function injectMinimalistButtons() {
     if (window.__md_blocked_frame) return;
@@ -61,7 +65,7 @@ if (window.ShortcutManager) {
     window.ShortcutManager.onShortcutPressed(() => {
         // 1. Stories Mode
         if (window.location.pathname.includes('/stories/')) {
-            if (typeof injectStoryButton === 'function') injectStoryButton(); // Force injection on the active slide just in case
+            injectStoryButton(); // Force injection on the active slide just in case
             
             let storyBtns = Array.from(document.querySelectorAll('.md-story-dl-btn-inline')).filter(b => {
                 let r = b.getBoundingClientRect();

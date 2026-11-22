@@ -1,3 +1,4 @@
+import { injectStoryButton } from '../story_button.js';
 import { syncOverlays } from './feed.js';
 
 export function startSyncLoop() {
@@ -10,7 +11,7 @@ export function startSyncLoop() {
             return;
         }
         syncOverlays();
-        if (typeof window.injectStoryButton === 'function') window.injectStoryButton();
+        injectStoryButton();
         requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);

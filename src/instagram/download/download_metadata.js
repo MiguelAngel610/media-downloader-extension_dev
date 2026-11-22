@@ -2,8 +2,9 @@
  * @fileoverview Completes download metadata before it is sent to the host (Instagram content script).
  * The resolvers (feed, story, fiber) may leave gaps; this fills owner, shortcode, date and media id
  * from the DOM and the address bar, in a fixed priority order.
- * Classic content script: names are global and must stay unique across src/instagram.
  */
+import { idToShortcode } from '../utils/platform.js';
+import { resolveUsername } from '../utils/username_resolver.js';
 
 const DOWNLOAD_SHORTCODE_IN_PATH = /\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/;
 const DOWNLOAD_STORY_ID_IN_PATH = /\/stories\/[^/]+\/(\d+)/;
@@ -100,7 +101,7 @@ function fillMediaIdFromUrl(metadata, url) {
  * @param {string | null | undefined} url
  * @returns {Record<string, any>} the same object (or a new one when none was given)
  */
-function completeDownloadMetadata(metadata, button, originalElement, url) {
+export function completeDownloadMetadata(metadata, button, originalElement, url) {
     const result = metadata || {};
     const origin = originalElement || button;
     if (!result.username) result.username = resolveUsername(button, originalElement);

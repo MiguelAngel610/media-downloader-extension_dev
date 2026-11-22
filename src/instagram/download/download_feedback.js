@@ -2,8 +2,10 @@
  * @fileoverview Visual feedback of a download request on its button (Instagram content script).
  * The state is also stored on the post container (or <body> in stories) so that a button React
  * re-creates during the request can be re-synced by the injectors.
- * Classic content script: names are global and must stay unique across src/instagram.
  */
+import { SVG_CHECK, SVG_DOWNLOAD } from '../ui/svgs.js';
+import { getStoryKey, updateButtonIcon } from '../ui/button_state.js';
+import { isStoryContext } from './download_target.js';
 
 const DOWNLOAD_STATE_RESET_MS = 2000;
 const DOWNLOAD_STATE_CONTAINER_SELECTOR = 'article, main, div[role="dialog"]';
@@ -22,7 +24,7 @@ const DOWNLOAD_STATE_CONTAINER_SELECTOR = 'article, main, div[role="dialog"]';
  * @param {boolean} storyContext
  * @returns {Element | null}
  */
-function downloadStateHolder(button, originalElement, storyContext) {
+export function downloadStateHolder(button, originalElement, storyContext) {
     return storyContext ? document.body : (originalElement || button).closest(DOWNLOAD_STATE_CONTAINER_SELECTOR);
 }
 
@@ -31,7 +33,7 @@ function downloadStateHolder(button, originalElement, storyContext) {
  * @param {'md-loading' | 'md-success' | 'md-error'} stateClass
  * @param {string} iconSvg
  */
-function saveDownloadState(context, stateClass, iconSvg) {
+export function saveDownloadState(context, stateClass, iconSvg) {
     if (!context.holder) return;
     context.holder.__md_download_state = {
         time: Date.now(),
@@ -63,7 +65,7 @@ function scheduleDownloadStateReset(context, resetButton) {
  * A blob: URL that cannot be mapped to a page URL: nothing can be downloaded.
  * @param {DownloadFeedbackContext} context
  */
-function showUnresolvableBlob(context) {
+export function showUnresolvableBlob(context) {
     console.error("Media Downloader: Cannot resolve original URL for blob.");
     context.button.classList.remove('md-loading');
     context.button.classList.add('md-error');
@@ -86,7 +88,7 @@ function queueRejectionReason(response) {
  * @param {DownloadFeedbackContext} context
  * @param {unknown} response
  */
-function showQueueOutcome(context, response) {
+export function showQueueOutcome(context, response) {
     const { button } = context;
     button.classList.remove('md-loading');
     const reason = queueRejectionReason(response);

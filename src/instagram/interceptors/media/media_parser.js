@@ -13,7 +13,7 @@ export function extractSignatureFromUrl(url) {
         return parts[parts.length - 1];
     } catch {
         // Relative or escaped URL: fall back to a plain filename match.
-        let match = url.match(/\/([^\/]+\.(jpg|webp|mp4))/);
+        let match = url.match(/\/([^/]+\.(jpg|webp|mp4))/);
         return match ? match[1] : null;
     }
 }

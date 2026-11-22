@@ -1,6 +1,6 @@
 /* Media Downloader - Platform Utils */
 
-function getPlatform() {
+export function getPlatform() {
     const hostname = window.location.hostname;
     if (hostname.includes("instagram.com")) return "instagram";
     if (hostname.includes("facebook.com")) return "facebook";
@@ -8,7 +8,7 @@ function getPlatform() {
     return "unknown";
 }
 
-function idToShortcode(idStr) {
+export function idToShortcode(idStr) {
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
     try {
         let num = BigInt(idStr);

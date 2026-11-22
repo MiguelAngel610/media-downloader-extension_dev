@@ -2,7 +2,6 @@
  * @fileoverview Finds the "..." (more options) button of the active story header, next to which the
  * download button is injected (Instagram content script). Runs on every animation frame, so the last
  * match is cached and the full-page scan is throttled.
- * Classic content script: names are global and must stay unique across src/instagram.
  */
 
 const STORY_DOTS_SCAN_INTERVAL_MS = 200;
@@ -11,7 +10,7 @@ const STORY_DOTS_CLICKABLE_SELECTOR = 'button, [role="button"], div[role="button
 const STORY_DOTS_LABELED_SELECTOR = 'button[aria-label], [role="button"][aria-label]';
 const STORY_DOTS_EXACT_LABELS = ['more', 'más', 'mas'];
 const STORY_DOTS_LABEL_PARTS = ['opciones', 'options'];
-const STORY_DOTS_HIJACKED_CLASS = 'md-hijacked-dots';
+export const STORY_DOTS_HIJACKED_CLASS = 'md-hijacked-dots';
 
 /** @param {Element} element */
 function horizontalDistanceToCenter(element) {
@@ -64,7 +63,7 @@ function scanForStoryDots() {
 }
 
 /** @returns {Element | null} the active story's "..." button; null when absent or while throttled */
-function findStoryDotsButton() {
+export function findStoryDotsButton() {
     const cached = cachedDotsIfActive();
     if (cached) return cached;
     if (window.__md_lastStoryButtonScan && Date.now() - window.__md_lastStoryButtonScan < STORY_DOTS_SCAN_INTERVAL_MS) return null;

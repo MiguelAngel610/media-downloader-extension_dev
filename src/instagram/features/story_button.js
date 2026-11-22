@@ -3,8 +3,14 @@
  * (Instagram content script). Finding the header button (stories/story_dots_locator.js), the media
  * (stories/story_media_locator.js), its best URL (stories/story_media_lookup.js) and the button state
  * (stories/story_button_state.js) live in their own modules; this file wires them together.
- * Classic content script: names are global and must stay unique across src/instagram.
  */
+import { STORY_BUTTON_BASE_CLASS, clearStoryButtonLoading, currentStoryKey, markStoryButtonLoading, resetFinishedStoryButtons, syncStoryButtonState } from '../stories/story_button_state.js';
+import { STORY_DOTS_HIJACKED_CLASS, findStoryDotsButton } from '../stories/story_dots_locator.js';
+import { SVG_DOWNLOAD } from '../ui/svgs.js';
+import { detectSharedReelOrPost } from '../stories/shared_post_detector.js';
+import { findStoryMediaElement } from '../stories/story_media_locator.js';
+import { resolveStoryMedia } from '../stories/story_media_lookup.js';
+import { sendDownloadRequest } from '../ui/button_state.js';
 
 const STORY_SHARED_WARNING_DURATION_MS = 8000;
 
@@ -95,7 +101,7 @@ function createStoryDownloadButton() {
 }
 
 /** Called on every frame by the progress loop and on navigation; cheap when nothing changed. */
-function injectStoryButton() {
+export function injectStoryButton() {
     if (!window.location.href.includes('/stories/')) return;
 
     const storyKey = currentStoryKey();
@@ -122,4 +128,3 @@ function injectStoryButton() {
     syncStoryButtonState(button);
 }
 
-window.injectStoryButton = injectStoryButton;

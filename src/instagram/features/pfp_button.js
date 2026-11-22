@@ -1,6 +1,8 @@
 /* Media Downloader - PFP Button: Profile picture download button */
+import { SVG_CHECK, SVG_DOWNLOAD } from '../ui/svgs.js';
+import { getOverlayRoot } from '../ui/overlay_root.js';
 
-function injectPfpButton() {
+export function injectPfpButton() {
     let overlayRoot = getOverlayRoot();
     let profilePic = document.querySelector('header img[alt*="profile picture"], header img[alt*="foto de perfil"]');
     if (profilePic && !profilePic.__md_processed) {

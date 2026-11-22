@@ -40,11 +40,9 @@ const REFACTORED_MODULES = [
     'src/instagram/ui/button_state.js',
 ];
 
-// Page-world (MAIN) modules bundled by esbuild into dist/*.bundle.js.
-const ES_MODULES = [
-    'src/instagram/interceptors/**/*.js',
-    'src/instagram/features/progress/**/*.js',
-];
+// Instagram is written as ES modules bundled by esbuild: the page-world interceptor
+// (dist/ig_interceptor.bundle.js) and the content script (dist/ig_content.bundle.js).
+const ES_MODULES = ['src/instagram/**/*.js'];
 
 export default defineConfig([
     { ignores: ['dist/**', 'node_modules/**', '.trash/**', 'host/**', 'tests/fixtures/**'] },

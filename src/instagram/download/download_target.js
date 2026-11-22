@@ -2,8 +2,8 @@
  * @fileoverview Decides what the host should download (Instagram content script).
  * Direct CDN URLs and DASH manifests are downloaded natively ("direct_story"). A blob: URL cannot
  * leave the page, so the story/post page URL is sent instead and resolved by gallery-dl ("auto").
- * Classic content script: names are global and must stay unique across src/instagram.
  */
+import { getPlatform } from '../utils/platform.js';
 
 const DOWNLOAD_STORY_WITH_ID_IN_PATH = /\/stories\/([^/]+)\/(\d+)/;
 const DOWNLOAD_POST_OR_REEL_IN_PATH = /\/(?:p|reel)\/([a-zA-Z0-9_-]+)/;
@@ -19,7 +19,7 @@ const DOWNLOAD_INSTAGRAM_ORIGIN = 'https://www.instagram.com';
  * @param {Element | null} button
  * @returns {boolean} the request comes from the story viewer
  */
-function isStoryContext(button) {
+export function isStoryContext(button) {
     return Boolean(button && button.classList.contains('md-story-dl-btn-inline')) || window.location.href.includes('/stories/');
 }
 
@@ -53,7 +53,7 @@ function postPageUrl(metadata, locationHref) {
  * @param {Record<string, any>} metadata - already completed by completeDownloadMetadata
  * @returns {DownloadTarget | null} null when a blob: URL cannot be mapped to any page URL
  */
-function resolveDownloadTarget(button, url, metadata) {
+export function resolveDownloadTarget(button, url, metadata) {
     if (getPlatform() !== 'instagram') return { url, mediaType: 'auto' };
     const isBlobWithoutManifest = Boolean(url && url.startsWith('blob:') && !metadata.dash_manifest);
     if (!isBlobWithoutManifest) return { url, mediaType: metadata.mediaType || 'direct_story' };

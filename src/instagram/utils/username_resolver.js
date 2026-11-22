@@ -1,6 +1,6 @@
 /* Media Downloader - Username Resolver: Extracts username from DOM, URL, or meta tags */
 
-function resolveUsername(btn, originalElement) {
+export function resolveUsername(btn, originalElement) {
     let username = "Unknown";
     let urlMatch = window.location.href.match(/(?:instagram\.com\/)([a-zA-Z0-9_.-]+)/);
     let storyMatch = window.location.href.match(/\/stories\/([a-zA-Z0-9_.-]+)\//);

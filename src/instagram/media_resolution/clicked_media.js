@@ -5,7 +5,6 @@
  *    every size of the same image;
  *  - shortcode: a post container can hold several /p/ and /reel/ links (pinned or neighbouring posts);
  *    the one closest to the viewport centre belongs to the post on screen.
- * Classic content script: names are global and must stay unique across src/instagram.
  */
 
 const RESOLVER_FILENAME_FALLBACK = /\/([^/]+)\.(?:jpg|webp|mp4)/;
@@ -14,7 +13,7 @@ const RESOLVER_FILENAME_FALLBACK = /\/([^/]+)\.(?:jpg|webp|mp4)/;
  * @param {string | null | undefined} url
  * @returns {string | null} filename without extension (ignores .jpg vs .webp differences)
  */
-function extractSignature(url) {
+export function extractSignature(url) {
     if (!url) return null;
     try {
         const parts = new URL(url).pathname.split('/');
@@ -47,7 +46,7 @@ function siblingThumbnailOf(media) {
  * @param {HTMLElement} media - <img> or <video>
  * @returns {string | null}
  */
-function posterSignatureOf(media) {
+export function posterSignatureOf(media) {
     if (media.tagName === 'IMG') return extractSignature(media.src);
     if (media.tagName !== 'VIDEO') return null;
     let signature = media.poster ? extractSignature(media.poster) : null;
@@ -73,7 +72,7 @@ function distanceToViewportCenter(element) {
  * @param {Element | null} article
  * @returns {string | null}
  */
-function findCenteredShortcode(article) {
+export function findCenteredShortcode(article) {
     if (!article) return null;
     const ranked = Array.from(article.querySelectorAll(RESOLVER_POST_LINK_SELECTOR))
         .map((link) => ({ link, distance: distanceToViewportCenter(link) }))

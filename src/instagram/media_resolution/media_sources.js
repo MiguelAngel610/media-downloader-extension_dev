@@ -4,7 +4,6 @@
  *     element with data-md-id and asks interceptors/media/fiber_search.js (MAIN world);
  *     ig_interceptor_init.js stores the answer in window.__md_fiberResults[id];
  *  2. the media dictionary built from the intercepted API responses (window.__md_storyMediaDict).
- * Classic content script: names are global and must stay unique across src/instagram.
  */
 
 const RESOLVER_FIBER_POLL_INTERVAL_MS = 50;
@@ -21,7 +20,7 @@ const RESOLVER_FIBER_MAX_POLLS = 15; // ~750 ms before falling back to the media
  * @param {Element} media
  * @returns {string} unique id now present as data-md-id on the element
  */
-function tagMediaElement(media) {
+export function tagMediaElement(media) {
     const id = `md_media_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
     media.setAttribute('data-md-id', id);
     return id;
@@ -37,7 +36,7 @@ function waitMs(ms) {
  * @param {FiberLookupRequest} request
  * @returns {Promise<Record<string, any> | undefined>} the stored MD_FIBER_RESULT, or undefined on timeout
  */
-async function requestFiberResult(id, request) {
+export async function requestFiberResult(id, request) {
     window.__md_fiberResults = window.__md_fiberResults || {};
     window.postMessage({ type: 'MD_REQUEST_FIBER', id, posterSig: request.posterSig, shortcode: request.shortcode, carouselIndex: request.carouselIndex }, '*');
     for (let poll = 0; poll < RESOLVER_FIBER_MAX_POLLS; poll++) {
@@ -88,7 +87,7 @@ function pickCarouselItem(media, items) {
  * @param {string | null} expectedShortcode
  * @returns {ResolvedMedia}
  */
-function findInMediaDictionary(media, expectedShortcode) {
+export function findInMediaDictionary(media, expectedShortcode) {
     const bestMetadata = {};
     if (!window.__md_storyMediaDict) return { bestUrl: null, bestMetadata };
     let items = Object.values(window.__md_storyMediaDict);

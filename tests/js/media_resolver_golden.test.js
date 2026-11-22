@@ -4,16 +4,16 @@
 const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
+const { loadContentScripts } = require('./helpers/content_scripts.js');
 const CASES = require('./media_resolver_cases.js');
 
-const repoRoot = path.resolve(__dirname, '..', '..');
 // Same order as manifest.json; files that do not exist (yet) are skipped.
 const SCRIPTS = [
     'src/shared/utils/error_reporter.js',
     'src/instagram/media_resolution/clicked_media.js',
     'src/instagram/media_resolution/media_sources.js',
     'src/instagram/utils/media_resolver.js',
-].filter((file) => fs.existsSync(path.join(repoRoot, file)));
+];
 
 async function runCase(testCase) {
     const dom = new JSDOM(`<!doctype html><html><body>${testCase.html}</body></html>`,
@@ -30,12 +30,7 @@ async function runCase(testCase) {
         const [left, top, width, height] = element.getAttribute('rect').split(',').map(Number);
         element.getBoundingClientRect = () => ({ left, top, width, height, right: left + width, bottom: top + height });
     }
-    // Real <script> elements, like Chrome's classic content scripts (shared global lexical scope).
-    for (const file of SCRIPTS) {
-        const script = window.document.createElement('script');
-        script.textContent = fs.readFileSync(path.join(repoRoot, file), 'utf8') + `\n//# sourceURL=${file}`;
-        window.document.head.appendChild(script);
-    }
+    loadContentScripts(window, SCRIPTS);
     const media = testCase.media ? window.document.querySelector(testCase.media) : null;
     if (media && testCase.overrideSrc) Object.defineProperty(media, 'src', { get: () => testCase.overrideSrc });
     const article = testCase.article ? window.document.querySelector(testCase.article) : null;

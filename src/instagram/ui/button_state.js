@@ -1,7 +1,11 @@
 /**
  * @fileoverview Download button icon/state helpers and the download request entry point (Instagram content script).
- * Classic content script: names are global and must stay unique across src/instagram.
  */
+import { SVG_DOWNLOAD } from './svgs.js';
+import { completeDownloadMetadata } from '../download/download_metadata.js';
+import { downloadStateHolder, saveDownloadState, showQueueOutcome, showUnresolvableBlob } from '../download/download_feedback.js';
+import { getPlatform } from '../utils/platform.js';
+import { isStoryContext, resolveDownloadTarget } from '../download/download_target.js';
 
 const BUTTON_STORY_KEY_IN_PATH = /\/stories\/([^/?#]+)(?:\/(\d+))?/;
 
@@ -12,7 +16,7 @@ const BUTTON_STORY_KEY_IN_PATH = /\/stories\/([^/?#]+)(?:\/(\d+))?/;
  * @param {string} newSvgCode - trusted static SVG markup (svgs.js)
  * @param {boolean} isFloating
  */
-function updateButtonIcon(btn, newSvgCode, isFloating) {
+export function updateButtonIcon(btn, newSvgCode, isFloating) {
     if (isFloating) {
         btn.innerHTML = newSvgCode;
         return;
@@ -34,14 +38,13 @@ function updateButtonIcon(btn, newSvgCode, isFloating) {
  * Identifies the story slide on screen ("user/storyId"), or the page path outside stories.
  * @returns {string}
  */
-function getStoryKey() {
+export function getStoryKey() {
     const match = window.location.href.match(BUTTON_STORY_KEY_IN_PATH);
     if (!match) return window.location.pathname;
     const userOrType = match[1];
     const storyId = new URLSearchParams(window.location.search).get('story_media_id') || match[2] || '';
     return storyId ? `${userOrType}/${storyId}` : userOrType;
 }
-window.getStoryKey = getStoryKey;
 
 /**
  * Sends one download to the host and drives the button feedback.
@@ -53,7 +56,7 @@ window.getStoryKey = getStoryKey;
  * @param {boolean} [isFloating]
  * @param {Element | null} [originalElement] - the post element when btn lives in the overlay root
  */
-function sendDownloadRequest(btn, url, metadata, isFloating = false, originalElement = null) {
+export function sendDownloadRequest(btn, url, metadata, isFloating = false, originalElement = null) {
     btn.classList.add('md-loading');
     const storyContext = isStoryContext(btn);
     /** @type {DownloadFeedbackContext} */

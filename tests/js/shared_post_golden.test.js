@@ -3,15 +3,15 @@
 const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
+const { loadContentScripts } = require('./helpers/content_scripts.js');
 const CASES = require('./shared_post_cases.js');
 
-const repoRoot = path.resolve(__dirname, '..', '..');
 const SCRIPTS = [
     'src/shared/utils/error_reporter.js',
     'src/instagram/stories/story_viewport.js',
     'src/instagram/stories/shared_post_detector.js',
     'src/instagram/features/story_button.js',
-].filter((file) => fs.existsSync(path.join(repoRoot, file)));
+];
 
 /** @returns {string} stable description of the element a detection points at */
 function describe(element) {
@@ -27,11 +27,7 @@ function runCase(testCase) {
         const [left, top, width, height] = element.getAttribute('rect').split(',').map(Number);
         element.getBoundingClientRect = () => ({ left, top, width, height, right: left + width, bottom: top + height });
     }
-    for (const file of SCRIPTS) {
-        const script = window.document.createElement('script');
-        script.textContent = fs.readFileSync(path.join(repoRoot, file), 'utf8') + `\n//# sourceURL=${file}`;
-        window.document.head.appendChild(script);
-    }
+    loadContentScripts(window, SCRIPTS);
     const detection = window.detectSharedReelOrPost();
     const result = {
         detection: { ...detection, element: describe(detection.element) },

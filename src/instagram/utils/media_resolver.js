@@ -2,7 +2,6 @@
  * @fileoverview Resolves the best media URL and metadata for a clicked feed/modal element
  * (Instagram content script): identify the click (media_resolution/clicked_media.js), then ask the
  * fiber search and fall back to the media dictionary (media_resolution/media_sources.js).
- * Classic content script: names are global and must stay unique across src/instagram.
  */
 
 /**
@@ -10,6 +9,9 @@
  * @param {string | null} expectedShortcode
  * @returns {ResolvedMedia}
  */
+import { findCenteredShortcode, posterSignatureOf } from '../media_resolution/clicked_media.js';
+import { findInMediaDictionary, requestFiberResult, tagMediaElement } from '../media_resolution/media_sources.js';
+
 function metadataFromFiberResult(result, expectedShortcode) {
     const bestUrl = result.url || null;
     const bestMetadata = {
@@ -33,7 +35,7 @@ function metadataFromFiberResult(result, expectedShortcode) {
  * @param {number | null} [carouselIndex] - 1-based slide index when the caller knows it
  * @returns {Promise<ResolvedMedia>}
  */
-async function resolveMediaUrl(media, article, knownShortcode = null, carouselIndex = null) {
+export async function resolveMediaUrl(media, article, knownShortcode = null, carouselIndex = null) {
     if (!media) return { bestUrl: null, bestMetadata: {} };
     const id = tagMediaElement(media);
     const posterSig = posterSignatureOf(media);

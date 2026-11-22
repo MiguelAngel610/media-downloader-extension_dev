@@ -329,7 +329,7 @@ function scanServerRenderedData() {
     try {
         const html = document.documentElement.innerHTML;
 
-        const videoMatches = [...html.matchAll(/"video_versions":\[\{[^\}]*"url":"([^"]+)"/g)];
+        const videoMatches = [...html.matchAll(/"video_versions":\[\{[^}]*"url":"([^"]+)"/g)];
         const dashMatches = [...html.matchAll(/"video_dash_manifest":"([^"]+)"/g)];
 
         for (let i = 0; i < Math.max(videoMatches.length, dashMatches.length); i++) {

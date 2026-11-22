@@ -145,7 +145,7 @@ window.__md_markStoryAsGhostSeen = function (networkUsername = null) {
     if (window.__md_resumeInProgress) return; // Do not touch checkpoints or update seen state while auto-advancing slides
     let username = networkUsername;
     if (!username) {
-        const match = window.location.href.match(/\/stories\/([^\/]+)\//);
+        const match = window.location.href.match(/\/stories\/([^/]+)\//);
         if (!match) return;
         username = match[1];
     }

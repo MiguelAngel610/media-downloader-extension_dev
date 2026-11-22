@@ -8,7 +8,6 @@ const { JSDOM } = require('jsdom');
 const { loadContentScripts } = require('./helpers/content_scripts.js');
 const CASES = require('./story_button_cases.js');
 
-const repoRoot = path.resolve(__dirname, '..', '..');
 // Same order as manifest.json; files that do not exist (yet) are skipped.
 const FIXED_NOW = 1800000000000;
 const SCRIPTS = [

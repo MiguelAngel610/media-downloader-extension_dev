@@ -3,8 +3,10 @@
  * Sources, most reliable first: the API dictionary entry of this story id
  * (window.__md_storyMediaDict), the page-world fiber search (fills a missing DASH manifest, user or
  * date of videos), a CDN filename match in the dictionary, and finally the profile's stories URL.
- * Classic content script: names are global and must stay unique across src/instagram.
  */
+import { currentStoryId } from './story_viewport.js';
+import { directMediaUrl } from './story_media_locator.js';
+import { extractSignature } from '../media_resolution/clicked_media.js';
 
 const STORY_FIBER_POLL_INTERVAL_MS = 50;
 const STORY_FIBER_MAX_POLLS = 10;
@@ -128,7 +130,7 @@ function upgradeBySignature(resolution) {
  * @param {HTMLElement | null} media - story element on screen
  * @returns {Promise<StoryResolution>}
  */
-async function resolveStoryMedia(media) {
+export async function resolveStoryMedia(media) {
     const entry = storyEntryFromDictionary();
     const resolution = { bestUrl: entry ? entry.url : null, bestMetadata: entry || {} };
     if (!resolution.bestUrl && media) resolution.bestUrl = directMediaUrl(media);

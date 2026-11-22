@@ -2,8 +2,8 @@
  * @fileoverview Detects a story that re-shares a feed post or reel (Instagram content script).
  * Those stories only contain a low-quality preview, so the story button warns the user and links
  * to the original. Strategies run from most to least reliable; the first match wins.
- * Classic content script: names are global and must stay unique across src/instagram.
  */
+import { STORY_BODY_HEIGHT, STORY_FULL_HEIGHT, currentStoryId, isExtensionUi, isInStoryColumn, isRenderedVisible, nearestLinkHref } from './story_viewport.js';
 
 const SHARED_POST_LINK_SELECTOR = 'a[href*="/reel/"], a[href*="/reels/"], a[href*="/p/"], a[href*="/tv/"]';
 const SHARED_POST_REEL_PATHS = ['/reel/', '/reels/', '/tv/'];
@@ -86,7 +86,7 @@ function findOriginalAuthorAttribution(elements) {
 }
 
 /** @returns {SharedPostDetection} */
-function detectSharedReelOrPost() {
+export function detectSharedReelOrPost() {
     const fromDictionary = sharedItemFromDictionary();
     if (fromDictionary) return fromDictionary;
     const fromLink = findSharedPostLink();

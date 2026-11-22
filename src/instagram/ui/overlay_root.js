@@ -5,7 +5,7 @@ if (window.self !== window.top) {
     window.__md_blocked_frame = true;
 }
 
-function getOverlayRoot() {
+export function getOverlayRoot() {
     if (window.__md_blocked_frame) return null;
     let overlayRoot = document.getElementById('md-overlay-root');
     if (!overlayRoot) {
