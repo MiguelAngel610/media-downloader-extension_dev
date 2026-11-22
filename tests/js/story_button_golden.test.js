@@ -1,17 +1,21 @@
 // Golden master for the Instagram story button: where injectStoryButton places the button, and what
-// its click handler sends to sendDownloadRequest (URL + metadata), the button state, toasts and whether
+// a click sends to the service worker (the queue_download message), the button state, toasts and whether
 // the global media dictionary was mutated.
 // Usage: node tests/js/story_button_golden.test.js <fixture.json>   (STORY_BUTTON_RECORD=1 to record)
 const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
+const { loadContentScripts } = require('./helpers/content_scripts.js');
 const CASES = require('./story_button_cases.js');
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 // Same order as manifest.json; files that do not exist (yet) are skipped.
+const FIXED_NOW = 1800000000000;
 const SCRIPTS = [
     'src/shared/utils/error_reporter.js',
+    'src/instagram/utils/platform.js',
     'src/instagram/ui/svgs.js',
+    'src/instagram/utils/username_resolver.js',
     'src/instagram/media_resolution/clicked_media.js',
     'src/instagram/download/download_metadata.js',
     'src/instagram/download/download_target.js',
@@ -24,7 +28,7 @@ const SCRIPTS = [
     'src/instagram/stories/story_media_locator.js',
     'src/instagram/stories/story_media_lookup.js',
     'src/instagram/features/story_button.js',
-].filter((file) => fs.existsSync(path.join(repoRoot, file)));
+];
 
 function setUp(testCase) {
     const dom = new JSDOM(`<!doctype html><html><body>${testCase.html}</body></html>`, { url: testCase.url, runScripts: 'dangerously', pretendToBeVisual: true });
@@ -45,16 +49,25 @@ function setUp(testCase) {
             window.__md_fiberResults[data.id] = { url: answer.url, dash_manifest: answer.dash, media_id: answer.media_id, index: answer.index, shortcode: answer.shortcode, user: answer.user, time: answer.time };
         }, 20);
     };
-    applyRects(window);
-    for (const file of SCRIPTS) {
-        const script = window.document.createElement('script');
-        script.textContent = fs.readFileSync(path.join(repoRoot, file), 'utf8') + `\n//# sourceURL=${file}`;
-        window.document.head.appendChild(script);
-    }
-    window.sendDownloadRequest = (button, url, metadata, isFloating) => {
-        if (testCase.sendThrows) throw new Error('host unavailable');
-        log.sent.push({ url, metadata: JSON.parse(JSON.stringify(metadata)), isFloating, buttonLoading: button.classList.contains('md-loading') });
+    window.Date.now = () => FIXED_NOW;
+    // Observed at the real boundary (the message to the service worker): imported bindings such as
+    // sendDownloadRequest cannot be stubbed once the scripts are ES modules.
+    window.chrome = {
+        runtime: {
+            id: 'test-extension',
+            lastError: undefined,
+            sendMessage(message, callback) {
+                log.sent.push(JSON.parse(JSON.stringify(message)));
+                callback({ status: 'queued', requestId: 'r1' });
+            },
+        },
+        storage: { local: { get: (_keys, callback) => {
+            if (testCase.sendThrows) throw new Error('host unavailable');
+            callback({ selectedAccount: 'M' });
+        } } },
     };
+    applyRects(window);
+    loadContentScripts(window, SCRIPTS);
     return { window, log };
 }
 

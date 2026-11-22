@@ -131,31 +131,35 @@
   "click:dictionary_video_with_dash": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/o1/v/t16/dict_v.mp4?efg=x",
-        "metadata": {
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
           "url": "https://scontent.cdninstagram.com/o1/v/t16/dict_v.mp4?efg=x",
           "dash_manifest": "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\"><Period><AdaptationSet/></Period></MPD>",
           "username": "alice",
           "timestamp": 1700000000,
           "media_id": "111",
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+          "media_category": "story",
+          "shortcode": "Bv"
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -175,29 +179,34 @@
   "click:dictionary_image_story": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/v/t51.2885-15/full_i.jpg?stp=dst-jpg",
-        "metadata": {
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
           "url": "https://scontent.cdninstagram.com/v/t51.2885-15/full_i.jpg?stp=dst-jpg",
           "username": "alice",
           "timestamp": 1700000000,
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+          "media_category": "story",
+          "shortcode": "Bv",
+          "media_id": "full_i"
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -215,34 +224,37 @@
   "click:video_without_dictionary_uses_fiber": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/o1/v/t16/fiber_v.mp4?efg=x",
-        "metadata": {
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
           "url": "https://scontent.cdninstagram.com/o1/v/t16/fiber_v.mp4?efg=x",
           "dash_manifest": "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\"><Period><AdaptationSet/></Period></MPD>",
-          "shortcode": "STORYCODE1",
+          "shortcode": "Ir",
           "username": "alice",
           "timestamp": 1700000001,
           "media_id": "555",
           "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [
       "type"
     ],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -256,32 +268,37 @@
   "click:fiber_url_encoded_dash": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/o1/v/t16/fiber_enc.mp4?efg=x",
-        "metadata": {
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
           "url": "https://scontent.cdninstagram.com/o1/v/t16/fiber_enc.mp4?efg=x",
           "dash_manifest": "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\"><Period><AdaptationSet/></Period></MPD>",
           "username": "alice",
           "timestamp": 1700000002,
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+          "media_category": "story",
+          "shortcode": "Bv",
+          "media_id": "fiber_enc"
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [
       "type"
     ],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -295,33 +312,37 @@
   "click:fiber_media_id_merges_dictionary": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/o1/v/t16/by_media_id.mp4?efg=x",
-        "metadata": {
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
           "url": "https://scontent.cdninstagram.com/o1/v/t16/by_media_id.mp4?efg=x",
           "username": "carol",
           "timestamp": 1700000003,
           "dash_manifest": "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\"><Period><AdaptationSet/></Period></MPD>",
           "media_id": "999",
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+          "media_category": "story",
+          "shortcode": "Pn"
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [
       "type"
     ],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -342,32 +363,37 @@
   "click:dictionary_without_dash_asks_fiber_keeps_url": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/o1/v/t16/dict_nodash.mp4?efg=x",
-        "metadata": {
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
           "url": "https://scontent.cdninstagram.com/o1/v/t16/dict_nodash.mp4?efg=x",
           "username": "alice",
           "timestamp": 1700000004,
           "dash_manifest": "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\"><Period><AdaptationSet/></Period></MPD>",
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+          "media_category": "story",
+          "shortcode": "Bv",
+          "media_id": "dict_nodash"
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [
       "type"
     ],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -387,28 +413,35 @@
   "click:fiber_timeout_uses_video_src": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/o1/v/t16/direct_src.mp4?efg=x",
-        "metadata": {
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
+          "media_category": "story",
+          "username": "alice",
+          "shortcode": "Bv",
+          "timestamp": 1800000000,
+          "media_id": "direct_src"
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [
       "type"
     ],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -422,28 +455,34 @@
   "click:fiber_error_answer": {
     "sent": [
       {
-        "url": "blob:https://www.instagram.com/v1",
-        "metadata": {
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+        "action": "queue_download",
+        "url": "https://www.instagram.com/stories/alice/111/",
+        "mediaType": "auto",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
+          "media_category": "story",
+          "username": "alice",
+          "shortcode": "Bv",
+          "timestamp": 1800000000
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [
       "type"
     ],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -457,32 +496,36 @@
   "click:video_without_src_media_id_in_dictionary": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/o1/v/t16/no_src_dict.mp4?efg=x",
-        "metadata": {
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
           "url": "https://scontent.cdninstagram.com/o1/v/t16/no_src_dict.mp4?efg=x",
           "username": "gina",
           "timestamp": 1700000006,
           "media_id": "888",
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+          "media_category": "story",
+          "shortcode": "N4"
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [
       "type"
     ],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -502,28 +545,35 @@
   "click:video_source_child": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/o1/v/t16/source_tag.mp4?efg=x",
-        "metadata": {
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
+          "media_category": "story",
+          "username": "alice",
+          "shortcode": "Bv",
+          "timestamp": 1800000000,
+          "media_id": "source_tag"
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [
       "type"
     ],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -537,29 +587,34 @@
   "click:signature_match_in_dictionary": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/v/t51.2885-15/sig_abc_n.jpg?stp=dst-jpg&full=1",
-        "metadata": {
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
           "url": "https://scontent.cdninstagram.com/v/t51.2885-15/sig_abc_n.jpg?stp=dst-jpg&full=1",
           "username": "dave",
           "timestamp": 1700000005,
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+          "media_category": "story",
+          "shortcode": "Bv",
+          "media_id": "sig_abc_n"
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -577,27 +632,32 @@
   "click:no_media_username_only": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://www.instagram.com/stories/erin/",
-        "metadata": {
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
           "username": "erin",
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+          "media_category": "story",
+          "shortcode": "Bv",
+          "timestamp": 1800000000
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -613,26 +673,32 @@
   "click:no_media_no_dictionary": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://www.instagram.com/stories/alice/111/",
-        "metadata": {
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
+          "media_category": "story",
+          "username": "alice",
+          "shortcode": "Bv",
+          "timestamp": 1800000000
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -644,26 +710,32 @@
   "click:media_found_by_center_scan": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/v/t51.2885-15/near.jpg?stp=dst-jpg",
-        "metadata": {
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
+          "media_category": "story",
+          "username": "alice",
+          "shortcode": "Bv",
+          "timestamp": 1800000000
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
@@ -675,26 +747,32 @@
   "click:center_scan_tie_prefers_larger": {
     "sent": [
       {
+        "action": "queue_download",
         "url": "https://scontent.cdninstagram.com/v/t51.2885-15/big.jpg?stp=dst-jpg",
-        "metadata": {
-          "media_category": "story"
-        },
-        "isFloating": true,
-        "buttonLoading": true
+        "mediaType": "direct_story",
+        "platform": "instagram",
+        "account": "M",
+        "direct_metadata": {
+          "media_category": "story",
+          "username": "alice",
+          "shortcode": "Bv",
+          "timestamp": 1800000000
+        }
       }
     ],
     "toasts": [
-      "showInfo:Starting download..."
+      "showInfo:Starting download...",
+      "showInfo:⏳ Starting download..."
     ],
     "fiberRequests": [],
     "consoleErrors": 0,
     "button": {
-      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "className": "md-native-btn md-story-dl-btn-inline md-success",
       "opacity": "0.5",
       "background": "rgba(255, 255, 255, 0.3)"
     },
     "downloadState": {
-      "class": "md-loading",
+      "class": "md-success",
       "isFloating": true,
       "storyKey": "alice/111",
       "hasHtml": true
