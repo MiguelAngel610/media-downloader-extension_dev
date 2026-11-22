@@ -51,6 +51,7 @@ async function buildSuites() {
         { name: 'Host security (path/TCP/stdout)', command: python, args: [fromRoot('tests/host/test_security.py'), host], skip: pythonSkip },
         { name: 'Host command injection', command: python, args: [fromRoot('tests/host/test_injection.py'), host, scratchDir], skip: pythonSkip },
         { name: 'Host direct downloads', command: python, args: [fromRoot('tests/host/test_direct_download.py'), host], skip: pythonSkip },
+        { name: 'Host routing equivalence (golden)', command: python, args: [fromRoot('tests/host/test_routing_equivalence.py'), host], skip: pythonSkip },
         { name: 'Host native protocol', command: python, args: [fromRoot('tests/host/test_protocol.py'), host], skip: pythonSkip },
     ];
 }

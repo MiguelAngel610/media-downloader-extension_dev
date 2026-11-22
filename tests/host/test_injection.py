@@ -1,9 +1,9 @@
-import os, sys, subprocess, importlib.util
+import os, sys, subprocess
 host_path, marker_dir = sys.argv[1], sys.argv[2]
-spec = importlib.util.spec_from_file_location("host", host_path)
-host = importlib.util.module_from_spec(spec); spec.loader.exec_module(host)
-E = host.DownloaderEngines
-host.Logger.log_info = staticmethod(lambda msg: None)  # keep host.log untouched
+sys.path.insert(0, os.path.dirname(os.path.abspath(host_path)))
+from md_host import host_log, url_safety  # noqa: E402
+from md_host.engines import gallery_dl  # noqa: E402
+host_log.log_info = lambda msg: None  # keep host.log untouched
 
 def payload(name):
     marker = os.path.join(marker_dir, name)
@@ -19,15 +19,15 @@ results.append(("baseline old shell=True executes injected command", os.path.exi
 
 # NEW implementation
 url, marker = payload("new_pwned.txt")
-res = E.execute_gallery_dl(url, [])
+res = gallery_dl.download(url, [])
 results.append(("new code does NOT execute injected command", not os.path.exists(marker)))
 results.append(("new code still reports gallery-dl result", res.get("status") in ("error", "success", "skipped")))
-results.append(("option-looking URL rejected", E.execute_gallery_dl("--exec=calc", [])["message"] == "Rejected unsafe URL"))
-results.append(("file:// URL rejected", not E.is_safe_http_url("file:///C:/Windows/win.ini")))
-results.append(("normal https URL accepted", E.is_safe_http_url("https://www.instagram.com/p/ABC/?igsh=x&utm=y")))
-results.append(("resolver uses python -m gallery_dl", E.resolve_gallery_dl_command()[1:] == ["-m", "gallery_dl"]))
+results.append(("option-looking URL rejected", gallery_dl.download("--exec=calc", [])["message"] == "Rejected unsafe URL"))
+results.append(("file:// URL rejected", not url_safety.is_safe_http_url("file:///C:/Windows/win.ini")))
+results.append(("normal https URL accepted", url_safety.is_safe_http_url("https://www.instagram.com/p/ABC/?igsh=x&utm=y")))
+results.append(("resolver uses python -m gallery_dl", gallery_dl.resolve_command()[1:] == ["-m", "gallery_dl"]))
 
-for name, ok in results: print(("PASS" if ok else "FAIL") + "  " + name)
-print(f"
-{sum(ok for _, ok in results)}/{len(results)} passed")
+for name, ok in results:
+    print(("PASS" if ok else "FAIL") + "  " + name)
+print(f"\n{sum(ok for _, ok in results)}/{len(results)} passed")
 sys.exit(0 if all(ok for _, ok in results) else 1)

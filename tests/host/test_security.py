@@ -1,6 +1,6 @@
-"""Regression tests for host.py security fixes A (path traversal), B (TCP auth), C (stdout lock)."""
+"""Regression tests for the md_host security fixes A (path traversal), B (TCP auth), C (stdout lock)."""
 import contextlib
-import importlib.util
+import importlib
 import io
 import json
 import os
@@ -12,9 +12,9 @@ import threading
 import time
 
 host_path = sys.argv[1]
-spec = importlib.util.spec_from_file_location("host", host_path)
-host = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(host)
+sys.path.insert(0, os.path.dirname(os.path.abspath(host_path)))
+from md_host import host_log, native_messaging, path_guard, request_router, tcp_bridge, timestamps, url_safety  # noqa: E402
+from md_host.engines import direct_http, gallery_dl  # noqa: E402
 
 results = []
 def check(name, ok):
@@ -23,21 +23,21 @@ def check(name, ok):
 # Isolate: fake home directory, no writes to the real host.log
 fake_home = tempfile.mkdtemp(prefix="md_host_test_")
 real_expanduser = os.path.expanduser
-host.os.path.expanduser = lambda p: p.replace("~", fake_home, 1) if p.startswith("~") else real_expanduser(p)
-host.Logger.log_info = staticmethod(lambda msg: None)
+os.path.expanduser = lambda p: p.replace("~", fake_home, 1) if p.startswith("~") else real_expanduser(p)
+host_log.log_info = lambda msg: None
 gallery_dir = os.path.join(fake_home, "gallery-dl")
 
 # ---------------------------------------------------------------- A: path traversal
 written_paths = []
-host.DownloaderEngines.execute_direct_http = staticmethod(
+direct_http.download = (
     lambda url, filepath: written_paths.append(filepath) or {"status": "success", "filename": os.path.basename(filepath)})
 
 def direct_story(metadata, platform="instagram"):
     written_paths.clear()
-    host.MediaManager.downloaded_urls_cache.clear()
+    request_router.RECENT_REQUESTS.clear()
     msg = {"url": f"https://example.invalid/{time.time_ns()}.jpg", "mediaType": "direct_story", "platform": platform,
            "direct_metadata": dict({"timestamp": 1700000000, "shortcode": "ABC123"}, **metadata)}
-    return host.MediaManager.process_request(msg, platform, "M", "direct_story"), list(written_paths)
+    return request_router.process_request(msg), list(written_paths)
 
 def is_inside(path):
     return os.path.commonpath([os.path.realpath(gallery_dir), os.path.realpath(path)]) == os.path.realpath(gallery_dir)
@@ -54,21 +54,21 @@ res, paths = direct_story({"username": "CON"})
 check("A5 Windows reserved name is neutralized", paths and os.path.join("instagram", "_CON") in paths[0])
 res, _ = direct_story({"username": "x"}, platform="..\\..\\evil")
 check("A6 unknown platform rejected", res.get("message") == "Unknown platform")
-check("A7 sanitize_segment('..') falls back", host.PathGuard.sanitize_segment("..", "unknown") == "unknown")
+check("A7 sanitize_segment('..') falls back", path_guard.sanitize_segment("..", "unknown") == "unknown")
 try:
-    host.PathGuard.ensure_inside(gallery_dir, os.path.join(gallery_dir, "..", "outside"))
+    path_guard.ensure_inside(gallery_dir, os.path.join(gallery_dir, "..", "outside"))
     check("A8 ensure_inside rejects escaping path", False)
-except host.PathTraversalError:
+except path_guard.PathTraversalError:
     check("A8 ensure_inside rejects escaping path", True)
 
 # ---------------------------------------------------------------- B: TCP bridge auth
 forwarded = []
-host.NativeMessaging.send_message = classmethod(lambda cls, m: forwarded.append(m))
+native_messaging.send_message = lambda m: forwarded.append(m)
 
 with socket.socket() as probe:
     probe.bind(("127.0.0.1", 0))
     port = probe.getsockname()[1]
-server = host.TCPServer(port=port)
+server = tcp_bridge.TcpBridgeServer(port=port)
 server.start()
 time.sleep(0.3)
 token = open(os.path.join(gallery_dir, "md_bridge_token.txt"), encoding="utf-8").read().strip()
@@ -83,7 +83,7 @@ def session(lines, raw_chunks=None, wait=0.3, read_logs=False):
     time.sleep(wait)
     received = b""
     if read_logs:
-        host.Logger.broadcast_log("hello-log-line")
+        host_log.broadcast("hello-log-line")
         s.settimeout(1)
         try:
             received = s.recv(4096)
@@ -134,16 +134,14 @@ def parse_frames(raw):
     return frames, offset == len(raw)
 
 def hammer(use_lock):
-    spec2 = importlib.util.spec_from_file_location("host_fresh", host_path)
-    fresh = importlib.util.module_from_spec(spec2)
-    spec2.loader.exec_module(fresh)
+    fresh = importlib.reload(native_messaging)  # undo the send_message stub installed for section B
     if not use_lock:
-        fresh.NativeMessaging._stdout_lock = contextlib.nullcontext()
+        fresh._STDOUT_LOCK = contextlib.nullcontext()
     fake = FakeStdout()
     real_stdout = sys.stdout
     sys.stdout = fake
     try:
-        threads = [threading.Thread(target=lambda i=i: [fresh.NativeMessaging.send_message({"t": i, "n": n, "pad": "x" * 50}) for n in range(30)])
+        threads = [threading.Thread(target=lambda i=i: [fresh.send_message({"t": i, "n": n, "pad": "x" * 50}) for n in range(30)])
                    for i in range(20)]
         for t in threads: t.start()
         for t in threads: t.join()
@@ -158,7 +156,7 @@ count, clean = hammer(use_lock=False)
 check("C2 baseline without lock corrupts frames", not (count == 600 and clean))
 
 big = {"status": "success", "log": "y" * (2 * 1024 * 1024)}
-check("C3 >1MB message is trimmed under Chrome's limit", len(host.NativeMessaging._encode(big)) <= 1024 * 1024)
+check("C3 >1MB message is trimmed under Chrome's limit", len(native_messaging.encode_message(big)) <= 1024 * 1024)
 
 for name, ok in results:
     print(("PASS  " if ok else "FAIL  ") + name)

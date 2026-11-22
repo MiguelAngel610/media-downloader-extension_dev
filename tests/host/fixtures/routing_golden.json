@@ -1,0 +1,351 @@
+{
+  "fb_backup": {
+    "calls": [
+      {
+        "arg": {
+          "cookiefile": "<HOME>/gallery-dl/www.facebook.com_cookies.txt",
+          "outtmpl": "<HOME>/gallery-dl/Bandeja_Favoritos/facebook/post/ivy/2023-11-15_456.%(ext)s"
+        },
+        "engine": "ytdlp",
+        "url": "https://www.facebook.com/reel/456"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "fb_blob_story_url": {
+    "calls": [
+      {
+        "arg": {
+          "cookiefile": "<HOME>/gallery-dl/www.facebook.com_cookies.txt",
+          "outtmpl": "<HOME>/gallery-dl/facebook/frank/Videos/2023-11-15_777.%(ext)s"
+        },
+        "engine": "ytdlp",
+        "url": "https://www.facebook.com/stories/1/2"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "fb_direct_image": {
+    "calls": [
+      {
+        "arg": "<HOME>/gallery-dl/facebook/frank/Pictures/2023-11-15_pfbidABC.jpg",
+        "engine": "direct_http",
+        "url": "https://scontent.fbcdn.example/i.jpg"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "fb_direct_video_user_id": {
+    "calls": [
+      {
+        "arg": "<HOME>/gallery-dl/facebook/frank/Videos/2023-11-15_987654321.mp4",
+        "engine": "direct_http",
+        "url": "https://video.fbcdn.example/v.mp4"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "fb_page_story_photo": {
+    "calls": [
+      {
+        "arg": {
+          "cookiefile": "<HOME>/gallery-dl/www.facebook.com_cookies.txt",
+          "outtmpl": "<HOME>/gallery-dl/facebook/ivy/Pictures/2023-11-15_1700049600.%(ext)s"
+        },
+        "engine": "ytdlp",
+        "url": "https://www.facebook.com/stories/1"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "fb_page_video": {
+    "calls": [
+      {
+        "arg": {
+          "cookiefile": "<HOME>/gallery-dl/www.facebook.com_cookies.txt",
+          "outtmpl": "<HOME>/gallery-dl/facebook/ivy/Videos/2023-11-15_123.%(ext)s"
+        },
+        "engine": "ytdlp",
+        "url": "https://www.facebook.com/reel/123"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_backup_pfp": {
+    "calls": [
+      {
+        "arg": "<HOME>/gallery-dl/Bandeja_Favoritos/instagram/dave/dave_profile_pic_2023-11-15_<HMS>.jpg",
+        "engine": "direct_http",
+        "url": "https://cdn.example/s/p.jpg"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_backup_story": {
+    "calls": [
+      {
+        "arg": "<HOME>/gallery-dl/Bandeja_Favoritos/instagram/story/dave/2023-11-15_999.jpg",
+        "engine": "direct_http",
+        "url": "https://cdn.example/s/9.jpg"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_blob_story_id": {
+    "calls": [
+      {
+        "arg": [
+          "--config",
+          "<HOME>/gallery-dl/config.json",
+          "--cookies",
+          "<HOME>/gallery-dl/www.instagram.com_cookiesM.txt"
+        ],
+        "engine": "gallery_dl",
+        "url": "https://www.instagram.com/stories/erin/31234567/"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_blob_with_shortcode": {
+    "calls": [
+      {
+        "arg": [
+          "--config",
+          "<HOME>/gallery-dl/config.json",
+          "--cookies",
+          "<HOME>/gallery-dl/www.instagram.com_cookiesM.txt"
+        ],
+        "engine": "gallery_dl",
+        "url": "https://www.instagram.com/p/BLOBSHORT01/"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_carousel_index": {
+    "calls": [
+      {
+        "arg": "<HOME>/gallery-dl/instagram/alice/2023-11-15_ABCDEFGHIJK_3.jpg",
+        "engine": "direct_http",
+        "url": "https://cdn.example/a/2.jpg"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_dash": {
+    "calls": [
+      {
+        "arg": {
+          "enable_file_urls": true,
+          "merge_output_format": "mp4",
+          "outtmpl": "<HOME>/gallery-dl/instagram/bob/2023-11-15_DASHSHORT01.%(ext)s",
+          "updatetime": false
+        },
+        "engine": "ytdlp",
+        "url": "<TMP_MANIFEST_URI>"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_gallery_account_m": {
+    "calls": [
+      {
+        "arg": [
+          "--config",
+          "<HOME>/gallery-dl/config.json",
+          "--cookies",
+          "<HOME>/gallery-dl/www.instagram.com_cookiesM.txt"
+        ],
+        "engine": "gallery_dl",
+        "url": "https://www.instagram.com/p/ABCDEFGHIJK/"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_gallery_account_v": {
+    "calls": [
+      {
+        "arg": [
+          "--config",
+          "<HOME>/gallery-dl/config.json",
+          "--cookies",
+          "<HOME>/gallery-dl/www.instagram.com_cookiesV.txt"
+        ],
+        "engine": "gallery_dl",
+        "url": "https://www.instagram.com/p/ABCDEFGHIJK/"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_gallery_backup": {
+    "calls": [
+      {
+        "arg": [
+          "--config",
+          "<HOME>/gallery-dl/config.json",
+          "-d",
+          "<HOME>/gallery-dl/Bandeja_Favoritos/instagram/post/gina"
+        ],
+        "engine": "gallery_dl",
+        "url": "https://www.instagram.com/p/BACKUPCODE1/"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_image_media_id_only": {
+    "calls": [
+      {
+        "arg": "<HOME>/gallery-dl/instagram/alice/2023-11-15_3123456789.jpg",
+        "engine": "direct_http",
+        "url": "https://cdn.example/a/1.jpg"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_image_shortcode": {
+    "calls": [
+      {
+        "arg": "<HOME>/gallery-dl/instagram/alice/2023-11-15_ABCDEFGHIJK.jpg",
+        "engine": "direct_http",
+        "url": "https://cdn.example/a/123_n.jpg"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_ms_timestamp": {
+    "calls": [
+      {
+        "arg": "<HOME>/gallery-dl/instagram/alice/2023-11-15_MSSHORTCODE.jpg",
+        "engine": "direct_http",
+        "url": "https://cdn.example/a/3.jpg"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_profile_pic": {
+    "calls": [
+      {
+        "arg": "<HOME>/gallery-dl/instagram/carol/carol_profile_pic_2023-11-15_<HMS>.jpg",
+        "engine": "direct_http",
+        "url": "https://cdn.example/p/pfp.jpg"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "ig_video_mp4": {
+    "calls": [
+      {
+        "arg": "<HOME>/gallery-dl/instagram/bob/2023-11-15_VIDEOSHORT1.mp4",
+        "engine": "direct_http",
+        "url": "https://cdn.example/v/clip.mp4?x=1"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "x_backup": {
+    "calls": [
+      {
+        "arg": {
+          "cookiefile": "<HOME>/gallery-dl/www.x.com_cookies.txt",
+          "outtmpl": "<HOME>/gallery-dl/Bandeja_Favoritos/twitter/post/hank/%(title)s.%(ext)s"
+        },
+        "engine": "ytdlp",
+        "url": "https://x.com/u/status/3"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "x_direct_tweet": {
+    "calls": [
+      {
+        "arg": {
+          "outtmpl": "<HOME>/gallery-dl/Twitter/X_1.%(ext)s"
+        },
+        "engine": "ytdlp",
+        "url": "https://pbs.twimg.com/media/A?format=jpg&name=orig"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  },
+  "x_page": {
+    "calls": [
+      {
+        "arg": {
+          "cookiefile": "<HOME>/gallery-dl/www.x.com_cookies.txt",
+          "outtmpl": "<HOME>/gallery-dl/Twitter/%(title)s.%(ext)s"
+        },
+        "engine": "ytdlp",
+        "url": "https://x.com/u/status/2"
+      }
+    ],
+    "result": {
+      "message": "captured",
+      "status": "success"
+    }
+  }
+}
