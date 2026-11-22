@@ -1,0 +1,172 @@
+{
+  "dictionary_ground_truth": {
+    "detection": {
+      "detected": true,
+      "isReel": true,
+      "label": "@creator",
+      "href": "https://www.instagram.com/reel/SHAREDREEL1/",
+      "element": null
+    },
+    "toastStillPresent": false
+  },
+  "dictionary_without_shared_item": {
+    "detection": {
+      "detected": false,
+      "element": null
+    },
+    "toastStillPresent": false
+  },
+  "centered_reel_link": {
+    "detection": {
+      "detected": true,
+      "isReel": true,
+      "label": "Watch full reel",
+      "href": "https://www.instagram.com/reel/REELCODE01/",
+      "element": "a:Watch full reel"
+    },
+    "toastStillPresent": false
+  },
+  "post_link_without_text": {
+    "detection": {
+      "detected": true,
+      "isReel": false,
+      "label": "See post",
+      "href": "https://www.instagram.com/p/POSTCODE01/",
+      "element": "a:"
+    },
+    "toastStillPresent": false
+  },
+  "tv_link_is_reel": {
+    "detection": {
+      "detected": true,
+      "isReel": true,
+      "label": "IGTV",
+      "href": "https://www.instagram.com/tv/TVCODE0001/",
+      "element": "a:IGTV"
+    },
+    "toastStillPresent": false
+  },
+  "link_in_extension_ui_ignored": {
+    "detection": {
+      "detected": false,
+      "element": null
+    },
+    "toastStillPresent": false
+  },
+  "hidden_link_skipped_next_used": {
+    "detection": {
+      "detected": true,
+      "isReel": true,
+      "label": "Watch",
+      "href": "https://www.instagram.com/reel/VISIBLE001/",
+      "element": "a:Watch"
+    },
+    "toastStillPresent": false
+  },
+  "link_outside_story_column": {
+    "detection": {
+      "detected": false,
+      "element": null
+    },
+    "toastStillPresent": false
+  },
+  "zero_width_link_uses_left": {
+    "detection": {
+      "detected": true,
+      "isReel": false,
+      "label": "x",
+      "href": "https://www.instagram.com/p/ZEROWIDTH1/",
+      "element": "a:x"
+    },
+    "toastStillPresent": false
+  },
+  "link_below_viewport_ignored": {
+    "detection": {
+      "detected": false,
+      "element": null
+    },
+    "toastStillPresent": false
+  },
+  "text_badge_spanish_with_link": {
+    "detection": {
+      "detected": true,
+      "isReel": true,
+      "label": "Ver reel completo",
+      "href": "https://www.instagram.com/reels/abc/",
+      "element": "span:Ver reel completo"
+    },
+    "toastStillPresent": false
+  },
+  "text_badge_view_photo_no_link": {
+    "detection": {
+      "detected": true,
+      "isReel": false,
+      "label": "View photo",
+      "href": null,
+      "element": "div:View photo"
+    },
+    "toastStillPresent": false
+  },
+  "text_badge_hidden_skipped": {
+    "detection": {
+      "detected": false,
+      "element": null
+    },
+    "toastStillPresent": false
+  },
+  "text_badge_too_many_children": {
+    "detection": {
+      "detected": false,
+      "element": null
+    },
+    "toastStillPresent": false
+  },
+  "attribution_in_story_body": {
+    "detection": {
+      "detected": true,
+      "isReel": false,
+      "label": "@original_creator",
+      "href": null,
+      "element": "div#clickable:@original_creator"
+    },
+    "toastStillPresent": false
+  },
+  "attribution_in_header_ignored": {
+    "detection": {
+      "detected": false,
+      "element": null
+    },
+    "toastStillPresent": false
+  },
+  "attribution_with_space_ignored": {
+    "detection": {
+      "detected": false,
+      "element": null
+    },
+    "toastStillPresent": false
+  },
+  "nothing_removes_outdated_toast": {
+    "detection": {
+      "detected": false,
+      "element": null
+    },
+    "toastStillPresent": false
+  },
+  "detection_keeps_toast": {
+    "detection": {
+      "detected": true,
+      "isReel": false,
+      "label": "See post",
+      "href": "https://www.instagram.com/p/KEEPTOAST1/",
+      "element": "a:See post"
+    },
+    "toastStillPresent": true
+  },
+  "story_url_without_id": {
+    "detection": {
+      "detected": false,
+      "element": null
+    },
+    "toastStillPresent": false
+  }
+}

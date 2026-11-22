@@ -70,6 +70,8 @@
         "src/instagram/download/download_feedback.js",
         "src/instagram/ui/button_state.js",
         "src/instagram/features/pfp_button.js",
+        "src/instagram/stories/story_viewport.js",
+        "src/instagram/stories/shared_post_detector.js",
         "src/instagram/features/story_button.js",
         "src/instagram/features/feed_buttons.js",
         "dist/video_progress.bundle.js",
