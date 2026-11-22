@@ -12,7 +12,7 @@ const repoRoot = path.resolve(__dirname, '..', '..');
 const SCRIPTS = [
     'src/shared/utils/error_reporter.js',
     'src/instagram/ui/svgs.js',
-    'src/instagram/media_resolution/poster_signature.js',
+    'src/instagram/media_resolution/clicked_media.js',
     'src/instagram/download/download_metadata.js',
     'src/instagram/download/download_target.js',
     'src/instagram/download/download_feedback.js',

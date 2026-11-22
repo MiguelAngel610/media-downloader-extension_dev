@@ -584,3 +584,11 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 - Código muerto eliminado: los dos clamps de `activeIndex` (`> total`, `=== 0`) eran inalcanzables (el índice siempre sale de 1..segments.length).
 **Verificación:** golden master jsdom con el módulo empaquetado en memoria con esbuild (`buildSync({ stdin, write:false })`, verificado en Context7): `tests/js/story_progress_cases.js`, 25 casos (segmento activo, cache, throttle, arrastre, seek de video y 7 tipos de animaciones). 25/25 idéntico, mutación (1500 → 500 ms) detectada.
 **Limitación del test:** jsdom no calcula `position: static`, así que la rama `segmentRow.style.position = 'relative'` no queda cubierta (en Chrome sí ocurre).
+
+## Corrección (22 de Noviembre 2026): Módulos Divididos de Más, Unificados
+Revisión contra "código ravioli": un archivo pequeño que se usa en **un solo lugar** no aporta claridad, solo saltos entre pestañas.
+- `media_resolution/`: 4 archivos → 2. `clicked_media.js` = qué se clickeó (`extractSignature`, `posterSignatureOf`, `findCenteredShortcode`); `media_sources.js` = de dónde sale la URL (`requestFiberResult` + `findInMediaDictionary`). Las entradas anteriores de estas notas que mencionan `poster_signature.js`, `shortcode_locator.js`, `fiber_bridge.js` o `dictionary_fallback.js` ahora apuntan a estos dos archivos.
+- `interceptors/media/fiber/fiber_tree.js` (2 funciones, solo lo importaba `fiber_search.js`) → movido dentro de `fiber_search.js` sin `export`.
+- Se mantienen separados los módulos que usan 2 o más archivos (`progress/story/viewport.js`, `slide_guard`, `search_state`, `field_extractors`) y los que son un concepto propio (las 3 fases de la búsqueda Fiber, `download/`, `stories/`).
+- Archivos originales en `.trash/merged_modules_2026-11-22/`. Goldens sin cambios (comportamiento idéntico).
+**Criterio para futuras divisiones:** dividir por concepto (algo con nombre que se pueda probar solo), no por métrica. Una función larga pero lineal se queda como está; un helper usado una sola vez se queda en el mismo archivo.

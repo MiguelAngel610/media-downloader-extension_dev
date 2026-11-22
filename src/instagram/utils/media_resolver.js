@@ -1,8 +1,7 @@
 /**
  * @fileoverview Resolves the best media URL and metadata for a clicked feed/modal element
- * (Instagram content script). Steps: thumbnail signature (media_resolution/poster_signature.js)
- * -> expected shortcode (media_resolution/shortcode_locator.js) -> page-world fiber search
- * (media_resolution/fiber_bridge.js) -> media dictionary fallback (media_resolution/dictionary_fallback.js).
+ * (Instagram content script): identify the click (media_resolution/clicked_media.js), then ask the
+ * fiber search and fall back to the media dictionary (media_resolution/media_sources.js).
  * Classic content script: names are global and must stay unique across src/instagram.
  */
 

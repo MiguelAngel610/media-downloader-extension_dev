@@ -9,7 +9,6 @@
  *   3. look the media id up in server-rendered data                  (fiber/initial_data_search.js)
  */
 import { logError } from '../shared/logger.js';
-import { getFiber, walkUpFibers } from './fiber/fiber_tree.js';
 import { searchProps } from './fiber/props_search.js';
 import { searchDomProps } from './fiber/dom_props_search.js';
 import { searchInitialData } from './fiber/initial_data_search.js';
@@ -18,6 +17,34 @@ import { createSearchState, hasDashWithIdentity, hasIdentity, hasMediaWithIdenti
 /** @typedef {import('./fiber/search_state.js').FiberSearchState} FiberSearchState */
 
 const REQUEST_TYPE = 'MD_REQUEST_FIBER';
+
+// React's fiber tree follows the component hierarchy (not the DOM), so walking up from the
+// clicked <video>/<img> reaches the component that owns THIS post's data.
+const FIBER_KEY_PREFIXES = ['__reactFiber$', '__reactInternalInstance$'];
+const MAX_FIBER_STEPS = 200;
+
+/**
+ * @param {Element | null} element
+ * @returns {Record<string, any> | null} the fiber node React attached to a DOM element
+ */
+function getFiber(element) {
+    if (!element) return null;
+    const key = Object.keys(element).find((name) => FIBER_KEY_PREFIXES.some((prefix) => name.startsWith(prefix)));
+    return key ? element[key] : null;
+}
+
+/**
+ * Calls `visit` for each ancestor fiber (bounded) until it returns true.
+ * @param {Record<string, any> | null} startFiber
+ * @param {(fiber: Record<string, any>) => boolean} visit - return true to stop
+ */
+function walkUpFibers(startFiber, visit) {
+    let fiber = startFiber;
+    for (let steps = 0; fiber && steps < MAX_FIBER_STEPS; steps++) {
+        if (visit(fiber)) return;
+        fiber = fiber.return;
+    }
+}
 
 /**
  * @param {Record<string, any>} props

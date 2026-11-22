@@ -10,10 +10,8 @@ const repoRoot = path.resolve(__dirname, '..', '..');
 // Same order as manifest.json; files that do not exist (yet) are skipped.
 const SCRIPTS = [
     'src/shared/utils/error_reporter.js',
-    'src/instagram/media_resolution/poster_signature.js',
-    'src/instagram/media_resolution/shortcode_locator.js',
-    'src/instagram/media_resolution/fiber_bridge.js',
-    'src/instagram/media_resolution/dictionary_fallback.js',
+    'src/instagram/media_resolution/clicked_media.js',
+    'src/instagram/media_resolution/media_sources.js',
     'src/instagram/utils/media_resolver.js',
 ].filter((file) => fs.existsSync(path.join(repoRoot, file)));
 
