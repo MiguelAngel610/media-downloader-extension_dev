@@ -1,0 +1,250 @@
+{
+  "image_post": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_image_post",
+      "url": "https://cdn.example/i/a_n.jpg?stp=p1440x1440",
+      "dash": "",
+      "media_id": "111",
+      "shortcode": "IMAGESHORT1",
+      "index": null,
+      "user": "alice",
+      "time": 1700049600
+    }
+  ],
+  "video_with_dash": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_video_with_dash",
+      "url": "https://cdn.example/v/v2.mp4?w=1080",
+      "dash": "<?xml version=\"1.0\"?><MPD><Period><AdaptationSet mimeType=\"video/mp4\"/></Period></MPD>",
+      "media_id": "222",
+      "shortcode": "VIDEOSHORT1",
+      "index": null,
+      "user": "alice",
+      "time": 1700049600
+    }
+  ],
+  "carousel_index_given": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_carousel_index_given",
+      "url": "https://cdn.example/v/s2.mp4?w=1080",
+      "dash": "<?xml version=\"1.0\"?><MPD><Period><AdaptationSet mimeType=\"video/mp4\"/></Period></MPD>",
+      "media_id": "300",
+      "shortcode": "CAROUSEL001",
+      "index": 2,
+      "user": "alice",
+      "time": 1700049600
+    }
+  ],
+  "carousel_poster_sig": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_carousel_poster_sig",
+      "url": "https://cdn.example/i/s3_n.jpg?stp=p1080x1080",
+      "dash": "",
+      "media_id": "401",
+      "shortcode": "CAROUSEL002",
+      "index": 3,
+      "user": "alice",
+      "time": 1700049600
+    }
+  ],
+  "carousel_id_match": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_carousel_id_match",
+      "url": "https://cdn.example/i/x2_n.jpg?stp=p1080x1080",
+      "dash": "",
+      "media_id": "502",
+      "shortcode": "CAROUSEL003",
+      "index": 2,
+      "user": "alice",
+      "time": 1700049600
+    }
+  ],
+  "carousel_dash_match": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_carousel_dash_match",
+      "url": "https://cdn.example/v/d1.mp4?w=720",
+      "dash": "<?xml version=\"1.0\"?><MPD><Period><AdaptationSet mimeType=\"video/webm\"/></Period></MPD>",
+      "media_id": "601",
+      "shortcode": "CAROUSEL004",
+      "index": 1,
+      "user": "alice",
+      "time": 1700049600
+    }
+  ],
+  "shortcode_guard_skips_neighbour": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_shortcode_guard_skips_neighbour",
+      "url": "https://cdn.example/v/right.mp4?w=1080",
+      "dash": "",
+      "media_id": "",
+      "shortcode": "RIGHTSHORT1",
+      "index": null,
+      "user": "alice",
+      "time": 1700049605
+    }
+  ],
+  "graphql_sidecar": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_graphql_sidecar",
+      "url": "https://cdn.example/i/side2.jpg",
+      "dash": "",
+      "media_id": "",
+      "shortcode": "SIDECAR0001",
+      "index": 2,
+      "user": "bob",
+      "time": 1700049600
+    }
+  ],
+  "article_fallback_for_user_time": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_article_fallback_for_user_time",
+      "url": "https://cdn.example/v/portal.mp4?w=1080",
+      "dash": "",
+      "media_id": "",
+      "shortcode": "PORTALSHRT1",
+      "index": null,
+      "user": "carol",
+      "time": 1700049600
+    }
+  ],
+  "phase2_dom_props": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_phase2_dom_props",
+      "url": "https://cdn.example/v/dom.mp4?w=720",
+      "dash": "",
+      "media_id": "",
+      "shortcode": "DOMSHORTCD1",
+      "index": null,
+      "user": "dave",
+      "time": 1700049600
+    }
+  ],
+  "phase2_parent_dom_props": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_phase2_parent_dom_props",
+      "url": "https://cdn.example/i/p_n.jpg?stp=p1080x1080",
+      "dash": "",
+      "media_id": "",
+      "shortcode": "PARENTSHRT1",
+      "index": null,
+      "user": "alice",
+      "time": 1700049600
+    }
+  ],
+  "phase3_initial_data": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_phase3_initial_data",
+      "url": "https://cdn.example/v/i2.mp4?w=1080",
+      "dash": "<?xml version=\"1.0\"?><MPD><Period><AdaptationSet mimeType=\"video/mp4\"/></Period></MPD>",
+      "media_id": "909",
+      "shortcode": "INITIALDAT1",
+      "index": null,
+      "user": null,
+      "time": null
+    }
+  ],
+  "nothing_found": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_nothing_found",
+      "error": true,
+      "media_id": "",
+      "shortcode": ""
+    }
+  ],
+  "poster_sig_no_match_falls_through": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_poster_sig_no_match_falls_through",
+      "error": true,
+      "media_id": "801",
+      "shortcode": "NOMATCHSHR1"
+    }
+  ],
+  "depth_limit": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_depth_limit",
+      "error": true,
+      "media_id": "",
+      "shortcode": "DEEPSHORTCD"
+    }
+  ],
+  "video_url_and_dash_manifest_fields": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_video_url_and_dash_manifest_fields",
+      "url": "https://cdn.example/v/legacy.mp4",
+      "dash": "<?xml version=\"1.0\"?><MPD><Period><AdaptationSet mimeType=\"video/mp4\"/></Period></MPD>",
+      "media_id": "",
+      "shortcode": "LEGACYSHRT1",
+      "index": null,
+      "user": "erin",
+      "time": 1700049600
+    }
+  ],
+  "short_manifest_rejected": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_short_manifest_rejected",
+      "url": "https://cdn.example/v/sm.mp4?w=720",
+      "dash": "",
+      "media_id": "",
+      "shortcode": "SHORTMANIF1",
+      "index": null,
+      "user": "alice",
+      "time": 1700049600
+    }
+  ],
+  "username_with_space_ignored": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_username_with_space_ignored",
+      "url": "https://cdn.example/i/sp_n.jpg?stp=p1080x1080",
+      "dash": "",
+      "media_id": "",
+      "shortcode": "SPACESHORT1",
+      "index": null,
+      "user": "frank",
+      "time": 1700049600
+    }
+  ],
+  "pending_props_differ": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_pending_props_differ",
+      "url": "https://cdn.example/i/pd_n.jpg?stp=p1080x1080",
+      "dash": "",
+      "media_id": "",
+      "shortcode": "PENDINGSHR1",
+      "index": null,
+      "user": "alice",
+      "time": 1700049600
+    }
+  ],
+  "throwing_getter_and_cycle": [
+    {
+      "type": "MD_FIBER_RESULT",
+      "id": "case_throwing_getter_and_cycle",
+      "url": "https://cdn.example/i/cyc_n.jpg?stp=p1080x1080",
+      "dash": "",
+      "media_id": "",
+      "shortcode": "CYCLESHORTC",
+      "index": null,
+      "user": "alice",
+      "time": 1700049600
+    }
+  ]
+}

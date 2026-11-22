@@ -31,6 +31,9 @@ async function buildSuites() {
     const qualityBundle = path.join(scratchDir, 'quality_main_world.bundle.mjs');
     await esbuild.build({ entryPoints: [fromRoot('tests/js/quality_main_world.test.mjs')], bundle: true, platform: 'node', format: 'esm', outfile: qualityBundle, logLevel: 'error' });
 
+    const fiberBundle = path.join(scratchDir, 'fiber_golden.bundle.mjs');
+    await esbuild.build({ entryPoints: [fromRoot('tests/js/fiber_golden.test.mjs')], bundle: true, platform: 'node', format: 'esm', outfile: fiberBundle, logLevel: 'error' });
+
     const remuxDir = mkdtempSync(path.join(scratchDir, 'remux_'));
     let remuxSkip = ffmpeg ? '' : 'ffmpeg not found on PATH (set FFMPEG_DIR to enable)';
     if (ffmpeg) {
@@ -44,6 +47,7 @@ async function buildSuites() {
     return [
         { name: 'IG ghost mode (bundle)', command: 'node', args: [fromRoot('tests/js/ghost_mode.test.js'), fromRoot('dist/ig_interceptor.bundle.js')] },
         { name: 'IG media quality (MAIN world)', command: 'node', args: [qualityBundle] },
+        { name: 'IG fiber search (golden)', command: 'node', args: [fiberBundle, fromRoot('tests/js/fixtures/fiber_golden.json')] },
         { name: 'IG profile pic + X images (DOM)', command: 'node', args: [fromRoot('tests/js/quality_dom.test.js'), fromRoot('src/instagram/utils/pfp_resolver.js'), fromRoot('src/x/x_buttons.js')] },
         { name: 'Toast/popup XSS', command: 'node', args: [fromRoot('tests/js/toast_xss.test.js'), fromRoot('src/shared/utils/toast_manager.js'), fromRoot('src/popup/popup.js')] },
         { name: 'Service worker', command: 'node', args: [fromRoot('tests/js/service_worker.test.js'), repoRoot] },

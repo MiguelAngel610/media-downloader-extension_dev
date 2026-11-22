@@ -29,6 +29,8 @@ const REFACTORED_MODULES = [
     'src/instagram/interceptors/ghost/ghost_settings.js',
     'src/instagram/interceptors/network/request_body.js',
     'src/instagram/interceptors/media/media_quality.js',
+    'src/instagram/interceptors/media/fiber_search.js',
+    'src/instagram/interceptors/media/fiber/*.js',
     'src/instagram/interceptors/media/profile_pic_collector.js',
     'src/instagram/interceptors/shared/time_utils.js',
     'src/instagram/utils/pfp_resolver.js',
