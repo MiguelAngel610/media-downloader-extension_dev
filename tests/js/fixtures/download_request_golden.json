@@ -1,0 +1,663 @@
+{
+  "feed_media_id_wins": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "alice",
+        "timestamp": 1700049600,
+        "media_id": "3123456789012345678_42",
+        "shortcode": "CtYv2acXPNO",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "feed_username_from_dom": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "timestamp": 1700049600,
+        "shortcode": "POSTCODE002",
+        "username": "alice",
+        "media_id": "123456_789_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "numeric_shortcode_closest_anchor": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "bob",
+        "timestamp": 1700049600,
+        "shortcode": "GRIDCODE01",
+        "media_id": "123456_789_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "long_dashed_shortcode_trimmed": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "bob",
+        "timestamp": 1700049600,
+        "shortcode": "ABCDEFGHIJKLMNOPQ",
+        "media_id": "123456_789_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "shortcode_from_article_links": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "carol",
+        "timestamp": 1700049600,
+        "shortcode": "REELCODE01",
+        "media_id": "123456_789_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "shortcode_from_location": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "dave",
+        "timestamp": 1700049600,
+        "shortcode": "LOCATIONCD1",
+        "media_id": "123456_789_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "story_location_id": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "erin",
+        "timestamp": 1700049600,
+        "shortcode": "CtYv2acXPNO",
+        "media_id": "123456_789_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-native-btn md-story-dl-btn-inline md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "body",
+      "class": "md-success",
+      "storyKey": "erin/3123456789012345678"
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "long_shortcode_dropped": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "frank",
+        "timestamp": 1700049600,
+        "shortcode": null,
+        "media_id": "123456_789_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": null,
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "timestamp_from_time_element": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "alice",
+        "shortcode": "TIMECODE01",
+        "timestamp": 1699956000,
+        "media_id": "123456_789_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "media_id_from_url_filename": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://cdn.example/v/t51/987654_321_n.jpg?x=1",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "gina",
+        "timestamp": 1700049600,
+        "shortcode": "FILECODE01",
+        "media_id": "987654_321_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "blob_story_with_id_in_url": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://www.instagram.com/stories/hank/3123456789012345678/",
+      "mediaType": "auto",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "hank",
+        "timestamp": 1700049600,
+        "shortcode": "CtYv2acXPNO",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-native-btn md-story-dl-btn-inline md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "body",
+      "class": "md-success",
+      "storyKey": "hank/3123456789012345678"
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "blob_story_user_and_media_id": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://www.instagram.com/stories/ivy/3111111111111111111/",
+      "mediaType": "auto",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "ivy",
+        "timestamp": 1700049600,
+        "media_id": "3111111111111111111_7",
+        "shortcode": "Css4xJ6jHHH",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-native-btn md-story-dl-btn-inline md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "body",
+      "class": "md-success",
+      "storyKey": "ivy"
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "blob_story_user_only": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://www.instagram.com/stories/jack/",
+      "mediaType": "auto",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "jack",
+        "timestamp": 1700049600,
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-native-btn md-story-dl-btn-inline md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "body",
+      "class": "md-success",
+      "storyKey": "jack"
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "blob_post_with_shortcode": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://www.instagram.com/p/BLOBPOST01/",
+      "mediaType": "auto",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "kate",
+        "timestamp": 1700049600,
+        "shortcode": "BLOBPOST01",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "blob_post_shortcode_from_location": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://www.instagram.com/p/LOCREEL001/",
+      "mediaType": "auto",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "liam",
+        "timestamp": 1700049600,
+        "shortcode": "LOCREEL001",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": null,
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "blob_unresolvable_aborts": {
+    "message": null,
+    "buttonClass": "md-post-btn md-error",
+    "buttonIcon": "original",
+    "state": null,
+    "toasts": [],
+    "alerts": [],
+    "errors": [
+      "Media Downloader: Cannot resolve original URL for blob."
+    ]
+  },
+  "blob_with_dash_is_direct": {
+    "message": {
+      "action": "queue_download",
+      "url": "blob:https://www.instagram.com/g",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "noah",
+        "timestamp": 1700049600,
+        "shortcode": "DASHCODE01",
+        "dash_manifest": "<MPD>x</MPD>",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "carousel_delegated_media_type": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://www.instagram.com/p/CAROUSEL01/",
+      "mediaType": "auto",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "shortcode": "CAROUSEL01",
+        "media_category": "post",
+        "mediaType": "auto",
+        "index": 2,
+        "username": "Unknown",
+        "timestamp": 1699956000
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "host_rejects_request": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "alice",
+        "timestamp": 1700049600,
+        "shortcode": "ERRCODE001",
+        "media_id": "123456_789_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-error",
+    "buttonIcon": "download",
+    "state": {
+      "on": "post",
+      "class": "md-error",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ],
+      [
+        "showError",
+        "❌ Download not started",
+        "Python host is not installed"
+      ]
+    ],
+    "alerts": [],
+    "errors": [
+      "Media Downloader: download request rejected: Python host is not installed"
+    ]
+  },
+  "extension_context_invalidated": {
+    "message": null,
+    "buttonClass": "md-post-btn",
+    "buttonIcon": "original",
+    "state": {
+      "on": "post",
+      "class": "md-loading",
+      "storyKey": null
+    },
+    "toasts": [],
+    "alerts": [
+      "La extensión fue actualizada. Por favor, recarga esta pestaña de Instagram para seguir descargando."
+    ],
+    "errors": []
+  },
+  "account_v_and_null_metadata": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "V",
+      "direct_metadata": {
+        "username": "alice",
+        "shortcode": "NULLMETA01",
+        "timestamp": 1699956000,
+        "media_id": "123456_789_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-post-btn md-success",
+    "buttonIcon": "check",
+    "state": {
+      "on": "post",
+      "class": "md-success",
+      "storyKey": null
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  },
+  "story_changed_before_response": {
+    "message": {
+      "action": "queue_download",
+      "url": "https://scontent.cdninstagram.com/v/t51.2885-15/123456_789_n.jpg?stp=dst-jpg_e35",
+      "mediaType": "direct_story",
+      "platform": "instagram",
+      "account": "M",
+      "direct_metadata": {
+        "username": "olga",
+        "timestamp": 1700049600,
+        "shortcode": "CtYv2acXPNO",
+        "media_id": "123456_789_n",
+        "media_category": "post"
+      }
+    },
+    "buttonClass": "md-native-btn md-story-dl-btn-inline",
+    "buttonIcon": "download",
+    "state": {
+      "on": "body",
+      "class": "md-success",
+      "storyKey": "olga/3123456789012345678"
+    },
+    "toasts": [
+      [
+        "showInfo",
+        "⏳ Starting download...",
+        null
+      ]
+    ],
+    "alerts": [],
+    "errors": []
+  }
+}

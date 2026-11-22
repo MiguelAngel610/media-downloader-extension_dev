@@ -1,284 +1,92 @@
-/* Media Downloader - Button State: Icon updates and download request dispatch */
+/**
+ * @fileoverview Download button icon/state helpers and the download request entry point (Instagram content script).
+ * Classic content script: names are global and must stay unique across src/instagram.
+ */
 
+const BUTTON_STORY_KEY_IN_PATH = /\/stories\/([^/?#]+)(?:\/(\d+))?/;
+
+/**
+ * Swaps the button icon. Native-looking buttons keep the original SVG's class/color so they still
+ * match Instagram's theme; floating buttons simply replace their content.
+ * @param {Element} btn
+ * @param {string} newSvgCode - trusted static SVG markup (svgs.js)
+ * @param {boolean} isFloating
+ */
 function updateButtonIcon(btn, newSvgCode, isFloating) {
     if (isFloating) {
         btn.innerHTML = newSvgCode;
         return;
     }
-    let oldSvg = btn.querySelector('svg');
-    if (oldSvg) {
-        let tmp = document.createElement('div');
-        tmp.innerHTML = newSvgCode;
-        let newSvg = tmp.querySelector('svg');
-        if (newSvg) {
-            if (oldSvg.hasAttribute('class')) newSvg.setAttribute('class', oldSvg.getAttribute('class'));
-            if (oldSvg.hasAttribute('color')) newSvg.setAttribute('color', oldSvg.getAttribute('color'));
-            newSvg.setAttribute('fill', 'none');
-            newSvg.setAttribute('stroke-width', '2');
-            oldSvg.replaceWith(newSvg);
-        }
-    }
+    const oldSvg = btn.querySelector('svg');
+    if (!oldSvg) return;
+    const template = document.createElement('div');
+    template.innerHTML = newSvgCode;
+    const newSvg = template.querySelector('svg');
+    if (!newSvg) return;
+    if (oldSvg.hasAttribute('class')) newSvg.setAttribute('class', oldSvg.getAttribute('class'));
+    if (oldSvg.hasAttribute('color')) newSvg.setAttribute('color', oldSvg.getAttribute('color'));
+    newSvg.setAttribute('fill', 'none');
+    newSvg.setAttribute('stroke-width', '2');
+    oldSvg.replaceWith(newSvg);
 }
 
+/**
+ * Identifies the story slide on screen ("user/storyId"), or the page path outside stories.
+ * @returns {string}
+ */
 function getStoryKey() {
-    let url = window.location.href;
-    let match = url.match(/\/stories\/([^\/?#]+)(?:\/(\d+))?/);
-    if (match) {
-        let userOrType = match[1];
-        let storyId = match[2] || '';
-        try {
-            let params = new URLSearchParams(window.location.search);
-            let queryMediaId = params.get('story_media_id');
-            if (queryMediaId) storyId = queryMediaId;
-        } catch (err) { window.MDErrorReporter.reportError('IG: story_media_id query param', err); }
-        if (storyId) return userOrType + '/' + storyId;
-        return userOrType;
-    }
-    return window.location.pathname;
+    const match = window.location.href.match(BUTTON_STORY_KEY_IN_PATH);
+    if (!match) return window.location.pathname;
+    const userOrType = match[1];
+    const storyId = new URLSearchParams(window.location.search).get('story_media_id') || match[2] || '';
+    return storyId ? `${userOrType}/${storyId}` : userOrType;
 }
 window.getStoryKey = getStoryKey;
 
+/**
+ * Sends one download to the host and drives the button feedback.
+ * Steps: loading state -> complete metadata (download_metadata.js) -> choose URL and strategy
+ * (download_target.js) -> queue_download -> success/error feedback (download_feedback.js).
+ * @param {Element} btn
+ * @param {string | null | undefined} url - CDN URL, page URL or blob: URL of the media
+ * @param {Record<string, any> | null | undefined} metadata - partial metadata from the resolvers (mutated)
+ * @param {boolean} [isFloating]
+ * @param {Element | null} [originalElement] - the post element when btn lives in the overlay root
+ */
 function sendDownloadRequest(btn, url, metadata, isFloating = false, originalElement = null) {
     btn.classList.add('md-loading');
+    const storyContext = isStoryContext(btn);
+    /** @type {DownloadFeedbackContext} */
+    const feedback = {
+        button: btn,
+        holder: downloadStateHolder(btn, originalElement, storyContext),
+        isFloating,
+        storyKey: storyContext ? getStoryKey() : null,
+    };
+    saveDownloadState(feedback, 'md-loading', SVG_DOWNLOAD);
 
-    let isStoryBtn = btn && btn.classList.contains('md-story-dl-btn-inline');
-    let parentArticle;
-    let requestStoryKey = (isStoryBtn || window.location.href.includes('/stories/')) ?
-        (typeof getStoryKey === 'function' ? getStoryKey() : window.location.pathname) : null;
-
-    if (isStoryBtn || window.location.href.includes('/stories/')) {
-        parentArticle = document.body;
-    } else {
-        parentArticle = (originalElement || btn).closest('article, main, div[role="dialog"]');
-    }
-    if (parentArticle) {
-        parentArticle.__md_download_state = {
-            time: Date.now(),
-            class: 'md-loading',
-            html: SVG_DOWNLOAD,
-            isFloating: isFloating,
-            storyKey: requestStoryKey
-        };
-    }
-
-    if (!metadata) metadata = {};
-
-    // Patch missing username
-    if (!metadata.username || metadata.username === "") {
-        metadata.username = resolveUsername(btn, originalElement);
-    }
-
-    // Always prioritize the exact media_id to calculate the perfect shortcode, as it guarantees uniqueness per slide/story
-    if (metadata.media_id && String(metadata.media_id).match(/^\d+(_\d+)?$/)) {
-        metadata.shortcode = idToShortcode(String(metadata.media_id).split('_')[0]);
-    }
-
-    // Patch shortcode if missing, if it's a numeric ID, or if it's an unusually long hash (>15 chars)
-    if (!metadata.shortcode || String(metadata.shortcode).match(/^\d+(_\d+)?$/) || String(metadata.shortcode).length > 15) {
-        let foundShortcode = null;
-
-        // 1. Try closest anchor (e.g. Grid thumbnails)
-        let aTag = (originalElement || btn).closest('a');
-        if (aTag && aTag.href) {
-            let m1 = aTag.href.match(/\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/);
-            if (m1) {
-                let s = m1[1];
-                if (s.length > 15 && s.includes('-')) s = s.split('-')[0];
-                foundShortcode = s;
-            }
-        }
-
-        // 2. Try any anchor inside the post (e.g. Timestamp or Comments link)
-        if (!foundShortcode) {
-            let article = (originalElement || btn).closest('article, main, div[role="dialog"]');
-            if (article) {
-                let links = article.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"]');
-                for (let a of links) {
-                    let m2 = a.href.match(/\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/);
-                    if (m2) {
-                        let s = m2[1];
-                        if (s.length > 15 && s.includes('-')) s = s.split('-')[0];
-                        foundShortcode = s;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // 3. Try address bar (Posts) - ONLY as a fallback if the button is on the main post itself
-        if (!foundShortcode) {
-            let m3 = window.location.href.match(/\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/);
-            if (m3) {
-                let s = m3[1];
-                if (s.length > 15 && s.includes('-')) s = s.split('-')[0];
-                foundShortcode = s;
-            }
-        }
-
-        // 4. Try address bar (Stories)
-        if (!foundShortcode) {
-            let m4 = window.location.href.match(/\/stories\/[^\/]+\/(\d+)/);
-            if (m4) foundShortcode = idToShortcode(m4[1]);
-        }
-
-        if (foundShortcode) {
-            metadata.shortcode = foundShortcode;
-        } else if (String(metadata.shortcode).match(/^\d+(_\d+)?$/)) {
-            metadata.shortcode = idToShortcode(String(metadata.shortcode).split('_')[0]);
-        } else if (String(metadata.shortcode).length > 15) {
-            metadata.shortcode = null;
-        }
-    }
-
-    if (!metadata.timestamp) metadata.timestamp = Math.floor(Date.now() / 1000);
-
-    // Patch timestamp using DOM <time> if it seems like a fallback (within last 1 min)
-    if (Math.abs((Date.now()/1000) - metadata.timestamp) < 60) {
-        let container = (originalElement || btn).closest('article, main, div[role="dialog"]');
-        if (container) {
-            let timeEl = container.querySelector('time[datetime]');
-            if (timeEl) {
-                let dtStr = timeEl.getAttribute('datetime');
-                if (dtStr) {
-                    metadata.timestamp = Math.floor(new Date(dtStr).getTime() / 1000);
-                }
-            }
-        }
-    }
-
-    // Ensure we have a unique media_id to prevent carousel overwrites
-    if (!metadata.media_id && url && url.startsWith('http')) {
-        try {
-            let urlFilename = url.split('?')[0].split('/').pop();
-            if (urlFilename && urlFilename.includes('_')) {
-                metadata.media_id = urlFilename.split('.')[0];
-            }
-        } catch (err) { window.MDErrorReporter.reportError('IG: media id from URL', err); }
-    }
-
+    const completedMetadata = completeDownloadMetadata(metadata, btn, originalElement, url);
     if (!chrome.runtime || !chrome.runtime.id) {
         alert("La extensión fue actualizada. Por favor, recarga esta pestaña de Instagram para seguir descargando.");
         btn.classList.remove('md-loading');
         return;
     }
 
-    chrome.storage.local.get(['selectedAccount'], function(result) {
-        const account = result.selectedAccount || 'M';
-
-        let finalUrl = url;
-        let mediaType = "auto";
-
-        if (getPlatform() === "instagram") {
-            if (url && url.startsWith('blob:') && (!metadata || !metadata.dash_manifest)) {
-                let isStoryBtn = btn && btn.classList.contains('md-story-dl-btn-inline');
-
-                if (isStoryBtn || window.location.href.includes('/stories/')) {
-                    let m = window.location.href.match(/\/stories\/([^\/]+)\/(\d+)/);
-                    if (m) {
-                        finalUrl = window.location.href;
-                    } else if (metadata.username && metadata.media_id) {
-                        finalUrl = "https://www.instagram.com/stories/" + metadata.username + "/" + String(metadata.media_id).split('_')[0] + "/";
-                    } else if (metadata.username) {
-                        finalUrl = "https://www.instagram.com/stories/" + metadata.username + "/";
-                    }
-                } else if (metadata.shortcode) {
-                    finalUrl = "https://www.instagram.com/p/" + metadata.shortcode + "/";
-                } else {
-                    let m = window.location.href.match(/\/(?:p|reel)\/([a-zA-Z0-9_-]+)/);
-                    if (m) finalUrl = "https://www.instagram.com/p/" + m[1] + "/";
-                }
-
-                if (finalUrl.startsWith('blob:')) {
-                    console.error("Media Downloader: Cannot resolve original URL for blob.");
-                    btn.classList.remove('md-loading');
-                    btn.classList.add('md-error');
-                    if (parentArticle) {
-                        parentArticle.__md_download_state = {
-                            time: Date.now(),
-                            class: 'md-error',
-                            html: SVG_DOWNLOAD,
-                            isFloating: isFloating,
-                            storyKey: requestStoryKey
-                        };
-                    }
-
-                    setTimeout(() => {
-                        btn.classList.remove('md-error');
-                        updateButtonIcon(btn, SVG_DOWNLOAD, isFloating);
-                        if (parentArticle && (!parentArticle.__md_download_state || parentArticle.__md_download_state.storyKey === requestStoryKey)) {
-                            delete parentArticle.__md_download_state;
-                        }
-                    }, 2000);
-                    return; // abort
-                }
-
-                mediaType = "auto";
-            } else {
-                // We have a direct CDN url (or a dash manifest). We can download natively!
-                mediaType = metadata && metadata.mediaType ? metadata.mediaType : "direct_story";
-            }
+    chrome.storage.local.get(['selectedAccount'], (result) => {
+        const target = resolveDownloadTarget(btn, url, completedMetadata);
+        if (!target) {
+            showUnresolvableBlob(feedback);
+            return;
         }
-
-        if (!metadata.media_category) {
-            metadata.media_category = "post";
-        }
-        
-        if (window.MDToastManager) {
-            window.MDToastManager.showInfo("⏳ Starting download...");
-        }
-
+        if (!completedMetadata.media_category) completedMetadata.media_category = "post";
+        if (window.MDToastManager) window.MDToastManager.showInfo("⏳ Starting download...");
         chrome.runtime.sendMessage({
             action: "queue_download",
-            url: finalUrl,
-            mediaType: mediaType,
+            url: target.url,
+            mediaType: target.mediaType,
             platform: getPlatform(),
-            account: account,
-            direct_metadata: metadata
-        }, (response) => {
-            btn.classList.remove('md-loading');
-
-            // "queued" only means the request reached the host; the real result arrives later as host_response.
-            let failed = Boolean(chrome.runtime.lastError) || !response || response.status === 'error';
-            if (failed) {
-                let reason = chrome.runtime.lastError ? chrome.runtime.lastError.message : (response && response.message) || "Unknown error";
-                console.error("Media Downloader: download request rejected:", reason);
-                if (window.MDToastManager) window.MDToastManager.showError("❌ Download not started", 5000, reason);
-            }
-            let stateClass = failed ? 'md-error' : 'md-success';
-            let stateIcon = failed ? SVG_DOWNLOAD : SVG_CHECK;
-
-            let activeStoryKey = (isStoryBtn || window.location.href.includes('/stories/')) ?
-                (typeof getStoryKey === 'function' ? getStoryKey() : window.location.pathname) : null;
-
-            let isSameStory = !requestStoryKey || (activeStoryKey === requestStoryKey);
-
-            if (isSameStory) {
-                btn.classList.add(stateClass);
-                updateButtonIcon(btn, stateIcon, isFloating);
-            } else {
-                btn.classList.remove('md-success', 'md-error');
-                updateButtonIcon(btn, SVG_DOWNLOAD, isFloating);
-            }
-
-            if (parentArticle) {
-                parentArticle.__md_download_state = {
-                    time: Date.now(),
-                    class: stateClass,
-                    html: stateIcon,
-                    isFloating: isFloating,
-                    storyKey: requestStoryKey
-                };
-            }
-
-            setTimeout(() => {
-                if (isSameStory) {
-                    btn.classList.remove('md-success', 'md-error');
-                    updateButtonIcon(btn, SVG_DOWNLOAD, isFloating);
-                }
-                if (parentArticle && (!parentArticle.__md_download_state || parentArticle.__md_download_state.storyKey === requestStoryKey)) {
-                    delete parentArticle.__md_download_state;
-                }
-            }, 2000);
-        });
+            account: result.selectedAccount || 'M',
+            direct_metadata: completedMetadata,
+        }, (response) => showQueueOutcome(feedback, response));
     });
 }

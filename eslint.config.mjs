@@ -34,6 +34,8 @@ const REFACTORED_MODULES = [
     'src/instagram/interceptors/media/profile_pic_collector.js',
     'src/instagram/interceptors/shared/time_utils.js',
     'src/instagram/utils/pfp_resolver.js',
+    'src/instagram/download/*.js',
+    'src/instagram/ui/button_state.js',
 ];
 
 // Page-world (MAIN) modules bundled by esbuild into dist/*.bundle.js.

@@ -7,11 +7,12 @@
     "build:features": "esbuild src/instagram/features/progress/index.js --bundle --format=iife --outfile=dist/video_progress.bundle.js --minify",
     "build": "npm run build:ig && npm run build:features",
     "watch:ig": "esbuild src/instagram/interceptors/index.js --bundle --format=iife --outfile=dist/ig_interceptor.bundle.js --watch",
-    "lint": "eslint .",
+    "lint": "eslint . && node tools/check_global_collisions.js .",
     "lint:strict": "eslint . --max-warnings 0",
     "audit": "node tools/code_metrics.js .",
     "test": "npm run build && node tests/run_all.mjs",
-    "check": "npm run lint && npm test"
+    "check": "npm run lint && npm test",
+    "lint:globals": "node tools/check_global_collisions.js ."
   },
   "repository": {
     "type": "git",
