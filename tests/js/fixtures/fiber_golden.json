@@ -44,7 +44,7 @@
       "id": "case_carousel_poster_sig",
       "url": "https://cdn.example/i/s3_n.jpg?stp=p1080x1080",
       "dash": "",
-      "media_id": "401",
+      "media_id": "403",
       "shortcode": "CAROUSEL002",
       "index": 3,
       "user": "alice",
@@ -68,11 +68,11 @@
     {
       "type": "MD_FIBER_RESULT",
       "id": "case_carousel_dash_match",
-      "url": "https://cdn.example/v/d1.mp4?w=720",
+      "url": "https://cdn.example/v/d2.mp4?w=720",
       "dash": "<?xml version=\"1.0\"?><MPD><Period><AdaptationSet mimeType=\"video/webm\"/></Period></MPD>",
-      "media_id": "601",
+      "media_id": "602",
       "shortcode": "CAROUSEL004",
-      "index": 1,
+      "index": 2,
       "user": "alice",
       "time": 1700049600
     }
@@ -169,7 +169,7 @@
       "type": "MD_FIBER_RESULT",
       "id": "case_poster_sig_no_match_falls_through",
       "error": true,
-      "media_id": "801",
+      "media_id": "",
       "shortcode": "NOMATCHSHR1"
     }
   ],

@@ -21,11 +21,18 @@ const CAROUSEL_KEYS = new Set(['carousel_media', 'edge_sidecar_to_children']);
  */
 function recordIdentity(obj, state, code) {
     if (!state.code && code) state.code = code;
-    const id = numericIdOf(obj);
-    if (id && !state.id) state.id = id;
     const user = usernameOf(obj);
     if (!state.user && user) state.user = user;
     if (!state.time) state.time = extractMediaTimestamp(obj);
+}
+
+/**
+ * @param {Record<string, any>} obj
+ * @param {FiberSearchState} state
+ */
+function recordMediaId(obj, state) {
+    const id = numericIdOf(obj);
+    if (id && !state.id) state.id = id;
 }
 
 /**
@@ -80,7 +87,8 @@ function searchCarousel(obj, slides, depth, visited, state, code) {
         try {
             if (!slides[i] || typeof slides[i] !== 'object') continue;
             searchProps(slides[i], depth + 1, visited, state, code, i);
-            if (hasDashWithIdentity(state)) return true;
+            // The manifest may come from the clicked element itself: keep going until a slide claims the index.
+            if (hasDashWithIdentity(state) && state.index) return true;
         } catch (err) {
             logErrorOnce('Fiber: carousel item', err);
         }
@@ -125,10 +133,14 @@ export function searchProps(obj, depth, visited, state, inheritedCode = null, sl
     const code = shortcodeOf(obj) || inheritedCode;
     if (isForeignPost(state, code)) return;
     recordIdentity(obj, state, code);
+    // A carousel slide may only define the media id AFTER passing the slide guard: recording it first
+    // made the id check match the slide against itself, so slide 1 always "won" (wrong media/index).
+    if (slideIndex < 0) recordMediaId(obj, state);
 
     const slides = carouselItemsOf(obj);
     if (slides && searchCarousel(obj, slides, depth, visited, state, code)) return;
     if (isWrongSlide(obj, state, slideIndex)) return;
+    if (slideIndex >= 0) recordMediaId(obj, state);
 
     recordMedia(obj, state, slideIndex);
     if (hasDashWithIdentity(state) || isImageComplete(obj, state)) return;

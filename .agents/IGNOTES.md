@@ -531,3 +531,10 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 - `network/`: `network.js` (fetch/XHR/beacon/WebSocket), `request_body.js`
 - `media/`: `media_parser.js`, `media_quality.js`, `profile_pic_collector.js`, `fiber_search.js`, `device_spoof.js`
 `index.js` conserva el orden de carga (logger → ghost_settings primero). Bundle y 11 suites de test en verde tras el movimiento.
+
+## Refactor + Fix (21 de Noviembre 2026): Fiber Search Modular y Bug del Carrusel "Slide 1 Siempre Gana"
+**Refactor (commit aparte, comportamiento idéntico):** el handler de 370 líneas (`searchProps` complejidad 173) se dividió en `interceptors/media/fiber/`: `field_extractors.js` (lectores puros), `search_state.js`, `slide_guard.js`, `props_search.js` (fase 1), `dom_props_search.js` (fase 2), `initial_data_search.js` (fase 3) y `fiber_tree.js`; `fiber_search.js` solo orquesta. Todos cumplen los límites de ESLint en modo estricto. Protegido por un golden master (`tests/js/fiber_cases.mjs` + `fixtures/fiber_golden.json`): 20 árboles fiber que cubren cada rama; la prueba de mutación (profundidad 15→25) lo hace fallar.
+**Bug encontrado al grabar el golden (causa de los viejos reportes "el carrusel descarga la primera imagen"):**
+1. `recordIdentity` guardaba el `pk` de cada slide como `media_id` ANTES del guard del slide, así que la comprobación por id comparaba el slide consigo mismo: el primer slide con `pk` siempre "coincidía" cuando el contenedor no traía `pk` propio.
+2. Al corregirlo apareció un segundo efecto: el bucle del carrusel terminaba en cuanto tenía DASH+usuario+fecha, pero el DASH podía venir del propio elemento clicado, así que salía sin que ningún slide reclamara el índice.
+**Fix:** el slide solo define `media_id` después de pasar el guard; el bucle del carrusel exige además `state.index`. Cambian exactamente 3 casos del golden (diff de 5 líneas en el fixture): `carousel_dash_match` slide 1→2 (URL, índice e id correctos), `carousel_poster_sig` media_id 401→403, `poster_sig_no_match` ya no reclama un id ajeno. Los otros 17 casos no cambian.
