@@ -49,6 +49,7 @@ async function buildSuites() {
         { name: 'IG media quality (MAIN world)', command: 'node', args: [qualityBundle] },
         { name: 'IG fiber search (golden)', command: 'node', args: [fiberBundle, fromRoot('tests/js/fixtures/fiber_golden.json')] },
         { name: 'IG download request (golden)', command: 'node', args: [fromRoot('tests/js/download_request_golden.test.js'), fromRoot('tests/js/fixtures/download_request_golden.json')] },
+        { name: 'IG media resolver (golden)', command: 'node', args: [fromRoot('tests/js/media_resolver_golden.test.js'), fromRoot('tests/js/fixtures/media_resolver_golden.json')] },
         { name: 'IG profile pic + X images (DOM)', command: 'node', args: [fromRoot('tests/js/quality_dom.test.js'), fromRoot('src/instagram/utils/pfp_resolver.js'), fromRoot('src/x/x_buttons.js')] },
         { name: 'Toast/popup XSS', command: 'node', args: [fromRoot('tests/js/toast_xss.test.js'), fromRoot('src/shared/utils/toast_manager.js'), fromRoot('src/popup/popup.js')] },
         { name: 'Service worker', command: 'node', args: [fromRoot('tests/js/service_worker.test.js'), repoRoot] },
