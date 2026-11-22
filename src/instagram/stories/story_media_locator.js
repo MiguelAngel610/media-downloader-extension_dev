@@ -2,6 +2,7 @@
  * @fileoverview Finds the <video>/<img> of the story on screen (Instagram content script).
  * First near the download button (same story card), then the largest centred media of the page.
  */
+import { horizontalOffsetFromCenter } from '../utils/viewport.js';
 
 const STORY_MEDIA_MAX_ANCESTOR_CLIMBS = 12;
 const STORY_MEDIA_MIN_SIZE_NEAR_BUTTON_PX = 150;
@@ -35,9 +36,8 @@ function findMediaNearButton(button) {
 function compareByCenterThenArea(a, b) {
     const aRect = a.getBoundingClientRect();
     const bRect = b.getBoundingClientRect();
-    const screenCenter = window.innerWidth / 2;
-    const aDistance = Math.abs(aRect.left + aRect.width / 2 - screenCenter);
-    const bDistance = Math.abs(bRect.left + bRect.width / 2 - screenCenter);
+    const aDistance = horizontalOffsetFromCenter(aRect);
+    const bDistance = horizontalOffsetFromCenter(bRect);
     if (Math.abs(aDistance - bDistance) < STORY_MEDIA_SAME_DISTANCE_PX) return bRect.width * bRect.height - aRect.width * aRect.height;
     return aDistance - bDistance;
 }
@@ -47,7 +47,7 @@ function findCenteredPageMedia() {
     const candidates = Array.from(document.querySelectorAll('video, img')).filter((element) => {
         const rect = element.getBoundingClientRect();
         return rect.width > STORY_MEDIA_MIN_SIZE_PAGE_PX && rect.height > STORY_MEDIA_MIN_SIZE_PAGE_PX && isHorizontallyOnScreen(rect)
-            && Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2) < STORY_MEDIA_MAX_CENTER_OFFSET_PX;
+            && horizontalOffsetFromCenter(rect) < STORY_MEDIA_MAX_CENTER_OFFSET_PX;
     }).sort(compareByCenterThenArea);
     return candidates.length > 0 ? candidates[0] : null;
 }

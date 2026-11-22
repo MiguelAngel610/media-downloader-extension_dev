@@ -4,7 +4,7 @@
  */
 import { getActiveStoryMedias } from './active_media.js';
 import { PROGRESS_CONTAINER_ID } from './segment_row.js';
-import { horizontalOffsetFromCenter } from './viewport.js';
+import { horizontalOffsetFromCenter } from '../../../utils/viewport.js';
 
 export const SLIDER_ID = 'md-story-slider';
 export const COUNTER_ID = 'md-story-counter';

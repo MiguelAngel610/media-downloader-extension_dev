@@ -2,7 +2,7 @@
  * @fileoverview Finds Instagram's row of story segment bars (the thin bars at the top of a story),
  * where the custom slider is mounted. Runs every frame: the row is cached and the DOM scan is throttled.
  */
-import { horizontalOffsetFromCenter } from './viewport.js';
+import { horizontalOffsetFromCenter } from '../../../utils/viewport.js';
 
 export const PROGRESS_CONTAINER_ID = 'md-story-progress-container';
 

@@ -24,12 +24,6 @@ export function isExtensionUi(element) {
     return Boolean(element.closest(STORY_EXTENSION_UI_SELECTOR));
 }
 
-/** @param {Element} element */
-export function isRenderedVisible(element) {
-    const style = window.getComputedStyle(element);
-    return style.visibility !== 'hidden' && style.opacity !== '0' && style.display !== 'none';
-}
-
 /**
  * @param {Element} element
  * @param {VerticalBounds} bounds

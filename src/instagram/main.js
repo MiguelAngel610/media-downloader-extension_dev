@@ -3,6 +3,7 @@ import { injectFeedButtons } from './features/feed_buttons.js';
 import { injectPfpButton } from './features/pfp_button.js';
 import { injectStoryButton } from './features/story_button.js';
 import { startSyncLoop } from './features/progress/loop.js';
+import { sortByHorizontalCenter } from './utils/viewport.js';
 
 function injectMinimalistButtons() {
     if (window.__md_blocked_frame) return;
@@ -72,10 +73,7 @@ if (window.ShortcutManager) {
                 return r.width > 0 && r.left >= -500 && r.left <= window.innerWidth + 500;
             });
             if (storyBtns.length > 0) {
-                storyBtns.sort((a, b) => {
-                    let aR = a.getBoundingClientRect(), bR = b.getBoundingClientRect();
-                    return Math.abs(aR.left + aR.width/2 - window.innerWidth/2) - Math.abs(bR.left + bR.width/2 - window.innerWidth/2);
-                })[0].click();
+                sortByHorizontalCenter(storyBtns)[0].click();
                 return;
             }
         }

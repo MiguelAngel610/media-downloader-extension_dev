@@ -2,7 +2,7 @@
  * @fileoverview Media elements of the story on screen: its playing video(s) and any playing audio
  * (music stickers). Used to drive the progress slider and to seek when it is dragged.
  */
-import { horizontalOffsetFromCenter, isStyleVisible, sortByHorizontalCenter } from './viewport.js';
+import { horizontalOffsetFromCenter, isStyleVisible, sortByHorizontalCenter } from '../../../utils/viewport.js';
 
 const ANCHOR_DOTS_MAX_TOP_PX = 300;
 const ANCHOR_DOTS_MIN_TOP_PX = -20;

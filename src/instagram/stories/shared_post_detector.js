@@ -3,7 +3,8 @@
  * Those stories only contain a low-quality preview, so the story button warns the user and links
  * to the original. Strategies run from most to least reliable; the first match wins.
  */
-import { STORY_BODY_HEIGHT, STORY_FULL_HEIGHT, currentStoryId, isExtensionUi, isInStoryColumn, isRenderedVisible, nearestLinkHref } from './story_viewport.js';
+import { isStyleVisible } from '../utils/viewport.js';
+import { STORY_BODY_HEIGHT, STORY_FULL_HEIGHT, currentStoryId, isExtensionUi, isInStoryColumn, nearestLinkHref } from './story_viewport.js';
 
 const SHARED_POST_LINK_SELECTOR = 'a[href*="/reel/"], a[href*="/reels/"], a[href*="/p/"], a[href*="/tv/"]';
 const SHARED_POST_REEL_PATHS = ['/reel/', '/reels/', '/tv/'];
@@ -34,7 +35,7 @@ function sharedItemFromDictionary() {
 /** @returns {SharedPostDetection | null} a visible reel/post/IGTV link inside the story */
 function findSharedPostLink() {
     for (const link of document.querySelectorAll(SHARED_POST_LINK_SELECTOR)) {
-        if (isExtensionUi(link) || !isInStoryColumn(link, STORY_FULL_HEIGHT) || !isRenderedVisible(link)) continue;
+        if (isExtensionUi(link) || !isInStoryColumn(link, STORY_FULL_HEIGHT) || !isStyleVisible(link)) continue;
         const href = link.getAttribute('href') || '';
         const isReel = SHARED_POST_REEL_PATHS.some((path) => href.includes(path));
         const label = link.textContent.trim() || (isReel ? 'Watch full reel' : 'See post');
@@ -57,7 +58,7 @@ function isBadgeCandidate(element) {
 function findSharedPostBadge(elements) {
     for (const element of elements) {
         if (isExtensionUi(element) || !isBadgeCandidate(element)) continue;
-        if (!isRenderedVisible(element) || !isInStoryColumn(element, STORY_FULL_HEIGHT)) continue;
+        if (!isStyleVisible(element) || !isInStoryColumn(element, STORY_FULL_HEIGHT)) continue;
         const text = element.textContent.trim();
         return { detected: true, isReel: SHARED_POST_BADGE_IS_REEL.test(text), label: text, href: nearestLinkHref(element), element };
     }
@@ -78,7 +79,7 @@ function isAttributionCandidate(element) {
 function findOriginalAuthorAttribution(elements) {
     for (const element of elements) {
         if (isExtensionUi(element) || !isAttributionCandidate(element)) continue;
-        if (!isRenderedVisible(element) || !isInStoryColumn(element, STORY_BODY_HEIGHT)) continue;
+        if (!isStyleVisible(element) || !isInStoryColumn(element, STORY_BODY_HEIGHT)) continue;
         const clickable = element.closest('[role="button"], button, a, div[tabindex]') || element;
         return { detected: true, isReel: false, label: element.textContent.trim(), href: nearestLinkHref(element), element: clickable };
     }

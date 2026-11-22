@@ -3,6 +3,7 @@
  * download button is injected (Instagram content script). Runs on every animation frame, so the last
  * match is cached and the full-page scan is throttled.
  */
+import { horizontalOffsetFromCenter, sortByHorizontalCenter } from '../utils/viewport.js';
 
 const STORY_DOTS_SCAN_INTERVAL_MS = 200;
 const STORY_DOTS_CONTAINER_SELECTOR = 'header, section, ._aa61, div[role="dialog"]';
@@ -11,12 +12,6 @@ const STORY_DOTS_LABELED_SELECTOR = 'button[aria-label], [role="button"][aria-la
 const STORY_DOTS_EXACT_LABELS = ['more', 'más', 'mas'];
 const STORY_DOTS_LABEL_PARTS = ['opciones', 'options'];
 export const STORY_DOTS_HIJACKED_CLASS = 'md-hijacked-dots';
-
-/** @param {Element} element */
-function horizontalDistanceToCenter(element) {
-    const rect = element.getBoundingClientRect();
-    return Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2);
-}
 
 /** Rendered, or already marked by us (Instagram may collapse it while the button sits next to it). @param {Element} element */
 function isUsableDots(element) {
@@ -29,7 +24,7 @@ function cachedDotsIfActive() {
     const cached = window.__md_cachedStoryDots;
     if (!cached || !document.body.contains(cached)) return null;
     // Inactive carousel slides are shifted off-centre by at least half the viewport.
-    return horizontalDistanceToCenter(cached) < window.innerWidth / 2 && isUsableDots(cached) ? cached : null;
+    return horizontalOffsetFromCenter(cached.getBoundingClientRect()) < window.innerWidth / 2 && isUsableDots(cached) ? cached : null;
 }
 
 /** @returns {Element[]} clickable parents of three-circle icons, headers first */
@@ -58,8 +53,7 @@ function scanForStoryDots() {
     for (const candidate of [...dotsIconCandidates(), ...labeledMenuCandidates()]) {
         if (!candidates.includes(candidate)) candidates.push(candidate);
     }
-    candidates.sort((a, b) => horizontalDistanceToCenter(a) - horizontalDistanceToCenter(b));
-    return candidates.length > 0 ? candidates[0] : null;
+    return candidates.length > 0 ? sortByHorizontalCenter(candidates)[0] : null;
 }
 
 /** @returns {Element | null} the active story's "..." button; null when absent or while throttled */

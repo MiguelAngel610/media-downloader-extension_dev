@@ -1,5 +1,6 @@
 /**
- * @fileoverview Viewport helpers shared by the story progress modules.
+ * @fileoverview Viewport checks shared by the Instagram content script: horizontal distance to the
+ * screen centre (the active story/post is the centred one) and style visibility.
  */
 
 /**

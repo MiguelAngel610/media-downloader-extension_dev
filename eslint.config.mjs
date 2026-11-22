@@ -37,6 +37,7 @@ const REFACTORED_MODULES = [
     'src/instagram/features/progress/story.js',
     'src/instagram/features/progress/story/*.js',
     'src/instagram/utils/media_resolver.js',
+    'src/instagram/utils/viewport.js',
     'src/instagram/ui/button_state.js',
 ];
 
