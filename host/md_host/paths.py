@@ -1,7 +1,21 @@
-"""Small filesystem helpers whose failures are logged, never silently ignored."""
+"""Where files live (the gallery-dl folder, resolved at call time so tests can redirect the home
+directory) and cleanup of temporary files, whose failures are logged, never silently ignored."""
 import os
 
-from md_host.runtime import host_log
+from md_host import host_log
+
+GALLERY_DIR_NAME = "gallery-dl"
+
+
+def gallery_dir() -> str:
+    """The user's private gallery-dl folder: downloads, cookies, config and the bridge token live here."""
+    return os.path.join(os.path.expanduser("~"), GALLERY_DIR_NAME)
+
+
+def ensure_gallery_dir() -> str:
+    path = gallery_dir()
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
 def remove_if_exists(path: str) -> None:

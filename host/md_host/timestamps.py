@@ -3,7 +3,7 @@ import datetime
 import time
 from typing import Any, Dict
 
-from md_host.runtime import host_log
+from md_host import host_log
 
 _MICROSECONDS_THRESHOLD = 1e14
 _MILLISECONDS_THRESHOLD = 1e11

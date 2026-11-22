@@ -13,8 +13,8 @@ tests_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(os.path.abspath(host_path)))
 sys.path.insert(0, tests_dir)
 from md_host.engines import direct_http, gallery_dl, ytdlp  # noqa: E402
-from md_host.routing import request_router  # noqa: E402
-from md_host.runtime import host_log  # noqa: E402
+from md_host import request_router  # noqa: E402
+from md_host import host_log  # noqa: E402
 from routing_capture import capture_all, make_fake_home  # noqa: E402
 
 home = make_fake_home()

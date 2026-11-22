@@ -2,7 +2,7 @@
 import os
 from typing import Any, Dict
 
-from md_host.runtime import host_log
+from md_host import host_log
 
 try:
     import yt_dlp

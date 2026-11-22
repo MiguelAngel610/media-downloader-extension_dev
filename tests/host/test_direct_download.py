@@ -8,8 +8,8 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(sys.argv[1])))
 from md_host.engines import direct_http  # noqa: E402
-from md_host.files import timestamps  # noqa: E402
-from md_host.runtime import host_log  # noqa: E402
+from md_host import timestamps  # noqa: E402
+from md_host import host_log  # noqa: E402
 host_log.log_info = lambda msg: None
 logs = []
 host_log.broadcast = lambda msg: logs.append(str(msg))

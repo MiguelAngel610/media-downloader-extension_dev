@@ -11,10 +11,10 @@ import time
 from typing import Any, Callable, Dict, Optional
 
 from md_host.engines import direct_http, ytdlp
-from md_host.files import filenames, fs_utils, timestamps
-from md_host.routing.media_request import MediaRequest
-from md_host.runtime import host_log
-from md_host.security import path_guard
+from md_host import filenames, paths, timestamps
+from md_host.media_request import MediaRequest
+from md_host import host_log
+from md_host import security
 
 Result = Dict[str, Any]
 Redispatch = Callable[[MediaRequest], Result]
@@ -94,11 +94,11 @@ def download_dash(manifest: str, filepath: str) -> Optional[Result]:
         "updatetime": False,  # Avoids Windows Errno 22 when the server sends an invalid modification date
     }
     result = ytdlp.download(pathlib.Path(manifest_file.name).as_uri(), options)
-    fs_utils.remove_if_exists(manifest_file.name)
-    fs_utils.remove_if_exists(base_path + ".mpd")
+    paths.remove_if_exists(manifest_file.name)
+    paths.remove_if_exists(base_path + ".mpd")
     if result["status"] == "success":
         return result
-    fs_utils.remove_part_files(os.path.dirname(filepath), os.path.basename(base_path))
+    paths.remove_part_files(os.path.dirname(filepath), os.path.basename(base_path))
     host_log.broadcast("NATIVE DASH fallback failed. Continuing to direct URL fallback...")
     return None
 
@@ -121,7 +121,7 @@ def handle(request: MediaRequest, gallery_dir: str, redispatch: Redispatch) -> R
     host_log.broadcast(f"Raw metadata received: {json.dumps(request.metadata)}")
     shortcode = _shortcode(request)
     extension = _extension(request)
-    directory = path_guard.ensure_inside(gallery_dir, output_dir(request, gallery_dir, extension))
+    directory = security.ensure_inside(gallery_dir, output_dir(request, gallery_dir, extension))
     os.makedirs(directory, exist_ok=True)
     write_user_id_file(directory, request)
 

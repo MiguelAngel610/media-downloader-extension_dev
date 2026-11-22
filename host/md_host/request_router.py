@@ -3,11 +3,11 @@ import threading
 import time
 from typing import Any, Callable, Dict, Optional
 
-from md_host.files import paths
+from md_host import paths
 from md_host.handlers import direct_media, gallery_dl_handler, ytdlp_handler
-from md_host.routing.media_request import MediaRequest
-from md_host.runtime import host_log
-from md_host.security import path_guard
+from md_host.media_request import MediaRequest
+from md_host import host_log
+from md_host import security
 
 Result = Dict[str, Any]
 Handler = Callable[[MediaRequest, str], Result]
@@ -85,9 +85,9 @@ def process_request(message: Dict[str, Any]) -> Result:
     if not isinstance(raw_metadata, dict):
         return {"status": "error", "message": "Invalid metadata"}
 
-    request = MediaRequest.from_message(message, path_guard.sanitize_metadata(raw_metadata))
+    request = MediaRequest.from_message(message, security.sanitize_metadata(raw_metadata))
     try:
         return dispatch(request)
-    except path_guard.PathTraversalError as error:
+    except security.PathTraversalError as error:
         host_log.broadcast(f"SECURITY: {error}")
         return {"status": "error", "message": "Rejected unsafe output path"}

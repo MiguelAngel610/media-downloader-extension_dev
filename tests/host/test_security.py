@@ -14,11 +14,11 @@ import time
 host_path = sys.argv[1]
 sys.path.insert(0, os.path.dirname(os.path.abspath(host_path)))
 from md_host.engines import direct_http, gallery_dl  # noqa: E402
-from md_host.files import timestamps  # noqa: E402
-from md_host.routing import request_router  # noqa: E402
-from md_host.runtime import host_log  # noqa: E402
-from md_host.security import path_guard, url_safety  # noqa: E402
-from md_host.transport import native_messaging, tcp_bridge  # noqa: E402
+from md_host import timestamps  # noqa: E402
+from md_host import request_router  # noqa: E402
+from md_host import host_log  # noqa: E402
+from md_host import security  # noqa: E402
+from md_host import native_messaging, tcp_bridge  # noqa: E402
 
 results = []
 def check(name, ok):
@@ -58,11 +58,11 @@ res, paths = direct_story({"username": "CON"})
 check("A5 Windows reserved name is neutralized", paths and os.path.join("instagram", "_CON") in paths[0])
 res, _ = direct_story({"username": "x"}, platform="..\\..\\evil")
 check("A6 unknown platform rejected", res.get("message") == "Unknown platform")
-check("A7 sanitize_segment('..') falls back", path_guard.sanitize_segment("..", "unknown") == "unknown")
+check("A7 sanitize_segment('..') falls back", security.sanitize_segment("..", "unknown") == "unknown")
 try:
-    path_guard.ensure_inside(gallery_dir, os.path.join(gallery_dir, "..", "outside"))
+    security.ensure_inside(gallery_dir, os.path.join(gallery_dir, "..", "outside"))
     check("A8 ensure_inside rejects escaping path", False)
-except path_guard.PathTraversalError:
+except security.PathTraversalError:
     check("A8 ensure_inside rejects escaping path", True)
 
 # ---------------------------------------------------------------- B: TCP bridge auth

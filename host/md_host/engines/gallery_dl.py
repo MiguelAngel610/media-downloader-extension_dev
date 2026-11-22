@@ -7,8 +7,8 @@ import subprocess
 import sys
 from typing import Any, Dict, List, NamedTuple, Optional
 
-from md_host.runtime import host_log
-from md_host.security import url_safety
+from md_host import host_log
+from md_host import security
 
 TIMEOUT_SECONDS = 45
 _CREATE_NO_WINDOW = 0x08000000
@@ -68,7 +68,7 @@ def _run(command: List[str]) -> RunOutcome:
 
 
 def download(url: str, option_args: List[str]) -> Dict[str, Any]:
-    if not url_safety.is_safe_http_url(url):
+    if not security.is_safe_http_url(url):
         host_log.broadcast(f"Rejected non-http(s) URL for gallery-dl: {url!r}")
         return {"status": "error", "message": "Rejected unsafe URL"}
 

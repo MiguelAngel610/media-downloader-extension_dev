@@ -4,9 +4,9 @@ import os
 import urllib.request
 from typing import Any, Dict, Optional
 
-from md_host.files import fs_utils
-from md_host.runtime import host_log
-from md_host.security import url_safety
+from md_host import paths
+from md_host import host_log
+from md_host import security
 
 TIMEOUT_SECONDS = 30
 CHUNK_BYTES = 1024 * 1024
@@ -42,7 +42,7 @@ def download(url: str, filepath: str) -> Dict[str, Any]:
     Writing straight to the final name left truncated files that later runs treated as
     "already downloaded" and never repaired.
     """
-    if not url_safety.is_safe_http_url(url):
+    if not security.is_safe_http_url(url):
         return {"status": "error", "message": "Rejected unsafe URL"}
     part_path = filepath + ".part"
     try:
@@ -50,7 +50,7 @@ def download(url: str, filepath: str) -> Dict[str, Any]:
         os.replace(part_path, filepath)
     except (OSError, http.client.HTTPException, IncompleteDownloadError) as error:
         # urllib.error.URLError and socket timeouts are OSError subclasses.
-        fs_utils.remove_if_exists(part_path)
+        paths.remove_if_exists(part_path)
         host_log.broadcast(f"STATUS: FAILED (Direct) {error}")
         return {"status": "error", "message": f"Direct download failed: {error}"}
     host_log.broadcast("STATUS: SUCCESS (Direct)")

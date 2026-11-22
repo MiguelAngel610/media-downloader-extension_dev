@@ -1,9 +1,10 @@
-"""Turns untrusted metadata (it comes from web pages) into safe single path segments."""
+"""Guards for untrusted input coming from web pages: filesystem path segments and URLs."""
 import os
 import re
+import urllib.parse
 from typing import Any, Dict
 
-from md_host.runtime import host_log
+from md_host import host_log
 
 _INVALID_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _RESERVED_NAMES = frozenset({"CON", "PRN", "AUX", "NUL",
@@ -53,3 +54,14 @@ def ensure_inside(base_dir: str, target: str) -> str:
     if not inside:
         raise PathTraversalError(f"Refusing to write outside {base_real}: {target_real}")
     return target
+
+
+def is_safe_http_url(url: Any) -> bool:
+    """Only absolute http(s) URLs may reach a downloader (blocks file://, options like '--exec=...', etc.)."""
+    if not isinstance(url, str) or not url:
+        return False
+    try:
+        parsed = urllib.parse.urlsplit(url)
+    except ValueError:
+        return False
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)

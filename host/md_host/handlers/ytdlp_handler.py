@@ -4,9 +4,9 @@ import tempfile
 from typing import Any, Dict, Optional, Tuple
 
 from md_host.engines import ytdlp
-from md_host.files import fs_utils, timestamps
-from md_host.routing.media_request import MediaRequest
-from md_host.security import path_guard
+from md_host import paths, timestamps
+from md_host.media_request import MediaRequest
+from md_host import security
 
 BACKUP_ROOT = "Bandeja_Favoritos"
 COOKIE_FILES = {"twitter": "www.x.com_cookies.txt", "facebook": "www.facebook.com_cookies.txt"}
@@ -66,7 +66,7 @@ def cookie_file(request: MediaRequest, gallery_dir: str) -> Optional[str]:
 def handle(request: MediaRequest, gallery_dir: str) -> Dict[str, Any]:
     source, temp_manifest = resolve_source(request)
     template = output_template(request, gallery_dir)
-    path_guard.ensure_inside(gallery_dir, os.path.dirname(template))
+    security.ensure_inside(gallery_dir, os.path.dirname(template))
     options: Dict[str, Any] = {"outtmpl": template}
     cookies = cookie_file(request, gallery_dir)
     if cookies:
@@ -75,4 +75,4 @@ def handle(request: MediaRequest, gallery_dir: str) -> Dict[str, Any]:
         return ytdlp.download(source, options)
     finally:
         if temp_manifest:
-            fs_utils.remove_if_exists(temp_manifest)
+            paths.remove_if_exists(temp_manifest)
