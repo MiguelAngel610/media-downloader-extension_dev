@@ -6,7 +6,6 @@
  */
 
 const SHARED_POST_LINK_SELECTOR = 'a[href*="/reel/"], a[href*="/reels/"], a[href*="/p/"], a[href*="/tv/"]';
-const SHARED_POST_STORY_ID = /\/stories\/[^/]+\/(\d+)/;
 const SHARED_POST_REEL_PATHS = ['/reel/', '/reels/', '/tv/'];
 // "See post", "Watch full reel", "Ver reel completo", "Ver publicación", "See photo"...
 const SHARED_POST_BADGE_TEXT = /(?:watch|ver|view|see|mirar)\s+(?:full\s+)?(?:reel|post|publicaci[oó]n|video|v[íi]deo|igv|photo|foto|content|contenido)/i;
@@ -27,8 +26,8 @@ const SHARED_POST_WARNING_TOAST_ID = 'md-reel-warning-toast';
  * @returns {SharedPostDetection | null}
  */
 function sharedItemFromDictionary() {
-    const storyId = window.location.href.match(SHARED_POST_STORY_ID);
-    const entry = storyId && window.__md_storyMediaDict ? window.__md_storyMediaDict[storyId[1]] : null;
+    const storyId = currentStoryId();
+    const entry = storyId && window.__md_storyMediaDict ? window.__md_storyMediaDict[storyId] : null;
     return entry && entry.shared_item ? { detected: true, ...entry.shared_item } : null;
 }
 

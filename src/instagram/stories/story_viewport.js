@@ -1,9 +1,11 @@
 /**
- * @fileoverview Geometry and visibility rules of the story viewer (Instagram content script).
+ * @fileoverview Story viewer basics (Instagram content script): the story id in the URL and the
+ * geometry/visibility rules of the viewer.
  * The story is a centred column; elements outside it belong to the neighbouring stories carousel.
  * Classic content script: names are global and must stay unique across src/instagram.
  */
 
+const STORY_ID_IN_URL = /\/stories\/[^/]+\/(\d+)/;
 const STORY_COLUMN_HALF_WIDTH_PX = 360;
 const STORY_EXTENSION_UI_SELECTOR = '#md-reel-warning-toast, [id^="md-"], [class*="md-"]';
 
@@ -50,4 +52,10 @@ function isInStoryColumn(element, bounds) {
 function nearestLinkHref(element) {
     const link = element.closest('a[href]') || element.querySelector('a[href]');
     return link ? link.href : null;
+}
+
+/** @returns {string | null} media id of the story slide in the URL (/stories/<user>/<id>/) */
+function currentStoryId() {
+    const match = window.location.href.match(STORY_ID_IN_URL);
+    return match ? match[1] : null;
 }
