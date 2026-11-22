@@ -61,7 +61,7 @@ for (const file of files) {
     const src = fs.readFileSync(file, 'utf8');
     let ast;
     try {
-        ast = acorn.parse(src, { ecmaVersion: 'latest', sourceType: rel.includes('interceptors/core/') || rel.includes('progress/') || rel.endsWith('interceptors/index.js') ? 'module' : 'script', locations: true, allowHashBang: true });
+        ast = acorn.parse(src, { ecmaVersion: 'latest', sourceType: rel.includes('instagram/interceptors/') || rel.includes('progress/') ? 'module' : 'script', locations: true, allowHashBang: true });
     } catch (err) {
         console.log(`PARSE ERROR ${rel}: ${err.message}`); continue;
     }

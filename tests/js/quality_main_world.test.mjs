@@ -15,9 +15,9 @@ globalThis.addEventListener = (type, fn) => { if (type === 'message') listeners.
 globalThis.postMessage = (data) => posted.push(data);
 const deliver = (data) => listeners.forEach((fn) => fn({ data, source: window, origin: location.origin }));
 
-const { pickBestVideoUrl, pickBestImageUrl, pickBestProfilePicUrl } = await import('../../src/instagram/interceptors/core/media_quality.js');
-const { processAndPostData } = await import('../../src/instagram/interceptors/core/media_parser.js');
-await import('../../src/instagram/interceptors/core/fiber_search.js');
+const { pickBestVideoUrl, pickBestImageUrl, pickBestProfilePicUrl } = await import('../../src/instagram/interceptors/media/media_quality.js');
+const { processAndPostData } = await import('../../src/instagram/interceptors/media/media_parser.js');
+await import('../../src/instagram/interceptors/media/fiber_search.js');
 
 const results = [];
 const check = (name, ok) => results.push([ok ? 'PASS' : 'FAIL', name]);

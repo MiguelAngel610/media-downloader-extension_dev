@@ -25,12 +25,12 @@ const REFACTORED_MODULES = [
     'src/background/**/*.js',
     'src/shared/utils/error_reporter.js',
     'src/shared/utils/toast_manager.js',
-    'src/instagram/interceptors/core/ghost_policy.js',
-    'src/instagram/interceptors/core/ghost_settings.js',
-    'src/instagram/interceptors/core/request_body.js',
-    'src/instagram/interceptors/core/media_quality.js',
-    'src/instagram/interceptors/core/profile_pic_collector.js',
-    'src/instagram/interceptors/core/time_utils.js',
+    'src/instagram/interceptors/ghost/ghost_policy.js',
+    'src/instagram/interceptors/ghost/ghost_settings.js',
+    'src/instagram/interceptors/network/request_body.js',
+    'src/instagram/interceptors/media/media_quality.js',
+    'src/instagram/interceptors/media/profile_pic_collector.js',
+    'src/instagram/interceptors/shared/time_utils.js',
     'src/instagram/utils/pfp_resolver.js',
 ];
 

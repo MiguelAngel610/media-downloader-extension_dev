@@ -13,8 +13,12 @@ import time
 
 host_path = sys.argv[1]
 sys.path.insert(0, os.path.dirname(os.path.abspath(host_path)))
-from md_host import host_log, native_messaging, path_guard, request_router, tcp_bridge, timestamps, url_safety  # noqa: E402
 from md_host.engines import direct_http, gallery_dl  # noqa: E402
+from md_host.files import timestamps  # noqa: E402
+from md_host.routing import request_router  # noqa: E402
+from md_host.runtime import host_log  # noqa: E402
+from md_host.security import path_guard, url_safety  # noqa: E402
+from md_host.transport import native_messaging, tcp_bridge  # noqa: E402
 
 results = []
 def check(name, ok):

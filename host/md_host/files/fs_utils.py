@@ -1,7 +1,7 @@
 """Small filesystem helpers whose failures are logged, never silently ignored."""
 import os
 
-from md_host import host_log
+from md_host.runtime import host_log
 
 
 def remove_if_exists(path: str) -> None:

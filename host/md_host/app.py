@@ -1,8 +1,10 @@
 """Main loop of the native host: one request in, one result out (tagged with its request_id)."""
 from typing import Any, Dict
 
-from md_host import environment, host_log, native_messaging, request_router
-from md_host.tcp_bridge import TcpBridgeServer
+from md_host.routing import request_router
+from md_host.runtime import environment, host_log
+from md_host.transport import native_messaging
+from md_host.transport.tcp_bridge import TcpBridgeServer
 
 
 def with_request_id(result: Dict[str, Any], request_id: Any) -> Dict[str, Any]:

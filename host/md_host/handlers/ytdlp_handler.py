@@ -3,9 +3,10 @@ import os
 import tempfile
 from typing import Any, Dict, Optional, Tuple
 
-from md_host import fs_utils, path_guard, timestamps
 from md_host.engines import ytdlp
-from md_host.media_request import MediaRequest
+from md_host.files import fs_utils, timestamps
+from md_host.routing.media_request import MediaRequest
+from md_host.security import path_guard
 
 BACKUP_ROOT = "Bandeja_Favoritos"
 COOKIE_FILES = {"twitter": "www.x.com_cookies.txt", "facebook": "www.facebook.com_cookies.txt"}

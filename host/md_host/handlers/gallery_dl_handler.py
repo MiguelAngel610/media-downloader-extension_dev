@@ -2,9 +2,10 @@
 import os
 from typing import Any, Dict, List
 
-from md_host import host_log, path_guard
 from md_host.engines import gallery_dl
-from md_host.media_request import MediaRequest
+from md_host.routing.media_request import MediaRequest
+from md_host.runtime import host_log
+from md_host.security import path_guard
 
 COOKIE_FILES = {"M": "www.instagram.com_cookiesM.txt", "V": "www.instagram.com_cookiesV.txt"}
 BACKUP_ROOT = "Bandeja_Favoritos"

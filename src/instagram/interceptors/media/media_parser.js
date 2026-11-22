@@ -1,8 +1,8 @@
-import { mdLog, logErrorOnce } from './logger.js';
-import { clearStoryCheckpoint } from './story_resume.js';
+import { mdLog, logErrorOnce } from '../shared/logger.js';
+import { clearStoryCheckpoint } from '../ghost/story_resume.js';
 import { pickBestImageUrl, pickBestVideoUrl } from './media_quality.js';
 import { recordProfilePic, flushProfilePics } from './profile_pic_collector.js';
-import { extractMediaTimestamp } from './time_utils.js';
+import { extractMediaTimestamp } from '../shared/time_utils.js';
 
 window.__md_storyMedia = window.__md_storyMedia || {};
 

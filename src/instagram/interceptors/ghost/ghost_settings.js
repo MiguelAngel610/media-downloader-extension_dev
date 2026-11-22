@@ -1,4 +1,4 @@
-import { mdLog, logError } from './logger.js';
+import { mdLog, logError } from '../shared/logger.js';
 
 /* Media Downloader - Ghost Settings (MAIN world)
  * Single source of truth for the stealth flags inside the page context.

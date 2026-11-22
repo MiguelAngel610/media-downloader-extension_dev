@@ -1,5 +1,5 @@
 /* Media Downloader - Device Spoof (MAIN world): temporary devicePixelRatio zoom used by pfp_resolver.js */
-import { logError } from './logger.js';
+import { logError } from '../shared/logger.js';
 
 window.addEventListener('message', function(event) {
     // Only our own window may trigger the zoom spoof (rejects openers/iframes; also avoids a TypeError on null data).

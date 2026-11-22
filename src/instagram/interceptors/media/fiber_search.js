@@ -1,6 +1,6 @@
-import { logError, logErrorOnce } from './logger.js';
+import { logError, logErrorOnce } from '../shared/logger.js';
 import { pickBestImageUrl, pickBestVideoUrl } from './media_quality.js';
-import { extractMediaTimestamp } from './time_utils.js';
+import { extractMediaTimestamp } from '../shared/time_utils.js';
 window.addEventListener('message', function(event) {
     // Only our own window may request a fiber walk (rejects openers/iframes; also avoids a TypeError on null data).
     if (event.source !== window || !event.data) return;

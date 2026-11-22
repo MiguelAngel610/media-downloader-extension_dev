@@ -1,8 +1,8 @@
-import { mdLog, logError } from './logger.js';
-import { showGhostToast, handleGhostBlock } from './ghost_mode.js';
-import { extractSignatureFromUrl, processAndPostData } from './media_parser.js';
-import { areSettingsReady, getGhostSettings, settingsReady } from './ghost_settings.js';
-import { NOT_BLOCKED, classifyRequest, decideGhostBlock, isGhostRelevant, isWebSocketPresencePayload } from './ghost_policy.js';
+import { mdLog, logError } from '../shared/logger.js';
+import { showGhostToast, handleGhostBlock } from '../ghost/ghost_mode.js';
+import { extractSignatureFromUrl, processAndPostData } from '../media/media_parser.js';
+import { areSettingsReady, getGhostSettings, settingsReady } from '../ghost/ghost_settings.js';
+import { NOT_BLOCKED, classifyRequest, decideGhostBlock, isGhostRelevant, isWebSocketPresencePayload } from '../ghost/ghost_policy.js';
 import { decodeWebSocketPayload, normalizeRequestUrl, readBodyTextAsync, readBodyTextSync, readFetchBodyText } from './request_body.js';
 
 /* Media Downloader - Network Interception (MAIN world)

@@ -1,4 +1,4 @@
-import { mdLog, logError } from './logger.js';
+import { mdLog, logError } from '../shared/logger.js';
 import { clearStoryCheckpoint, saveStoryCheckpoint, getStorySegmentInfo } from './story_resume.js';
 
 /* Media Downloader - Ghost Mode (MAIN world)

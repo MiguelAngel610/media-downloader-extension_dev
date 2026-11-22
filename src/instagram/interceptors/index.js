@@ -1,9 +1,9 @@
-import './core/logger.js';
+import './shared/logger.js';
 // Must stay first after the logger: it opens the settings channel and handshake.
-import './core/ghost_settings.js';
-import './core/device_spoof.js';
-import './core/ghost_mode.js';
-import './core/fiber_search.js';
-import './core/media_parser.js';
-import './core/story_resume.js';
-import './core/network.js';
+import './ghost/ghost_settings.js';
+import './media/device_spoof.js';
+import './ghost/ghost_mode.js';
+import './media/fiber_search.js';
+import './media/media_parser.js';
+import './ghost/story_resume.js';
+import './network/network.js';

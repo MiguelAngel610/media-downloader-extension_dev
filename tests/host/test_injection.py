@@ -1,8 +1,9 @@
 import os, sys, subprocess
 host_path, marker_dir = sys.argv[1], sys.argv[2]
 sys.path.insert(0, os.path.dirname(os.path.abspath(host_path)))
-from md_host import host_log, url_safety  # noqa: E402
 from md_host.engines import gallery_dl  # noqa: E402
+from md_host.runtime import host_log  # noqa: E402
+from md_host.security import url_safety  # noqa: E402
 host_log.log_info = lambda msg: None  # keep host.log untouched
 
 def payload(name):

@@ -1,4 +1,4 @@
-import { mdLog, logErrorOnce } from './logger.js';
+import { mdLog, logErrorOnce } from '../shared/logger.js';
 
 /* Media Downloader - Story Resume Guard: Prevents Ghost Mode from forcing stories to restart at slide 1 */
 

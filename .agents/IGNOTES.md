@@ -523,3 +523,11 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 ## Fix (21 de Noviembre 2026): Fiber Perdía Usuario y Fecha + Timestamps en Microsegundos
 **Causa:** `fiber_search.js` nunca enviaba `user`/`time` en `MD_FIBER_RESULT`; `media_resolver.js` leía `result.timestamp` y `story_button.js` leía `res.username`/`res.timestamp`, nombres que no existían en el puente (`ig_interceptor_init.js` guarda `user`/`time`). Resultado: reels/stories sin `<time>` en el DOM se nombraban con la fecha de descarga. Además `device_timestamp` llega en microsegundos (~1.7e15) y se pasaba tal cual como segundos (el host fallaba con "year out of range").
 **Solución:** nuevo `interceptors/core/time_utils.js` (`toUnixSeconds`, `extractMediaTimestamp`) usado por `media_parser.js` y `fiber_search.js` (DRY). Fiber publica `user` y `time` normalizados (y con `targetOrigin '/'`). Consumidores corregidos. Rama muerta `is_pfp_bot` eliminada de `button_state.js`. Test 16/16.
+
+## Estructura (21 de Noviembre 2026): Interceptores MAIN World Agrupados por Dominio
+`src/instagram/interceptors/core/` (13 módulos sueltos) se dividió por dominio (con `git mv`, se conserva el historial):
+- `shared/`: `logger.js` (mdLog, logError, logErrorOnce), `time_utils.js`
+- `ghost/`: `ghost_settings.js` (flags + canal seguro), `ghost_policy.js` (clasificación pura), `ghost_mode.js` (aro gris / seen), `story_resume.js`
+- `network/`: `network.js` (fetch/XHR/beacon/WebSocket), `request_body.js`
+- `media/`: `media_parser.js`, `media_quality.js`, `profile_pic_collector.js`, `fiber_search.js`, `device_spoof.js`
+`index.js` conserva el orden de carga (logger → ghost_settings primero). Bundle y 11 suites de test en verde tras el movimiento.

@@ -7,7 +7,7 @@ import re
 import urllib.request
 from typing import Any, Dict, Optional, Tuple
 
-from md_host import host_log
+from md_host.runtime import host_log
 
 DEFAULT_TEMPLATE = "{date:%Y-%m-%d}_{shortcode}.{extension}"
 _WINDOWS_INVALID_CHARS = '<>:"/\\|?*'

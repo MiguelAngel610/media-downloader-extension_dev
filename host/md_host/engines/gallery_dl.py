@@ -7,7 +7,8 @@ import subprocess
 import sys
 from typing import Any, Dict, List, NamedTuple, Optional
 
-from md_host import host_log, url_safety
+from md_host.runtime import host_log
+from md_host.security import url_safety
 
 TIMEOUT_SECONDS = 45
 _CREATE_NO_WINDOW = 0x08000000

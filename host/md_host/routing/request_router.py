@@ -3,9 +3,11 @@ import threading
 import time
 from typing import Any, Callable, Dict, Optional
 
-from md_host import host_log, path_guard, paths
+from md_host.files import paths
 from md_host.handlers import direct_media, gallery_dl_handler, ytdlp_handler
-from md_host.media_request import MediaRequest
+from md_host.routing.media_request import MediaRequest
+from md_host.runtime import host_log
+from md_host.security import path_guard
 
 Result = Dict[str, Any]
 Handler = Callable[[MediaRequest, str], Result]

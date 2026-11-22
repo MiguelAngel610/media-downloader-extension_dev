@@ -4,7 +4,9 @@ import os
 import urllib.request
 from typing import Any, Dict, Optional
 
-from md_host import fs_utils, host_log, url_safety
+from md_host.files import fs_utils
+from md_host.runtime import host_log
+from md_host.security import url_safety
 
 TIMEOUT_SECONDS = 30
 CHUNK_BYTES = 1024 * 1024

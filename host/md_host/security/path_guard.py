@@ -3,7 +3,7 @@ import os
 import re
 from typing import Any, Dict
 
-from md_host import host_log
+from md_host.runtime import host_log
 
 _INVALID_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _RESERVED_NAMES = frozenset({"CON", "PRN", "AUX", "NUL",

@@ -12,7 +12,9 @@ import socket
 import threading
 from typing import Any, Dict, Iterator, Optional
 
-from md_host import host_log, native_messaging, paths
+from md_host.files import paths
+from md_host.runtime import host_log
+from md_host.transport import native_messaging
 
 TOKEN_FILENAME = "md_bridge_token.txt"
 DEFAULT_HOST = "127.0.0.1"
