@@ -180,7 +180,7 @@
 **Fecha:** 21 de Noviembre 2026
 **Estándares verificados con Context7:** límites por defecto de ESLint (`complexity` 20, `max-depth` 4, `max-lines-per-function` 50, `max-lines` 300); Google JavaScript Style Guide (archivos `lowercase_with_underscores.js`, `lowerCamelCase`, `UpperCamelCase`, `CONSTANT_CASE`, JSDoc); PEP 8 para Python.
 **Comandos:**
-- `npm run lint`: ESLint (flat config `eslint.config.mjs`). Código legacy: límites de mantenibilidad como *warning* (deuda medible). Módulos en `REFACTORED_MODULES`: como *error* (no pueden regresar). Corrección (`no-empty`, `no-undef`, `no-unused-vars`, `camelcase`, `eqeqeq`, `no-var`): *error* en todo `src/`.
+- `npm run lint`: ESLint (flat config `eslint.config.mjs`). Límites de mantenibilidad como *warning* en todo el código; solo `complexity` es *error* en `REFACTORED_MODULES` (ver "Política de ESLint", 22 de noviembre). Corrección (`no-empty`, `no-undef`, `no-unused-vars`, `camelcase`, `eqeqeq`, `no-var`): *error* en todo `src/`.
 - `npm test`: build + 10 suites (JS y host Python) desde `tests/` (`tests/run_all.mjs` localiza `py`/`ffmpeg` en el PATH; `FFMPEG_DIR` opcional).
 - `npm run audit`: `tools/code_metrics.js` (acorn) lista cada función que supera los límites.
 **Línea base medida (antes de refactorizar):** 85 funciones fuera de límites, 12 archivos > 300 líneas. Peores: `progress/feed.js syncOverlays` (complejidad 127, anidación 13, 392 líneas), `fiber_search.js searchProps` (173), `feed_buttons.js onclick` (102, 362 líneas). Python: `host.py` con 11 clases en 874 líneas, `_handle_direct_story` complejidad 44, `mediaType` viola PEP 8.
