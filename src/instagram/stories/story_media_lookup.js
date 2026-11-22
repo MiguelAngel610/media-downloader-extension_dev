@@ -49,7 +49,9 @@ async function requestStoryFiberAnswer(media) {
         await new Promise((resolve) => setTimeout(resolve, STORY_FIBER_POLL_INTERVAL_MS));
         if (window.__md_fiberResults[id]) break;
     }
-    return window.__md_fiberResults[id];
+    const answer = window.__md_fiberResults[id];
+    delete window.__md_fiberResults[id]; // one answer per click: without this the map grows forever
+    return answer;
 }
 
 /**
@@ -80,8 +82,9 @@ function mergeFiberAnswer(resolution, answer) {
         resolution.bestUrl = answer.url;
         bestMetadata.url = answer.url;
     }
-    if (answer.dash && answer.dash.length > STORY_MIN_DASH_LENGTH) {
-        const manifest = decodeDashManifest(answer.dash);
+    // ig_interceptor_init.js stores the bridge's 'dash' field as 'dash_manifest'.
+    if (answer.dash_manifest && answer.dash_manifest.length > STORY_MIN_DASH_LENGTH) {
+        const manifest = decodeDashManifest(answer.dash_manifest);
         if (manifest) bestMetadata.dash_manifest = manifest;
     }
     if (answer.shortcode && answer.shortcode.length > 0) bestMetadata.shortcode = answer.shortcode;
@@ -100,7 +103,9 @@ function mergeDictionaryEntryById(resolution, mediaId) {
     const entry = window.__md_storyMediaDict && window.__md_storyMediaDict[mediaId];
     if (!entry) return;
     resolution.bestMetadata = Object.assign({}, entry, resolution.bestMetadata);
-    if (resolution.bestUrl.startsWith('blob:') && resolution.bestMetadata.url) resolution.bestUrl = resolution.bestMetadata.url;
+    // An empty URL (video without src) is as unusable as a blob: one.
+    const hasUsableUrl = Boolean(resolution.bestUrl) && !resolution.bestUrl.startsWith('blob:');
+    if (!hasUsableUrl && resolution.bestMetadata.url) resolution.bestUrl = resolution.bestMetadata.url;
 }
 
 /**
@@ -114,7 +119,9 @@ function upgradeBySignature(resolution) {
     const match = Object.values(window.__md_storyMediaDict).find((entry) => entry.url && entry.url.includes(signature));
     if (!match) return;
     resolution.bestUrl = match.url;
-    resolution.bestMetadata = match;
+    // New object (the caller adds media_category; the shared dictionary must stay untouched). The
+    // matched entry wins, but fields only fiber knew (media_id, shortcode) are kept.
+    resolution.bestMetadata = { ...resolution.bestMetadata, ...match };
 }
 
 /**

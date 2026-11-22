@@ -558,3 +558,19 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 - `stories/shared_post_detector.js`: 4 estrategias, de la más fiable a la menos: `sharedItemFromDictionary` (`shared_item` del API), `findSharedPostLink` (link /reel/, /reels/, /p/, /tv/), `findSharedPostBadge` ("See post", "Ver reel completo"…), `findOriginalAuthorAttribution` ("@autor" debajo de la tarjeta). `detectSharedReelOrPost` las orquesta y, si no encuentra nada, borra el toast viejo `#md-reel-warning-toast`.
 **Verificación:** golden master jsdom (`tests/js/shared_post_cases.js`, 20 casos con `getBoundingClientRect` simulado): 20/20 idéntico. Mutación (límite del header 120 → 40 px) detectada.
 **Trampa de test documentada:** un id de historia como clave numérica de JS (`{ 3123456789012345678: … }`) se redondea a `…680` (pasa `Number.MAX_SAFE_INTEGER`). Los ids de IG deben ser siempre **strings**; el código real ya los usa así porque vienen del JSON.
+
+## Refactor (22 de Noviembre 2026): Botón de Historias Dividido en `src/instagram/stories/`
+**Antes:** `injectStoryButton` (complejidad 49) + su `onclick` (complejidad 80, 185 líneas) en `features/story_button.js`. **Ahora** `story_button.js` solo orquesta:
+- `story_button_state.js`: `currentStoryKey`, `markStoryButtonLoading`, `clearStoryButtonLoading`, `resetStoryButton`, `resetFinishedStoryButtons`, `syncStoryButtonState` (TTL de 2 s en `document.body.__md_download_state`).
+- `story_dots_locator.js`: botón "..." del header (cache en `__md_cachedStoryDots`, escaneo limitado a 1 cada 200 ms; ícono de 3 círculos → fallback `aria-label` "More/Más/Opciones"; gana el más cercano al centro).
+- `story_media_locator.js`: media cerca del botón (sube hasta 12 ancestros, >150 px, el video gana) → fallback: la más centrada de la página (>200 px, a menos de 450 px del centro; si empatan por <10 px, gana la más grande).
+- `story_media_lookup.js`: diccionario por id de historia → Fiber (solo videos sin DASH, sin autor o con fecha de menos de 24 h) → match por firma CDN → URL de historias del perfil.
+- `story_viewport.js` ahora tiene `currentStoryId()` (DRY: el regex del id estaba duplicado).
+**Verificación:** golden master jsdom (`tests/js/story_button_cases.js`): 9 inyecciones + 16 clicks, idéntico al original (commit `3caac58`). Mutación (umbral de empate 10 → 0 px) detectada.
+
+## Bug Fix (22 de Noviembre 2026): 4 Bugs Silenciosos en la Descarga de Historias
+1. **Fiber nunca aportaba el DASH en historias:** `ig_interceptor_init.js` guarda el campo como `dash_manifest`, pero el `onclick` leía `res.dash` (siempre `undefined`). Si el diccionario del API no tenía DASH, el video bajaba en calidad progresiva. **Fix:** leer `answer.dash_manifest`.
+2. **Mutación del diccionario global:** el match por firma hacía `bestMetadata = apiMedia` (sin copia), así que `media_category = "story"` (y lo que añadiera `completeDownloadMetadata`) se escribía en `__md_storyMediaDict`. **Fix:** objeto nuevo `{ ...bestMetadata, ...match }` (copia superficial, suficiente según MDN porque solo se escriben campos de primer nivel). Además conserva los campos que solo Fiber conocía (`media_id`).
+3. **Fuga de memoria:** las respuestas de Fiber nunca se borraban de `__md_fiberResults`; ahora se borran tras leerlas.
+4. **Video sin `src` → bajaba TODAS las historias del usuario:** con `src` vacío, `bestUrl` quedaba `''`, no se reemplazaba por la URL del diccionario (solo se reemplazaban las `blob:`) y el fallback enviaba `instagram.com/stories/<user>/` a gallery-dl. **Fix:** una URL vacía cuenta como inutilizable igual que `blob:`.
+**Verificación:** caso nuevo `video_without_src_media_id_in_dictionary`; el diff del golden antes/después muestra solo esos 4 cambios.

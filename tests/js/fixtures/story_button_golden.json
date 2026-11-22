@@ -206,8 +206,7 @@
       "111": {
         "url": "https://scontent.cdninstagram.com/v/t51.2885-15/full_i.jpg?stp=dst-jpg",
         "username": "alice",
-        "timestamp": 1700000000,
-        "media_category": "story"
+        "timestamp": 1700000000
       }
     },
     "pendingFiberResults": 0,
@@ -219,6 +218,7 @@
         "url": "https://scontent.cdninstagram.com/o1/v/t16/fiber_v.mp4?efg=x",
         "metadata": {
           "url": "https://scontent.cdninstagram.com/o1/v/t16/fiber_v.mp4?efg=x",
+          "dash_manifest": "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\"><Period><AdaptationSet/></Period></MPD>",
           "shortcode": "STORYCODE1",
           "username": "alice",
           "timestamp": 1700000001,
@@ -248,7 +248,7 @@
       "hasHtml": true
     },
     "dictionaryAfter": {},
-    "pendingFiberResults": 1,
+    "pendingFiberResults": 0,
     "taggedMedia": [
       "media"
     ]
@@ -259,6 +259,7 @@
         "url": "https://scontent.cdninstagram.com/o1/v/t16/fiber_enc.mp4?efg=x",
         "metadata": {
           "url": "https://scontent.cdninstagram.com/o1/v/t16/fiber_enc.mp4?efg=x",
+          "dash_manifest": "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\"><Period><AdaptationSet/></Period></MPD>",
           "username": "alice",
           "timestamp": 1700000002,
           "media_category": "story"
@@ -286,7 +287,7 @@
       "hasHtml": true
     },
     "dictionaryAfter": {},
-    "pendingFiberResults": 1,
+    "pendingFiberResults": 0,
     "taggedMedia": [
       "media"
     ]
@@ -333,7 +334,7 @@
         "dash_manifest": "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\"><Period><AdaptationSet/></Period></MPD>"
       }
     },
-    "pendingFiberResults": 1,
+    "pendingFiberResults": 0,
     "taggedMedia": [
       "media"
     ]
@@ -345,7 +346,8 @@
         "metadata": {
           "url": "https://scontent.cdninstagram.com/o1/v/t16/dict_nodash.mp4?efg=x",
           "username": "alice",
-          "timestamp": 1700000000,
+          "timestamp": 1700000004,
+          "dash_manifest": "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\"><Period><AdaptationSet/></Period></MPD>",
           "media_category": "story"
         },
         "isFloating": true,
@@ -374,11 +376,10 @@
       "111": {
         "url": "https://scontent.cdninstagram.com/o1/v/t16/dict_nodash.mp4?efg=x",
         "username": "alice",
-        "timestamp": 1700000000,
-        "media_category": "story"
+        "timestamp": 1700000000
       }
     },
-    "pendingFiberResults": 1,
+    "pendingFiberResults": 0,
     "taggedMedia": [
       "media"
     ]
@@ -448,7 +449,52 @@
       "hasHtml": true
     },
     "dictionaryAfter": {},
-    "pendingFiberResults": 1,
+    "pendingFiberResults": 0,
+    "taggedMedia": [
+      "media"
+    ]
+  },
+  "click:video_without_src_media_id_in_dictionary": {
+    "sent": [
+      {
+        "url": "https://scontent.cdninstagram.com/o1/v/t16/no_src_dict.mp4?efg=x",
+        "metadata": {
+          "url": "https://scontent.cdninstagram.com/o1/v/t16/no_src_dict.mp4?efg=x",
+          "username": "gina",
+          "timestamp": 1700000006,
+          "media_id": "888",
+          "media_category": "story"
+        },
+        "isFloating": true,
+        "buttonLoading": true
+      }
+    ],
+    "toasts": [
+      "showInfo:Starting download..."
+    ],
+    "fiberRequests": [
+      "type"
+    ],
+    "consoleErrors": 0,
+    "button": {
+      "className": "md-native-btn md-story-dl-btn-inline md-loading",
+      "opacity": "0.5",
+      "background": "rgba(255, 255, 255, 0.3)"
+    },
+    "downloadState": {
+      "class": "md-loading",
+      "isFloating": true,
+      "storyKey": "alice/111",
+      "hasHtml": true
+    },
+    "dictionaryAfter": {
+      "888": {
+        "url": "https://scontent.cdninstagram.com/o1/v/t16/no_src_dict.mp4?efg=x",
+        "username": "gina",
+        "timestamp": 1700000006
+      }
+    },
+    "pendingFiberResults": 0,
     "taggedMedia": [
       "media"
     ]
@@ -522,8 +568,7 @@
       "777": {
         "url": "https://scontent.cdninstagram.com/v/t51.2885-15/sig_abc_n.jpg?stp=dst-jpg&full=1",
         "username": "dave",
-        "timestamp": 1700000005,
-        "media_category": "story"
+        "timestamp": 1700000005
       }
     },
     "pendingFiberResults": 0,
@@ -703,8 +748,7 @@
       "111": {
         "url": "https://scontent.cdninstagram.com/v/t51.2885-15/boom_full.jpg?stp=dst-jpg",
         "username": "alice",
-        "timestamp": 1700000000,
-        "media_category": "story"
+        "timestamp": 1700000000
       }
     },
     "pendingFiberResults": 0,
