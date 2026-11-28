@@ -125,8 +125,7 @@ function createSlider() {
 function createCounter() {
     const counter = document.createElement('div');
     counter.id = COUNTER_ID;
-    counter.textContent = ''; // a dummy '1/1' would trip the story completion guards (story_resume.js)
-    counter.dataset.ready = 'false';
+    counter.textContent = ''; // Filled by the first measurement: a placeholder would flash a wrong "n/total"
     return counter;
 }
 

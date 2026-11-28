@@ -15,6 +15,16 @@ export function toUnixSeconds(value) {
 }
 
 /**
+ * Local clock time for logs ("taken at 14:05:12").
+ * @param {unknown} value - seconds, milliseconds or microseconds
+ * @returns {string}
+ */
+export function formatLocalTime(value) {
+    const seconds = toUnixSeconds(value);
+    return seconds ? new Date(seconds * 1000).toLocaleTimeString() : 'unknown time';
+}
+
+/**
  * First usable timestamp of an Instagram media/user object, in Unix seconds.
  * @param {Record<string, any>} obj
  * @returns {number | null}

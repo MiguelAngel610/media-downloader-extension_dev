@@ -1,7 +1,4 @@
-// globals and logger
-window.__md_vanishMode = false;
-window.__md_ghostOnline = false;
-window.__md_ghostSeen = false;
+// Styled console logger shared by the MAIN world modules.
 
 export function mdLog(badge, message, badgeColor = "#3b82f6") {
     console.log(

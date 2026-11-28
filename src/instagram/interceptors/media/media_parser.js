@@ -1,5 +1,3 @@
-import { mdLog, logErrorOnce } from '../shared/logger.js';
-import { clearStoryCheckpoint } from '../ghost/story_resume.js';
 import { pickBestImageUrl, pickBestVideoUrl } from './media_quality.js';
 import { recordProfilePic, flushProfilePics } from './profile_pic_collector.js';
 import { extractMediaTimestamp } from '../shared/time_utils.js';
@@ -18,7 +16,13 @@ export function extractSignatureFromUrl(url) {
     }
 }
 
-export function findStoryMedia(obj, parentUsername = "", parentTimestamp = null, checkResetFn = null) {
+/**
+ * Walks a decoded payload and stores every media it finds in window.__md_storyMedia.
+ * @param {any} obj
+ * @param {string} [parentUsername]
+ * @param {number | null} [parentTimestamp] - Unix seconds inherited from the enclosing item
+ */
+export function findStoryMedia(obj, parentUsername = "", parentTimestamp = null) {
     if (!obj || typeof obj !== 'object') return;
 
     recordProfilePic(obj);
@@ -31,14 +35,9 @@ export function findStoryMedia(obj, parentUsername = "", parentTimestamp = null,
     else if (obj.author && obj.author.username) currentUsername = obj.author.username;
     else if (obj.username && typeof obj.username === 'string' && !obj.username.includes(' ')) currentUsername = obj.username;
 
-    if (obj.latest_reel_media && checkResetFn) checkResetFn(currentUsername, obj.latest_reel_media);
     // Normalized to Unix seconds: device_timestamp is often in microseconds.
     let ownTimestamp = extractMediaTimestamp(obj);
     if (ownTimestamp) currentTimestamp = ownTimestamp;
-
-    if (currentUsername && currentTimestamp && checkResetFn) {
-        checkResetFn(currentUsername, currentTimestamp);
-    }
 
     if ((obj.video_versions || obj.image_versions2) && (obj.id || obj.pk)) {
         let id = obj.id || obj.pk;
@@ -87,51 +86,15 @@ export function findStoryMedia(obj, parentUsername = "", parentTimestamp = null,
 
     for (let k in obj) {
         if (obj[k] && typeof obj[k] === 'object') {
-            findStoryMedia(obj[k], currentUsername, currentTimestamp, checkResetFn);
+            findStoryMedia(obj[k], currentUsername, currentTimestamp);
         }
     }
 }
 
+/** @param {unknown} data - a decoded Instagram payload */
 export function processAndPostData(data) {
     if (!data) return;
-    
-    let seenUsers = {};
-    let seenModified = false;
-    try {
-        seenUsers = JSON.parse(localStorage.getItem('md_ghost_seen_users') || '{}');
-    } catch (err) { logErrorOnce('Ghost Seen Store (read)', err); }
-    
-    let seenKeys = Object.keys(seenUsers);
-    let checkResetFn = null;
-    if (seenKeys.length > 0) {
-        checkResetFn = function(uname, ts) {
-            if (!uname || !ts || !seenUsers[uname]) return;
-            let seenTime = typeof seenUsers[uname] === 'object' ? seenUsers[uname].seenAt : seenUsers[uname];
-            let numTs = Number(ts);
-            if (isNaN(numTs) || numTs <= 0) return;
-
-            let tsMs = numTs;
-            if (numTs > 1e14) tsMs = Math.floor(numTs / 1000); // Microseconds to milliseconds
-            else if (numTs < 1e11) tsMs = numTs * 1000;       // Seconds to milliseconds
-
-            if (tsMs > seenTime + 10000) { // Genuinely new story uploaded after previous view (10s buffer)
-                delete seenUsers[uname];
-                seenModified = true;
-                clearStoryCheckpoint(uname);
-                mdLog("✨ Story Alert", `New story posted by @${uname} after previous view — Ring restored to colorful`, "#06b6d4");
-            }
-        };
-    }
-    
-    findStoryMedia(data, "", null, checkResetFn);
+    findStoryMedia(data);
     flushProfilePics();
-
-    if (seenModified) {
-        try {
-            localStorage.setItem('md_ghost_seen_users', JSON.stringify(seenUsers));
-            if (window.__md_applyGhostVisuals) window.__md_applyGhostVisuals();
-        } catch (err) { logErrorOnce('Ghost Seen Store (write)', err); }
-    }
-    
     window.postMessage({ type: 'MD_STORY_MEDIA_UPDATE', media: window.__md_storyMedia }, '*');
 }

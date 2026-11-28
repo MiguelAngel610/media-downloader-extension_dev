@@ -1,35 +1,20 @@
-import { mdLog, logError } from '../shared/logger.js';
-import { clearStoryCheckpoint, saveStoryCheckpoint, getStorySegmentInfo } from './story_resume.js';
+import { mdLog } from '../shared/logger.js';
+import { formatLocalTime } from '../shared/time_utils.js';
+import { normalizeUsername } from '../shared/username.js';
+import { recordLocalSeen } from './seen_ledger.js';
 
 /* Media Downloader - Ghost Mode (MAIN world)
- * Visual feedback and "seen in stealth" bookkeeping.
- * Request classification lives in ghost_policy.js, interception in network.js
- * and the flags in ghost_settings.js. */
+ * What happens after a seen request is blocked: the opened story goes into the local seen ledger
+ * (native_seen.js replays it, so Instagram itself resumes and grays rings), the popup's stealth
+ * history is notified and the user gets feedback. Request classification lives in ghost_policy.js,
+ * interception in network.js, the flags in ghost_settings.js and persisted records in ghost_storage.js. */
 
 /** @typedef {import('./ghost_policy.js').GhostBlockType} GhostBlockType */
+/** @typedef {import('./ghost_policy.js').SeenItem} SeenItem */
 
-const SEEN_USERS_STORAGE_KEY = 'md_ghost_seen_users';
-const SEEN_TTL_MS = 24 * 60 * 60 * 1000; // Instagram story lifetime
 const BLOCK_FEEDBACK_COOLDOWN_MS = 2000;
-
-/** @returns {Record<string, number | { seenAt: number }>} */
-function readSeenUsers() {
-    try {
-        return JSON.parse(localStorage.getItem(SEEN_USERS_STORAGE_KEY) || '{}');
-    } catch (err) {
-        logError('Ghost Seen Store', err);
-        return {};
-    }
-}
-
-/** @param {Record<string, number | { seenAt: number }>} seenUsers */
-function writeSeenUsers(seenUsers) {
-    try {
-        localStorage.setItem(SEEN_USERS_STORAGE_KEY, JSON.stringify(seenUsers));
-    } catch (err) {
-        logError('Ghost Seen Store', err);
-    }
-}
+/** `/stories/<segment>/` paths that are sections, not story owners. */
+const NON_OWNER_STORY_SEGMENTS = Object.freeze(['highlights', 'direct', 'explore']);
 
 /**
  * @param {string} icon
@@ -48,131 +33,41 @@ export function showGhostToast(icon, color) {
     }, 1500);
 }
 
-window.__md_applyGhostVisuals = function () {
-    const seenUsers = readSeenUsers();
-
-    const now = Date.now();
-    let updated = false;
-    for (const u in seenUsers) {
-        const entry = seenUsers[u];
-        const seenTime = typeof entry === 'object' ? entry.seenAt : entry;
-        if (now - seenTime > SEEN_TTL_MS) {
-            delete seenUsers[u];
-            updated = true;
-        }
-    }
-    if (updated) writeSeenUsers(seenUsers);
-
-    const users = Object.keys(seenUsers);
-
-    // At document_start <head> may not exist yet.
-    const styleParent = document.head || document.documentElement;
-    if (!styleParent) return;
-
-    let styleEl = document.getElementById('md-ghost-styles');
-    if (!styleEl) {
-        styleEl = document.createElement('style');
-        styleEl.id = 'md-ghost-styles';
-        styleParent.appendChild(styleEl);
-    }
-
-    if (users.length === 0) {
-        styleEl.textContent = '';
-        return;
-    }
-
-    const cssRules = users.map((u) => {
-        const uLower = u.toLowerCase();
-        return `
-        a[href*="/stories/${u}/"] canvas,
-        a[href*="/stories/${u}/"] svg:not([aria-label]),
-        :is([role="button"], button, li, header):has(img[alt*="${uLower}"]):not(:has(video)) canvas,
-        :is([role="button"], button, li, header):has(img[alt*="${uLower}"]):not(:has(video)) svg:not([aria-label]),
-        :is([role="button"], button, li):has(:is([title="${uLower}"], span, div):is([title="${uLower}"])):not(:has(video)) canvas,
-        :is([role="button"], button, li):has(:is([title="${uLower}"], span, div):is([title="${uLower}"])):not(:has(video)) svg:not([aria-label]) {
-            filter: grayscale(100%) contrast(0) brightness(1.6) !important;
-            opacity: 0.2 !important;
-            transition: all 0.5s ease;
-        }
-        `;
-    });
-
-    const css = cssRules.join('\n');
-    if (styleEl.textContent !== css) {
-        styleEl.textContent = css;
-    }
-
-    // Direct DOM inline pass for 100% reliable gray ring across all layouts and languages
-    document.querySelectorAll('img[alt]').forEach((img) => {
-        const alt = (img.getAttribute('alt') || '').toLowerCase();
-        for (const u of users) {
-            const uLower = u.toLowerCase();
-            const match = alt === uLower ||
-                alt.includes(` ${uLower} `) ||
-                alt.endsWith(` ${uLower}`) ||
-                alt.endsWith(` ${uLower}.`) ||
-                alt.includes(`de ${uLower}`) ||
-                alt.includes(`${uLower}'s`) ||
-                alt.includes(uLower);
-            if (!match) continue;
-            const container = img.closest('[role="button"], button, li, header, a') || img.parentElement;
-            if (!container) continue;
-            container.querySelectorAll('canvas, svg:not([aria-label])').forEach((ring) => {
-                ring.style.setProperty('filter', 'grayscale(100%) contrast(0) brightness(1.6)', 'important');
-                ring.style.setProperty('opacity', '0.2', 'important');
-            });
-        }
-    });
-};
-
-/** Runs the visual pass, isolating failures so the interval keeps working. */
-function safeApplyGhostVisuals() {
-    try {
-        window.__md_applyGhostVisuals();
-    } catch (err) {
-        logError('Ghost Visuals', err);
-    }
+/** @returns {string | null} owner of the story on screen, from /stories/<username>/ */
+function currentStoryOwner() {
+    const match = window.location.pathname.match(/^\/stories\/([a-zA-Z0-9_.-]+)/);
+    const owner = match ? normalizeUsername(match[1]) : null;
+    return owner && !NON_OWNER_STORY_SEGMENTS.includes(owner) ? owner : null;
 }
 
-// Periodic visual sync for single page application navigation and scroll
-setInterval(safeApplyGhostVisuals, 1000);
-window.addEventListener('popstate', () => {
-    setTimeout(safeApplyGhostVisuals, 150);
-});
+/**
+ * The request's own reelMediaTakenAt wins over the dictionary. The owner comes from the payload first,
+ * then the dictionary, and the URL last: the payload names the exact story that was opened.
+ * @param {string | null} networkUsername
+ * @param {SeenItem | null} seenItem
+ * @returns {{ owner: string | null, takenAt: unknown }}
+ */
+function resolveBlockedStory(networkUsername, seenItem) {
+    const media = seenItem && seenItem.mediaId && window.__md_storyMedia ? window.__md_storyMedia[seenItem.mediaId] : null;
+    return {
+        owner: normalizeUsername(networkUsername) || normalizeUsername(media && media.username) || currentStoryOwner(),
+        takenAt: (seenItem && seenItem.takenAt) || (media && media.timestamp),
+    };
+}
 
-/** @param {string | null} [networkUsername] */
-window.__md_markStoryAsGhostSeen = function (networkUsername = null) {
-    if (window.__md_resumeInProgress) return; // Do not touch checkpoints or update seen state while auto-advancing slides
-    let username = networkUsername;
-    if (!username) {
-        const match = window.location.href.match(/\/stories\/([^/]+)\//);
-        if (!match) return;
-        username = match[1];
+/**
+ * @param {string | null} networkUsername
+ * @param {SeenItem | null} seenItem
+ */
+function recordBlockedStorySeen(networkUsername, seenItem) {
+    const { owner, takenAt } = resolveBlockedStory(networkUsername, seenItem);
+    if (!owner) return;
+    if (recordLocalSeen(owner, takenAt)) {
+        mdLog('👁️ Native Seen', `@${owner} watched up to the story taken at ${formatLocalTime(takenAt)}`, '#8b5cf6');
     }
-
-    const segInfo = getStorySegmentInfo();
-    const cur = segInfo && segInfo.cur ? segInfo.cur : 1;
-    const total = segInfo && segInfo.total ? segInfo.total : 1;
-    const isLast = segInfo && segInfo.isLast !== undefined ? segInfo.isLast : (total <= 1 || cur >= total);
-
-    // Mark as ghost-seen immediately
-    const seenUsers = readSeenUsers();
-    seenUsers[username] = Date.now();
-    writeSeenUsers(seenUsers);
-
-    // Manage checkpoint: if partially viewed, save position; if finished, clear
-    if (!isLast && cur > 1 && cur < total) {
-        saveStoryCheckpoint(username, cur, total);
-    } else if (isLast) {
-        clearStoryCheckpoint(username);
-    }
-
-    // Notify content script to save in extension storage
-    window.postMessage({ type: 'MD_GHOST_HISTORY_ADD', username: username, timestamp: Date.now() }, '/');
-
-    safeApplyGhostVisuals();
-    mdLog("👻 Story Viewed in Stealth", `@${username} marked as ghost-seen (${cur}/${total}) — Ring turned gray`, "#8b5cf6");
-};
+    // The popup's stealth history records every view; '/' restricts delivery to this origin.
+    window.postMessage({ type: 'MD_GHOST_HISTORY_ADD', username: owner, timestamp: Date.now() }, '/');
+}
 
 let lastGhostBlockFeedbackAt = 0;
 
@@ -180,11 +75,10 @@ let lastGhostBlockFeedbackAt = 0;
  * Called by network.js whenever a story/DM seen request is blocked.
  * @param {GhostBlockType | null} type
  * @param {string | null} [networkUsername]
+ * @param {SeenItem | null} [seenItem]
  */
-export function handleGhostBlock(type, networkUsername = null) {
-    if (type === 'story') {
-        window.__md_markStoryAsGhostSeen(networkUsername);
-    }
+export function handleGhostBlock(type, networkUsername = null, seenItem = null) {
+    if (type === 'story') recordBlockedStorySeen(networkUsername, seenItem);
     // Instagram retries blocked mutations; rate-limit the feedback to avoid console spam.
     const now = Date.now();
     if (now - lastGhostBlockFeedbackAt > BLOCK_FEEDBACK_COOLDOWN_MS) {

@@ -38,9 +38,9 @@ Eres un Ingeniero de Software Senior especializado en desarrollo de extensiones 
 - **Alarms over Timers:** Para tareas programadas o reintentos en segundo plano, usa `chrome.alarms` en lugar de `setTimeout` o `setInterval`.
 
 ## 7. Network Interception & Injection Architecture
-- **Interceptor Lifecycle:** Los scripts en `src/interceptors/` corren en el contexto de la página para interceptar `fetch` y `XMLHttpRequest`. La comunicación hacia los content scripts debe manejarse mediante eventos `window.postMessage` tipados y estructurados.
-- **DOM Mutation Throttling:** Usa `src/utils/dom_observer.js` con debounce o control de frecuencia para evitar sobrecarga de CPU cuando plataformas como Instagram o X renderizan cientos de nodos en scroll continuo.
-- **CSS Isolation:** Todos los elementos inyectados en el DOM (botones de feed, historias, progress bars) deben usar clases con prefijos únicos y definirse en `src/styles/content.css` o dentro de módulos dedicados para no colisionar con las hojas de estilo del sitio.
+- **Interceptor Lifecycle:** Los scripts en `src/<platform>/interceptors/` corren en el contexto de la página para interceptar `fetch` y `XMLHttpRequest`. La comunicación hacia los content scripts debe manejarse mediante eventos `window.postMessage` tipados y estructurados.
+- **DOM Mutation Throttling:** Usa `src/shared/utils/dom_observer.js` con debounce o control de frecuencia para evitar sobrecarga de CPU cuando plataformas como Instagram o X renderizan cientos de nodos en scroll continuo.
+- **CSS Isolation:** Todos los elementos inyectados en el DOM (botones de feed, historias, progress bars) deben usar clases con prefijos únicos y definirse en `src/shared/styles/content.css` o dentro de módulos dedicados para no colisionar con las hojas de estilo del sitio.
 
 ## 8. Telegram Web Engine (WebK & WebZ)
 - **Dual-Client Compatibility:** Toda lógica para Telegram debe diferenciar explícitamente entre la interfaz WebK (`src/telegram/features/webk_buttons.js`) y WebZ (`src/telegram/features/webz_buttons.js`), adaptándose a sus estructuras de DOM y mecanismos de streaming respectivos.

@@ -44,7 +44,7 @@ function reportBlocked(decision, channel) {
         showGhostToast('🟢', '#064e3b');
         return;
     }
-    handleGhostBlock(decision.type, decision.username);
+    handleGhostBlock(decision.type, decision.username, decision.seenItem || null);
 }
 
 // ==========================================
@@ -308,12 +308,6 @@ function decodeJsonStringLiteral(raw) {
 }
 
 function scanServerRenderedData() {
-    try {
-        window.__md_applyGhostVisuals();
-    } catch (err) {
-        logError('Ghost Visuals', err);
-    }
-
     // 1. Standard JSON scripts
     document.querySelectorAll('script[type="application/json"]').forEach((scriptEl) => {
         const text = scriptEl.innerHTML;

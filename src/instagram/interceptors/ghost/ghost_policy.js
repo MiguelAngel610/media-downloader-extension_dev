@@ -10,12 +10,19 @@
  * @property {boolean} isStorySeen
  * @property {boolean} isDirectSeen
  * @property {string | null} username - Story owner resolved from the payload's media/reel id
+ * @property {SeenItem | null} seenItem - The story item a seen request reports
+ */
+/**
+ * @typedef {Object} SeenItem
+ * @property {string | null} mediaId - Story item pk (no owner suffix)
+ * @property {number | null} takenAt - reelMediaTakenAt as sent by Instagram, when present
  */
 /**
  * @typedef {Object} GhostDecision
  * @property {boolean} blocked
  * @property {GhostBlockType | null} type
  * @property {string | null} username
+ * @property {SeenItem | null} [seenItem]
  */
 
 const STORY_SEEN_BODY_MARKERS = Object.freeze([
@@ -54,6 +61,9 @@ const WEBSOCKET_PRESENCE_MARKERS = Object.freeze([
 ]);
 
 const MEDIA_ID_PATTERN = /"(?:reel_id|media_id)"\s*:\s*"([^"]+)"/;
+// Seen request variables, snake_case or camelCase (reelMediaId / reel_media_id / media_id).
+const SEEN_MEDIA_ID_PATTERN = /"(?:reel_?media_?id|media_?id)"\s*:\s*"?(\d+)/i;
+const SEEN_TAKEN_AT_PATTERN = /"reel_?media_?taken_?at"\s*:\s*"?(\d+)/i;
 
 /** @type {Readonly<GhostDecision>} */
 export const NOT_BLOCKED = Object.freeze({ blocked: false, type: null, username: null });
@@ -75,18 +85,43 @@ function includesAny(haystack, markers) {
  */
 function resolveStoryOwner(bodyText) {
     let match = bodyText.match(MEDIA_ID_PATTERN);
-    if (!match) {
-        try {
-            match = decodeURIComponent(bodyText).match(MEDIA_ID_PATTERN);
-        } catch (err) {
-            // Expected for bodies with stray '%' sequences: they simply carry no encoded id.
-            if (!(err instanceof URIError)) throw err;
-        }
-    }
+    if (!match) match = decodeBody(bodyText).match(MEDIA_ID_PATTERN);
     if (!match || !match[1]) return null;
-    const mediaId = match[1].split('_')[0];
-    const media = window.__md_storyMedia && window.__md_storyMedia[mediaId];
+    return storyOwnerOf(match[1].split('_')[0]);
+}
+
+/** @param {string | null} mediaId @returns {string | null} */
+function storyOwnerOf(mediaId) {
+    const media = mediaId && window.__md_storyMedia && window.__md_storyMedia[mediaId];
     return media && media.username ? media.username : null;
+}
+
+/** @param {string} bodyText @returns {string} the URL-decoded body, or '' when it is not decodable */
+function decodeBody(bodyText) {
+    try {
+        return decodeURIComponent(bodyText);
+    } catch (err) {
+        // Expected for bodies with stray '%' sequences: they simply carry no encoded variables.
+        if (!(err instanceof URIError)) throw err;
+        return '';
+    }
+}
+
+/**
+ * Which story item a seen request reports. Read from the request itself (not the screen), so the
+ * local seen ledger records exactly the item Instagram would have stored.
+ * @param {string} bodyText
+ * @returns {SeenItem | null}
+ */
+export function extractSeenItem(bodyText) {
+    const text = `${bodyText}\n${decodeBody(bodyText)}`;
+    const mediaIdMatch = text.match(SEEN_MEDIA_ID_PATTERN);
+    const takenAtMatch = text.match(SEEN_TAKEN_AT_PATTERN);
+    if (!mediaIdMatch && !takenAtMatch) return null;
+    return {
+        mediaId: mediaIdMatch ? mediaIdMatch[1] : null,
+        takenAt: takenAtMatch ? Number(takenAtMatch[1]) : null,
+    };
 }
 
 /**
@@ -105,11 +140,13 @@ export function classifyRequest(url, bodyText) {
     const isPresence = includesAny(urlLower, PRESENCE_URL_MARKERS) ||
         (urlLower.includes('graphql') && bodyLower.includes('update_presence'));
 
+    const seenItem = isStorySeen ? extractSeenItem(bodyText) : null;
     return {
         isPresence,
         isStorySeen,
         isDirectSeen,
-        username: isStorySeen ? resolveStoryOwner(bodyText) : null,
+        username: isStorySeen ? (storyOwnerOf(seenItem && seenItem.mediaId) || resolveStoryOwner(bodyText)) : null,
+        seenItem,
     };
 }
 
@@ -128,7 +165,7 @@ export function isGhostRelevant(classification) {
  */
 export function decideGhostBlock(classification, settings) {
     if (classification.isStorySeen && (settings.vanishMode || settings.ghostSeen)) {
-        return { blocked: true, type: 'story', username: classification.username };
+        return { blocked: true, type: 'story', username: classification.username, seenItem: classification.seenItem };
     }
     if (classification.isDirectSeen && settings.ghostSeen) {
         return { blocked: true, type: 'dm', username: null };

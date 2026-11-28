@@ -1,11 +1,30 @@
 # Notas TAccnicas - Instagram
 
-## Estructura de mA3dulos
-- `src/instagram/core/` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬  state.js, styles.js, vanish_init.js
-- `src/instagram/utils/` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬  platform.js, username_resolver.js, media_resolver.js
-- `src/instagram/ui/` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬  svgs.js, overlay_root.js, button_state.js
-- `src/instagram/features/` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬  pfp_button.js, story_button.js, feed_buttons.js, video_progress.js
-- `src/instagram/main.js` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬  Orquestador principal + MutationObserver + click interceptor
+## Estructura de módulos (verificada con `git ls-files`, 28 de noviembre 2026)
+- **MAIN world** (`dist/ig_interceptor.bundle.js`, entrada `src/instagram/interceptors/index.js`):
+  - `ghost/`: `ghost_settings.js` (flags + canal seguro), `ghost_policy.js` (qué es un `seen`/presencia y qué item reporta), `ghost_storage.js` (lo persistido + migración), `seen_ledger.js` (hasta qué historia se vio cada reel), `native_seen.js` (hook de `JSON.parse` que reescribe `reel.seen`), `ghost_mode.js` (qué pasa tras bloquear un seen: ledger, historial del popup, aviso)
+  - `network/`: `network.js` (parches de fetch/XHR/beacon/WebSocket + sniffer de respuestas), `request_body.js`
+  - `media/`: `media_parser.js` (diccionario de medios + "Story Alert"), `media_quality.js`, `profile_pic_collector.js`, `fiber_search.js` + `fiber/` (búsqueda en el árbol de React), `device_spoof.js`
+  - `shared/`: `logger.js`, `time_utils.js` (incluye `formatLocalTime`), `timed_store.js` (factory de registros JSON con TTL en `localStorage`), `username.js` (`normalizeUsername`)
+- **ISOLATED world** (`dist/ig_content.bundle.js`, entrada `src/instagram/index.js`):
+  - `main.js` (orquestador, MutationObserver, rescate de clics y atajo de teclado), `core/` (`ig_interceptor_init.js` = puente MAIN↔ISOLATED, `state.js`, `styles.js`)
+  - `features/` (`feed_buttons.js`, `pfp_button.js`, `story_button.js`, `auto_backup.js`, `progress/` = barra/slider y `#md-story-counter`)
+  - `stories/`, `download/`, `media_resolution/`, `ui/`, `utils/` (`viewport.js`, `media_resolver.js`, `pfp_resolver.js`…)
+- Compartidos (scripts clásicos, `window.MD*`): `src/shared/utils/` (`shortcut_manager.js`, `toast_manager.js`, `dom_observer.js`…).
+
+## Revisión de estas notas (28 de noviembre 2026): qué ya NO es cierto
+Las entradas de abajo son historial. Se verificaron contra el código actual y estas afirmaciones están obsoletas o mal:
+- **Archivos que ya no existen:** `vanish.js`, `vanish_init.js`, `ig_interceptor.js`, `ig_ghost_mode.js`, `video_progress.js`, `dist/video_progress.bundle.js`, `interceptors/core/*` y los 4 módulos de `media_resolution/` fusionados el 22 de noviembre. Equivalencias: `vanish.js` → `interceptors/ghost/*` + `network/network.js` + `media/media_parser.js`; `video_progress.js` → `features/progress/`; `interceptors/core/X` → `interceptors/{ghost,media,network,shared}/X`. Las menciones `\vanish.js\`, `\feed_buttons.js\`, `\button_state.js\` aparecen sin la primera letra (`anish.js`, `eed_buttons.js`, `utton_state.js`) porque se escribieron con barras invertidas (`\v`, `\f`, `\b` = caracteres de control).
+- **Aro gris (3 versiones contradictorias):** el 3 de agosto se puso "solo al terminar"; la auditoría del 21 de octubre (punto 7) lo cambió a "al abrir cualquier slide"; el 28 de noviembre se volvió a "solo al terminar", y solo si lo confirma `#md-story-counter`. **Vigente: la del 28 de noviembre.**
+- **"Story Alert" borra el checkpoint** (Smart Resume de octubre, punto 4): falso desde el 28 de noviembre; solo devuelve el aro a color.
+- **Avance del Smart Resume** (octubre): no son "~60 ms por paso / ~120 ms" sino pasos de 85 ms, y cada paso dispara clics sintéticos + `.click()` + `ArrowRight`. El `ArrowRight` en `document`/`window` no llega a React (que escucha en su contenedor raíz) y activaba el atajo de descarga (ver fix del 28 de noviembre).
+- **"Relay calcula la diapositiva inicial con `reel.seen_timestamp === 0`, ignorando el ID de la URL"** (octubre) y **"`button[aria-label="Next"]` es el chevron de la siguiente cuenta"** (auditoría de octubre, punto 3): nunca se documentó cómo se verificaron. Tratarlas como hipótesis.
+- **Likes bloqueados como "Seguro de Vida"** (25 de julio, punto 4): ya no; `ghost_policy.js` no tiene el marcador amplio `xdtstory` (lo quitó la auditoría de octubre).
+- **Selector del aro `[role="button"]:has(img…) canvas` en `fiber_search.js`** (10 de septiembre): no existe en el código; el aro lo pinta `__md_applyGhostVisuals` en `ghost_mode.js`.
+- **Carrera de `injectNextScript`/`scriptsToInject`** (septiembre): ya no hay inyección por `<script>`; el bundle MAIN se declara con `"world": "MAIN"` en el manifest (fix del 21 de noviembre).
+- **Atajo de teclado en `main.js` con `e.code`/`e.key`** (28 de julio, punto 4): la comparación vive en `src/shared/utils/shortcut_manager.js`; `main.js` solo decide qué botón pulsar.
+- **Enlaces `file:///C:/Users/…`**: eran rutas absolutas (y del OneDrive viejo); se cambiaron por rutas relativas `../src/…`, aunque varios destinos ya no existen (ver la primera viñeta).
+- **Codificación:** ~215 líneas tienen mojibake (`MA3dulo` = "Módulo", `Ã³` = "ó"). Parte es irreversible (se perdieron bytes), así que no se corrigió en bloque.
 
 ## Problema: Falla silenciosa al descargar carruseles y nombres incorrectos (timestamp en lugar de shortcode)
 **Fecha:** 06 de Septiembre 2026
@@ -210,7 +229,7 @@
 ## ActualizaciA3n (3 de Agosto 2026): LA3gica Inteligente del Anillo Gris en Modo Fantasma (Vanish Mode)
 **1. Marcado Exclusivo al Finalizar Todas las Historias:**
 - **Causa del problema previo:** Al ver solo la primera historia de 10 en Modo Fantasma, el interceptor bloqueaba el POST de `seen` e inmediatamente guardaba al usuario en `localStorage` con un anillo gris por 24 horas.
-- **SoluciA3n QuirÃºrgica:** En [vanish.js](file:///C:/Users/Migue/OneDrive/Documents/Projects/media_downloader_extension_dev/src/interceptors/vanish.js) se integrA3 la verificaciA3n `isViewingLastStorySegment()` que consulta tanto nuestro contador oficial `#md-story-counter` como la estructura nativa de barras superiores. Ahora, el anillo gris **solo se activa si estÃ¡s reproduciendo la ÃºÃºltima historia del usuario (`activeIndex >= totalSegments`)**. Si sales antes, el cA-rculo permanece 100% colorido en el feed (comportamiento idAcntico al nativo).
+- **SoluciA3n QuirÃºrgica:** En [vanish.js](../src/interceptors/vanish.js) se integrA3 la verificaciA3n `isViewingLastStorySegment()` que consulta tanto nuestro contador oficial `#md-story-counter` como la estructura nativa de barras superiores. Ahora, el anillo gris **solo se activa si estÃ¡s reproduciendo la ÃºÃºltima historia del usuario (`activeIndex >= totalSegments`)**. Si sales antes, el cA-rculo permanece 100% colorido en el feed (comportamiento idAcntico al nativo).
 
 **2. RestauraciA3n AutomÃ¡tica al Subir una Nueva Historia:**
 - **LA3gica de Reseteo:** Cuando el usuario publica una nueva historia horas despuAcs, su marca de tiempo (`latest_reel_media` o `taken_at`) en las respuestas API/GraphQL del feed supera la marca de tiempo guardada del Altimo visto.
@@ -218,8 +237,8 @@
 
 ## Feature (3 de Agosto 2026): Alerta Inteligente contra Reels/Posts re-subidos a Historias
 - **Problema de Calidad y EstActica:** Cuando los usuarios comparten un Reel o PublicaciA3n del feed dentro de su Historia (ej. sticker con texto *"See Post"*, *"Watch full reel >"*, *"Ver reel completo"*, *"Ver publicaciA3n"* o *"View post"*), descargar el contenido directamente desde la historia genera un archivo re-comprimido, cortado a 15 segundos o con resoluciA3n degradada y marcos oscuros con botones de interfaz de Instagram pegados al archivo.
-- **DetecciA3n CuÃ¡druple Avanzada en Tiempo Real (`detectSharedReelOrPost` & API Interception):** Al presionar el botA3n de descarga o usar el atajo en una historia en [story_button.js](file:///C:/Users/Migue/OneDrive/Documents/Projects/media_downloader_extension_dev/src/instagram/features/story_button.js), la extensiA3n aplica un sistema militar de 4 capas:
-  0. **Verdad Absoluta en API de Red (JSON Ground Truth):** El interceptor en [vanish.js](file:///C:/Users/Migue/OneDrive/Documents/Projects/media_downloader_extension_dev/src/interceptors/vanish.js) lee las respuestas web nativas y detecta si la historia contiene arreglos como `story_feed_media`, `reeling_media` o `story_reels_media`. Al coincidir con el ID de historia en pantalla, bloquea el intento de descarga instantÃ¡neamente con certeza absoluta, sin depender siquiera de los elementos web.
+- **DetecciA3n CuÃ¡druple Avanzada en Tiempo Real (`detectSharedReelOrPost` & API Interception):** Al presionar el botA3n de descarga o usar el atajo en una historia en [story_button.js](../src/instagram/features/story_button.js), la extensiA3n aplica un sistema militar de 4 capas:
+  0. **Verdad Absoluta en API de Red (JSON Ground Truth):** El interceptor en [vanish.js](../src/interceptors/vanish.js) lee las respuestas web nativas y detecta si la historia contiene arreglos como `story_feed_media`, `reeling_media` o `story_reels_media`. Al coincidir con el ID de historia en pantalla, bloquea el intento de descarga instantÃ¡neamente con certeza absoluta, sin depender siquiera de los elementos web.
   1. **Enlaces Ocultos o Visibles:** Localiza etiquetas (`<a href*="/p/">`, `/reel/`, `/reels/`, `/tv/`) incluso con ancho 0 antes del clic.
   2. **Etiquetas y Stickers Textuales:** EvalÃºa nodos con expresiones regulares expandidas (*see*, *watch*, *ver*, *view*, *mirar* + *post*, *reel*, *photo*, *foto*, *publicaciA3n*, *video*).
   3. **Menciones de AtribuciA3n Universal Pre-Clic:** Escanea el Ã¡rbol DOM completo en busca de nodos de texto simples que comiencen con `@` sin espacios en la zona central de la historia, interceptando reposts cuya interfaz aÃºn no ha generado el globo "See Post".
@@ -227,7 +246,7 @@
 - **NotificaciA3n Discreta Abajo a la Derecha (`showSharedReelWarning`):** Si se detecta una re-publicaciA3n o menciA3n de Reel/Post, la extensiA3n **bloquea permanentemente la descarga en la historia** y despliega en la esquina inferior derecha del navegador una tarjeta de notificaciA3n luminosa, estActica y nada intrusiva con A-cono personalizado (A3A3 para Reels, A3A3ï¸� para Posts/Fotos) y un **botA3n azul** brillante para abrir el Post, Reel o MenciA3n (`Open "@username"` u `Open Full Post/Reel in New Window`) y descargarlo sin marcos.
 
 ## Fix (3 de Agosto 2026): Eliminacin del Delay de 1 Segundo en Barra de Progreso de Historias
-- **Causa RaA-z Descubierta en Video:** Al cambiar de historia (ej. de 6/16 a 7/16), durante exactamente 1 segundo aparecA-an las barras blancas cortadas nativas de Instagram sin el nÃºmero de historias, y un segundo mÃ¡s tarde aparecA-a nuestra barra personalizada con el contador. Esto sucedA-a porque en [video_progress.js](file:///C:/Users/Migue/OneDrive/Documents/Projects/media_downloader_extension_dev/src/instagram/features/video_progress.js) el ciclo principal `syncOverlays()` tenA-a un temporizador que suspendA-a toda la sincronizaciA3n durante **1000 milisegundos (`Date.now() + 1000`)** cada vez que el URL (`window.location.href`) cambiaba.
+- **Causa RaA-z Descubierta en Video:** Al cambiar de historia (ej. de 6/16 a 7/16), durante exactamente 1 segundo aparecA-an las barras blancas cortadas nativas de Instagram sin el nÃºmero de historias, y un segundo mÃ¡s tarde aparecA-a nuestra barra personalizada con el contador. Esto sucedA-a porque en [video_progress.js](../src/instagram/features/video_progress.js) el ciclo principal `syncOverlays()` tenA-a un temporizador que suspendA-a toda la sincronizaciA3n durante **1000 milisegundos (`Date.now() + 1000`)** cada vez que el URL (`window.location.href`) cambiaba.
 - **SoluciA3n QuirÃºrgica:**
   1. Se separaron `syncStoryProgressBar()` y `syncModalScrollLock()` en funciones independientes de mÃ¡xima prioridad que **siempre se ejecutan instantÃ¡neamente** en cada cuadro de animaciA3n (60 FPS), sin ser jamÃ¡s suspendidas por temporizadores ni transiciones de URL.
   2. Se configurA3 el detector de cambio de URL para que **no suspenda los elementos web si la navegaciA3n es puramente dentro del visor de historias** (`wasStory && isStory`).
@@ -236,7 +255,7 @@
 ## Fix (3 de Agosto 2026): Atajo de Teclado Universal y NavegaciA3n Feed âž” Historias sin F5
 - **1. Soporte Universal para el Atajo de Teclado:**
   - **Problema Descubierto:** Al abrir perfiles individuales o publicaciones en pestaÃ±as nuevas, presionar el atajo de descarga de la extensiA3n (ej. ALT+Q / ALT+S) no funcionaba.
-  - **Causa RaA-z:** En [main.js](file:///C:/Users/Migue/OneDrive/Documents/Projects/media_downloader_extension_dev/src/instagram/main.js), el escuchador de teclado `keydown` estaba programado para buscar y hacer clic exclusivamente en `.md-story-dl-btn-inline` (botones dentro del visor de historias), ignorando el resto de Instagram.
+  - **Causa RaA-z:** En [main.js](../src/instagram/main.js), el escuchador de teclado `keydown` estaba programado para buscar y hacer clic exclusivamente en `.md-story-dl-btn-inline` (botones dentro del visor de historias), ignorando el resto de Instagram.
   - **SoluciA3n QuirÃºrgica:** Se reescribiA3 el manejador de atajos en una matriz inteligente multi-contexto. Ahora, al presionar el atajo, la extensiA3n evalÃºa el contexto en tiempo real:
     1. Si estÃ¡s en **Historias**, dispara el botA3n de la historia central.
     2. Si tienes un **Modal** abierto (Post o Reel emergente), dispara la descarga de ese modal.
@@ -245,7 +264,7 @@
 - **2. Descarga de Historias desde el Feed sin Necesidad de F5 (Recarga):**
   - **Problema Descubierto:** Al entrar a una historia haciendo clic en un anillo del feed (navegaciA3n SPA de Instagram), a veces la extensiA3n fallaba en inyectar el botA3n o al descargarlo, requiriendo un refresco (F5) para solucionarse.
   - **Causa RaA-z:** Al navegar desde el feed sin recargar la pgina, el DOM mantiene en segundo plano (ocultos o superpuestos) los encabezados y menAs de 3 puntos del feed anterior. La funciA3n `injectStoryButton` tomaba el primer menÃº de 3 puntos que encontraba en orden DOM (que solA-a ser el de un post del feed en segundo plano) y al hacer clic en descarga, la bsqueda global de medios PodA-a capturar un video del feed oculto.
-  - **SoluciA3n QuirÃºrgica en [story_button.js](file:///C:/Users/Migue/OneDrive/Documents/Projects/media_downloader_extension_dev/src/instagram/features/story_button.js):**
+  - **SoluciA3n QuirÃºrgica en [story_button.js](../src/instagram/features/story_button.js):**
     1. **PriorizaciA3n por Zona y Centrado:** Ahora la extensiA3n filtra los menAs de 3 puntos a aquellos ubicados exclusivamente en la zona superior central de la pantalla y los ordena por proximidad al centro (`window.innerWidth / 2`), garantizando al 100% capturar el encabezado de la historia activa y jamÃ¡s los posts del feed en segundo plano.
     2. **BÃºsqueda JerÃ¡rquica al Descargarse:** Al hacer clic, en lugar de buscar videos globalmente por el documento entero, el algoritmo asciende directamente por los ancestros del botA3n (`dlBtn.parentElement`) para extraer Ãºnicamente la etiqueta `<video>` o `<img>` que vive dentro de la diapositiva exacta que estÃ¡s reproduciendo.
 
@@ -254,10 +273,10 @@
 - **AnÃ¡lisis de Fallas en CSS Anterior:**
   1. **Opacidad del CA-rculo (`opacity: 0.9`):** Al tener 90% de opacidad en hover, la intersecciA3n del degradado entre el progreso blanco (90% opaco) y el fondo gris (20% opaco) se transparentaba a travAcs de la perla blanca, creando una lA-nea vertical fantasiosa dentro del cA-rculo.
   2. **Desplazamiento Vertical AsimActrico (`margin-top: -4.5px / -3.5px`):** Al transicionar la altura del carril de 5px a 7px en hover con mÃ¡rgenes superiores imprecisos, el cA-rculo quedaba 1px desfasado del centro real y temblaba durante la animaciA3n.
-- **SoluciA3n EstActica de Calidad Nativa en [styles.js](file:///C:/Users/Migue/OneDrive/Documents/Projects/media_downloader_extension_dev/src/instagram/core/styles.js):**
+- **SoluciA3n EstActica de Calidad Nativa en [styles.js](../src/instagram/core/styles.js):**
   1. **ExpansiA3n TÃ¡ctil ErgonA3mica (6px âž” 12px) y Hitbox Ampliada ("Anti-osu!"):** Para evitar que el usuario tenga que "apuntar a un pA-xel como en un videojuego de precisiA3n", se expandiA3 el contenedor superior con `top: -12px; bottom: -12px` y `min-height: 32px` para otorgar un **Ã¡rea de clic masiva de 32px** de alto. En reposo, la barra luce con un grosor base robusto y visible de **6px**. Al acercar el mouse o arrastrar, se expande a unos suntuosos **12px** de altura para hacer clic o mover el tiempo con cero esfuerzo.
   2. **Perla Gigante y SincronA-a GeomActrica MActrica:** Se diseÃ±A3 una perla circular ergonA3mica de **20px Ã— 20px**. En reposo (barra de 6px), se aplica `margin-top: -7px` `((6 - 20) / 2 = -7)`. En hover (barra de 12px), transiciona en perfecta sincronA-a mecÃ¡nica a - **Bug 1: Congelamiento Visual al Pasar y Quitar el Mouse ("Bug Tocho"):**
-  - **Causa RaA-z Descubierta en [video_progress.js](file:///C:/Users/Migue/OneDrive/Documents/Projects/media_downloader_extension_dev/src/instagram/features/video_progress.js):** El evento de simple movimiento del puntero (`pointermove` y `touchmove`) estaba enlazado a la funciA3n `stopEvt`, la cual marcaba incondicionalmente la bandera `slider.__md_isDragging = true`. Al mover el mouse por la barra sin hacer clic, la extensiA3n asumA-a errA3neamente que se iniciA3 un arrastre permanente. Al salir de la barra sin haber hecho clic, jamÃ¡s se disparaba el evento `mouseup`, dejando el reproductor bloqueado de por vida (`!slider.__md_isDragging`) y congelando la animaciA3n al 96% o 97%.
+  - **Causa RaA-z Descubierta en [video_progress.js](../src/instagram/features/video_progress.js):** El evento de simple movimiento del puntero (`pointermove` y `touchmove`) estaba enlazado a la funciA3n `stopEvt`, la cual marcaba incondicionalmente la bandera `slider.__md_isDragging = true`. Al mover el mouse por la barra sin hacer clic, la extensiA3n asumA-a errA3neamente que se iniciA3 un arrastre permanente. Al salir de la barra sin haber hecho clic, jamÃ¡s se disparaba el evento `mouseup`, dejando el reproductor bloqueado de por vida (`!slider.__md_isDragging`) y congelando la animaciA3n al 96% o 97%.
   - **SoluciA3n QuirÃºrgica:** Se separA3 lA3gicamente el movimiento de la pulsaciA3n. Ahora, `pointermove` y `touchmove` Ãºnicamente detienen la propagaciA3n hacia Instagram, mientras que **solo `mousedown`, `pointerdown` y `touchstart`** activan la bandera de arrastre. Asimismo, se agregaron escuchadores a nivel `window` para limpiar el estado al soltar el clic en cualquier parte de la pantalla.
 - **Bug 2: Resto de Barra Gris Visible DetrÃ¡s del CA-rculo al Finalizar (AsomÃ¡ndose a la derecha):**
   - **Causa RaA-z:** Los temporizadores de las historias y reproductores de video en Instagram suelen pausar su progreso numAcrico entre el **96.5% y el 98.5%** durante los milisegundos de transiciA3n antes de cambiar a la siguiente diapositiva. Con un umbral de redondeo alto (`99.2%`), el cA-rculo se detenA-a a unos 15 pA-xeles de la derecha, dejando expuesta la punta redondeada del carril gris como una "oreja" detrÃ¡s del control blanco.
@@ -458,7 +477,7 @@ ull (porque el clon ya no vive dentro del Modal en el DOM). Esto causaba que la 
 3. Los círculos de historias en el feed son `<div role="button">` o `<button>`, no etiquetas `<a href="...">`; el listener de click/pointer jamás capturaba el evento.
 4. El store en memoria de Relay calcula la diapositiva inicial en base a `reel.seen_timestamp === 0`, ignorando cualquier ID secundario en la URL al montar.
 **Solución Definitiva (Ground-Truth Carousel Resume):**
-1. **Medición Ground-Truth Unificada:** Se centralizó `getStorySegmentInfo()` en [story_resume.js](file:///c:/Users/Migue/Documents/Projects/media_downloader_extension_dev/src/instagram/interceptors/core/story_resume.js) (leyendo `#md-story-counter` o barras de segmentos nativas en el DOM) y se sincronizó con `ghost_mode.js`.
+1. **Medición Ground-Truth Unificada:** Se centralizó `getStorySegmentInfo()` en [story_resume.js](../src/instagram/interceptors/core/story_resume.js) (leyendo `#md-story-counter` o barras de segmentos nativas en el DOM) y se sincronizó con `ghost_mode.js`.
 2. **Guardado Atómico:** Cada vez que Ghost Mode intercepta una petición `seen` protegida o el monitor de 250ms detecta avance de diapositiva (`segInfo.cur > 1 && segInfo.cur < segInfo.total`), se persiste en `localStorage` (`md_ghost_story_checkpoints`) con TTL de 24 horas y deduplicación por usuario.
 3. **Reanudación Activa Nativa:** Al montar el visor de historias de un usuario con checkpoint (`slideIndex > 1`), `story_resume.js` espera a que las barras de segmentos estén presentes y ejecuta avances programados (~60ms por paso) disparando el evento de teclado universal y agnóstico de idioma `KeyboardEvent('keydown', { key: 'ArrowRight' })` (con fallback dinámico al botón chevron Next), guiando la máquina de estados nativa de React de forma imperceptible y fluida (~120ms total).
 4. **Invalidación y Limpieza:** Al alcanzar la última diapositiva (`segInfo.isLast`), o al detectarse una nueva historia subida vía GraphQL (`media_parser.js`), el checkpoint del usuario se purga automáticamente.
@@ -606,3 +625,102 @@ Revisión contra "código ravioli": un archivo pequeño que se usa en **un solo 
 
 ## DRY (22 de Noviembre 2026): Un Solo `src/instagram/utils/viewport.js`
 Con todo IG en el mismo bundle, los helpers repetidos se unificaron: `horizontalOffsetFromCenter(rect)`, `sortByHorizontalCenter(elements)` e `isStyleVisible(element)` (antes: `progress/story/viewport.js`, `horizontalDistanceToCenter` en `story_dots_locator.js`, `isRenderedVisible` en `story_viewport.js`, 2 cálculos sueltos en `story_media_locator.js` y el sort del atajo de teclado en `main.js`). Se mantienen aparte a propósito: `isInStoryColumn` (usa el borde izquierdo si el ancho es 0) y la distancia 2D de `clicked_media.js` (`Math.hypot`, otro concepto). Goldens idénticos.
+
+## Fix (28 de Noviembre 2026): Story Resume Siempre en 1/N — el "Story Alert" Borraba el Checkpoint
+**Síntoma:** con Ghost Mode activo, toda historia reabierta empezaba en 1/N. En consola aparecía `✨ Story Alert — New story posted by @user after previous view` justo antes de abrirla y nunca `🔄 Detected checkpoint`.
+**Causa:** `checkResetFn` en `interceptors/media/media_parser.js` hacía dos cosas cuando el usuario subía una historia después de la última vista fantasma: devolver el aro a color (correcto) y `clearStoryCheckpoint(uname)` (incorrecto). Es el caso más común (vuelves horas después y la persona ya subió más), así que la posición guardada casi nunca sobrevivía hasta la reapertura. Las historias nuevas se agregan **al final** del reel, así que el índice guardado sigue siendo válido.
+**Fix:** el "Story Alert" solo borra la marca de `md_ghost_seen_users`; el checkpoint se invalida únicamente al llegar al último slide o por TTL (24 h). Se quitó el import de `clearStoryCheckpoint` en `media_parser.js`.
+**Verificación:** caso 11 en `tests/js/ghost_mode.test.js` (bundle real): con el código anterior falla 11b (checkpoint borrado); con el fix 15/15. El helper del test ahora acepta `win.nextResponseBody` para alimentar el sniffer con un payload del API.
+**Pendientes conocidos (sin cambios):**
+1. El checkpoint es un **índice** (`slideIndex`). Si las historias más viejas expiran (24 h), los índices se corren y el resume puede saltarse slides no vistos. Solución futura: guardar el `taken_at`/`media_id` del slide (la mutación `seen` bloqueada trae `reelMediaTakenAt`, según fuentes no oficiales) y calcular el índice al reabrir.
+2. El avance automático (`triggerNextStorySlide`) no se ha validado contra el DOM actual: el `ArrowRight` se despacha en `document`/`window`, pero React registra sus handlers en el contenedor raíz (docs de React, Context7), y cada paso dispara dos clics (eventos manuales + `.click()`), lo que puede pasarse de largo y borrar el checkpoint al llegar al último slide.
+
+## Fix (28 de Noviembre 2026): Aro Gris con Historias Pendientes y Falso "1/1" al Montar
+**Síntoma:** tras el fix anterior el resume funcionaba (`Successfully resumed @user to slide 3/7`), pero el aro quedaba gris aunque faltaran slides por ver. En consola: `marked as ghost-seen (1/1)` justo al abrir la historia de 7.
+**Causas:**
+1. **Decisión de diseño revertida a pedido del usuario:** el punto 7 de la auditoría del 21 de octubre ("Aplicación Inmediata de Aro Gris") marcaba al usuario en `md_ghost_seen_users` al abrir cualquier slide. Instagram nativo solo pone el aro gris cuando no quedan historias sin ver.
+2. **Lectura no confiable tratada como "último slide":** mientras el visor monta, `#md-story-counter` aún no está medido y el fallback DOM de `getStorySegmentInfo()` puede leer una fila cualquiera como `1/1` (`isLast: true`). `__md_markStoryAsGhostSeen` (llamado por cada `seen` bloqueado) lo tomaba como historia terminada: aro gris + `clearStoryCheckpoint`.
+3. `attemptResumeForUser` solo activaba el flag local `resumeInProgress`, no `window.__md_resumeInProgress`, así que `ghost_mode.js` no sabía que había un resume pendiente durante el montaje (hasta 2 s).
+**Fix:**
+- `getStorySegmentInfo()` devuelve `source: 'counter' | 'dom' | 'none'`. Nuevo `isStoryFinished(segInfo)`: solo `true` si el contador propio está listo y marca el último slide. El fallback DOM nunca pone el aro gris ni borra checkpoints.
+- `__md_markStoryAsGhostSeen`: aro gris + limpiar checkpoint solo si `isStoryFinished`; si es parcial, guarda el checkpoint. El historial del popup (`MD_GHOST_HISTORY_ADD`) se sigue enviando en cada vista.
+- `checkAndSaveProgress`: se quitó el bloque que marcaba como visto al estar viendo (y su lectura duplicada de `md_ghost_seen_users`); al terminar delega en `__md_markStoryAsGhostSeen`.
+- `setResumeInProgress()` mueve los dos flags juntos y se activa desde que se detecta el checkpoint.
+**Verificación:** casos 12a–12e en `tests/js/ghost_mode.test.js` (parcial 3/7 = color + checkpoint; 7/7 = gris + limpieza; contador sin medir = no toca nada). Con el código anterior fallaban 12a y 12e; ahora 20/20 y todas las suites en verde.
+**Migración manual:** las marcas grises escritas por la lógica vieja siguen en `localStorage` (TTL 24 h). Para limpiarlas: `localStorage.removeItem('md_ghost_seen_users')` en la consola de instagram.com.
+**Pendiente conocido:** al terminar todas las historias el checkpoint se borra; si la persona sube más después, el resume empieza en 1/N en vez de en la primera nueva. Solución futura: guardar "visto hasta N" al terminar en vez de borrar.
+
+## Fix (28 de Noviembre 2026): El Avance Automático del Story Resume Descargaba la Historia
+**Síntoma:** al reanudar una historia, cada paso del avance automático lanzaba una descarga. En consola: `⚠️ Fiber: request Error: media element md_vid_… not found` (el id `md_vid_*` solo lo crea `stories/story_media_lookup.js`, en el flujo de descarga; el elemento ya no existía porque el slide había cambiado).
+**Causa:** `triggerNextStorySlide()` (MAIN world) dispara clics y `KeyboardEvent('ArrowRight')` sintéticos. Los eventos del DOM son compartidos con el ISOLATED world, así que llegaban a dos listeners propios que no distinguían input real de input sintético:
+1. `src/shared/utils/shortcut_manager.js`: el atajo global de descarga escucha `keydown` en `window`. Si el atajo es `→`, cada `ArrowRight` sintético pulsaba el botón de descarga de la historia.
+2. `src/instagram/main.js`: el "rescate de clics" (fase de captura) hace `btn.click()` si las coordenadas de un clic caen sobre un botón de descarga. Los clics sintéticos al 85 % de la tarjeta podían caer ahí.
+**Fix:** ambos listeners ignoran `!event.isTrusted`. Verificado en MDN (Context7, `Event.isTrusted`): es `false` para `dispatchEvent()` y `HTMLElement.click()`, y `true` solo para eventos generados por el navegador ante una acción del usuario. Las pulsaciones y clics reales del usuario no cambian. El atajo sigue funcionando porque `main.js` llama `btn.click()` directamente (el `onclick` del botón no mira `isTrusted`).
+**Verificación:** nueva suite `tests/js/synthetic_input.test.js` (jsdom + bundle real de `main.js` + `shortcut_manager.js`): con el código anterior fallan los 2 casos, con el fix 2/2; 18 suites en verde. Limitación: jsdom no puede crear eventos confiables, así que el camino del usuario real no queda cubierto por el test.
+**Pendiente:** el `ArrowRight` sintético de `triggerNextStorySlide` probablemente no sirve (React no escucha en `document`) y el clic doble por paso puede pasarse de largo. No se tocó porque el avance funciona en el uso real (log `Successfully resumed @… to slide 3/7`).
+
+## Fix (28 de Noviembre 2026): Aro Gris que No Vuelve a Color + Falsos Positivos por Subcadena
+**Síntoma:** usuario visto hasta 3/7 seguía con el aro gris al salir del visor.
+**Causas encontradas en `__md_applyGhostVisuals` (`ghost_mode.js`):**
+1. **Estilos inline que nunca se revertían:** además de la regla CSS (que sí se regenera), un pase directo ponía `filter`/`opacity` inline en cada `<canvas>`/`<svg>` del aro. Nada los quitaba cuando el usuario salía de `md_ghost_seen_users` (Story Alert, TTL, borrado manual): el aro seguía gris hasta que React volviera a crear ese nodo.
+2. **Coincidencia por subcadena:** `alt.includes(username)` y `img[alt*="username"]` ponían gris a `mariana` si se había terminado `ana`.
+3. **Marcas de la lógica vieja ("gris al abrir"):** seguían en `localStorage` hasta 24 h, con el significado viejo.
+**Fix:**
+- El pase inline marca cada aro con `data-md-ghost-ring` y, en cada pasada, restaura (`removeProperty`) los marcados que ya no coinciden.
+- Coincidencia por nombre completo: regex con límites de caracteres de username (`[a-z0-9._]`; un `.` final solo cuenta como fin de oración) y selectores CSS exactos (`alt="u"`, `alt$=" u"`, `alt$=" u."`, `alt*=" u "`, `alt^="u'"`, `alt*=" u'"`, todos con flag `i`). Los usernames se validan con `^[a-z0-9._]{1,30}$` antes de meterlos en CSS/RegExp.
+- Migración única: si `md_ghost_seen_schema !== '2'`, se borra `md_ghost_seen_users` (reemplaza el `removeItem` manual del fix anterior).
+**Verificación:** nueva suite `tests/js/ghost_ring.test.js` (jsdom, módulo real): con el código anterior fallaban 4 de 7 (revertir color, `mariana`, CSS por subcadena, migración); ahora 7/7 y 19 suites en verde. No verificado aún en Chrome real.
+**Diagnóstico pendiente:** si tras recargar la extensión y la página el aro sigue gris sin el filtro desvanecido (`opacity 0.2`), es el estado nativo de Instagram (posible marca optimista local de Relay al ver la historia, aunque la petición `seen` se bloquee): se va al recargar la página, porque el servidor nunca recibió el `seen`. Hipótesis sin verificar.
+
+## Feature (28 de Noviembre 2026): Reanudación Nativa — Reescritura de `reel.seen` (Ghost Mode sin Clics)
+**Pedido:** que con Ghost Mode las historias se comporten como Instagram nativo: abrir en la historia **siguiente** a la última vista, al instante, sin el recorrido visible del avance por clics.
+**Investigación (fuentes no oficiales, contrastadas entre sí):**
+- Los reels web (`xdt_api__v1__feed__reels_media`) traen `seen` (puede ser `null`) junto a `latest_reel_media` ([gallery-dl #9829](https://github.com/mikf/gallery-dl/issues/9829)); el tray tipa `seen: number`, `latest_reel_media: number`, `media_ids` ([instagram-private-api, reels-tray.feed.response.ts](https://github.com/dilame/instagram-private-api/blob/master/src/responses/reels-tray.feed.response.ts)). El endpoint REST viejo de seen envía `reelMediaId`, `reelMediaOwnerId`, `reelId`, `reelMediaTakenAt`, `viewSeenAt`.
+- **Inferencia (no documentada):** un solo número por reel solo puede representar progreso parcial si es el `taken_at` del último item abierto; Instagram abre en el primer item con `taken_at > seen` y pinta el aro gris si `latest_reel_media <= seen`. Ghost Mode bloquea el seen, así que el servidor conserva el valor viejo: por eso siempre abría en 1/N.
+**Diseño (SoC):**
+- `ghost_policy.js` (puro): `extractSeenItem(body)` saca `mediaId` y `reelMediaTakenAt` del seen bloqueado (snake_case o camelCase, crudo o URL-encoded) y viaja en `GhostDecision.seenItem`.
+- `ghost_mode.js` → `recordBlockedStorySeen`: dueño = payload → diccionario → URL; `takenAt` = el del request → `__md_storyMedia[mediaId].timestamp`.
+- `seen_ledger.js`: por usuario, el `taken_at` (s) más nuevo abierto; nunca retrocede.
+- `native_seen.js`: envuelve `JSON.parse` (mismo resultado y mismas excepciones; solo actúa si el texto contiene `"latest_reel_media"` y el ledger tiene datos) y enruta `Response.prototype.json` por él. En cada objeto con `latest_reel_media` **y** `seen` del mismo dueño hace `seen = max(seen del servidor, ledger)`. Un error en la reescritura se registra y se devuelve el payload tal cual.
+- `ghost_storage.js` + `shared/timed_store.js` (DRY): los 3 registros persistidos (`md_ghost_seen_users`, `md_ghost_story_checkpoints`, `md_ghost_reel_seen`) usan una sola factory (leer, podar por TTL de 24 h, escribir, registrar errores). Se eliminaron las 4 copias de ese código (`ghost_mode.js`, `story_resume.js`, `media_parser.js`) y la migración v2 vive ahí.
+- `story_resume.js` queda como **respaldo** para reels que Instagram no vuelve a descargar (no pasan por `JSON.parse`), con la misma semántica que el nativo: el checkpoint es "visto hasta N" (desde el slide 1, nunca retrocede) y el resume va a N + 1. Si la reescritura funcionó, Instagram ya abre en N + 1 y el respaldo no hace nada (`cur >= target`).
+**Verificación:** casos 13a–13e en `tests/js/ghost_mode.test.js` (bundle real; cada mundo del test tiene su propio `JSON` y `Response` para que el hook no contamine al runner) y 12f. Prueba de mutación: con el hook desactivado fallan 13a, 13d y 13e. 19 suites en verde.
+**Sin verificar en Chrome real (siguiente paso):**
+1. Que el body real del seen web contenga `media_id`/`reelMediaId` o `reelMediaTakenAt` → si funciona, se ve el log `👁️ Native Seen @user watched up to the story taken at …`.
+2. Que el payload del reel tenga la clave `seen` y que Instagram la use para elegir el slide inicial → log `👁️ Native Seen @user reel opens after …` y apertura directa en N + 1.
+3. Huecos conocidos: XHR con `responseType = 'json'` (lo parsea el navegador, no pasa por `JSON.parse`) y reels ya en el store de Relay sin nueva descarga (para eso queda el respaldo por clics).
+
+## Optimización y Revisión (28 de Noviembre 2026): Reanudación Nativa
+**Confirmado en uso real por el usuario:** la reescritura de `reel.seen` funciona (abre en la historia siguiente, al instante). Con eso, la inferencia "`seen` = `taken_at` del último item abierto y el cliente abre en el primero con `taken_at > seen`" pasa de hipótesis a **comportamiento observado** (sigue sin documentación oficial).
+**Benchmark** (`JSON.parse` nativo contra el hook, payloads sintéticos con forma de Instagram, mediana, Node 24):
+| Payload | Tamaño | Nativo | Hook antes | Hook después |
+|---|---|---|---|---|
+| Respuesta pequeña | <1 KB | 0.001 ms | 0.001 ms | 0.001 ms |
+| Feed sin reels | 446 KB | 1.46 ms | +0.15 ms | +0.10 ms (solo el `includes`) |
+| 30 reels, ledger vacío | 398 KB | 2.10 ms | ≈0 | ≈0 |
+| 30 reels, 20 usuarios en el ledger | 398 KB | 2.09 ms | **+0.9 ms (+35 %)** | **+0.075 ms (+4 %)** |
+**Cambios:**
+1. **Una lectura del ledger por payload:** `readLocalSeenSnapshot()` + `localSeenOf(snapshot, owner)` reemplazan `getLocalSeen()`/`hasLocalSeen()`, que leían y parseaban `localStorage` una vez por reel (31 lecturas en un tray de 30).
+2. **El recorrido no entra en un reel ya encontrado:** sus items (la mayor parte del payload) nunca contienen otros reels.
+3. **Bug corregido: highlights:** tienen `latest_reel_media` + `seen` y el mismo dueño, así que su `seen` también se reescribía. Ahora se excluyen (`id` con prefijo `highlight:` o `reel_type` con "highlight"). Caso 13f.
+4. ~~La función del hook se llama `parse` (el `JSON.parse.name` parcheado sigue siendo el nativo).~~ **Falso:** el minificador de esbuild renombra la función (en Chrome real `JSON.parse.name === "wr"`). Se quitó la afirmación; el parche es detectable igual que los de fetch/XHR/WebSocket.
+5. DRY: `shared/username.js` (`normalizeUsername`) reemplaza 4 copias de `toLowerCase().trim()`; `story_resume.js` tiene una sola lista de segmentos que no son dueños (`highlights`, `direct`, `explore`).
+**Tipado:** `tsc --checkJs` (TypeScript 5.6.3 vía npx) sin errores en `native_seen.js`, `seen_ledger.js`, `ghost_storage.js` y `timed_store.js`. En `ghost_policy.js` solo falla `window.__md_storyMedia`: los globales `window.__md_*` no están declarados en ningún `.d.ts` (deuda del proyecto entero).
+**Riesgos de estabilidad conocidos:**
+- Si Instagram renombra `seen`/`latest_reel_media` o deja de usar `JSON.parse` para algún payload (p. ej. XHR con `responseType = 'json'`), la reescritura deja de aplicarse sin romper nada: queda el respaldo por clics. Señal: desaparece el log `👁️ Native Seen @user reel opens after…`.
+- El parche de `JSON.parse` es visible para la página (`toString()` no es `[native code]`), como los parches de fetch/XHR/WebSocket que ya existían.
+- Si un item no trae `taken_at`, `media_parser.js` usa "ahora" como timestamp. Si ese valor entrara al ledger, el reel completo contaría como visto. Es improbable en historias, que siempre traen `taken_at`.
+**Candidatos a retirar → RETIRADOS el 28 de noviembre (ver sección siguiente):** si en uso real nunca aparece `🔄 Story Resume … Resuming at slide`, el respaldo por clics (`story_resume.js`: intervalo de 250 ms + eventos sintéticos) sobra. Si el aro nativo queda gris al recargar tras terminar un reel, también sobra el pintado propio (`__md_applyGhostVisuals`: intervalo de 1 s + `querySelectorAll('img[alt]')`). Por la regla de borrado de `AGENTS.md`, ambos irían a `.trash/` solo con autorización.
+
+## Retiro (28 de Noviembre 2026): Respaldo por Clics y Pintado Propio del Aro Gris
+**Autorizado por el usuario** ("si ya no sirve ni se usa para absolutamente nada, bye"). Soft delete en `.trash/ghost_fallback_removal_2026-11-28/` con la misma estructura de rutas: `story_resume.js` y `tests/js/ghost_ring.test.js` completos, más una copia del estado anterior de cada archivo editado (para restaurar basta con copiarlos de vuelta).
+**Verificación en Chrome real** (Claude in Chrome sobre la cuenta del usuario, Ghost Mode activo, cada seen bloqueado por `Story Shield`):
+- **Reabrir sin recargar:** abrió directo en 2/7 sin avance visible y sin log `Advancing`. Tampoco apareció `reel opens after`: Instagram **no** volvió a descargar el reel y usó su propio estado en memoria (store de Relay), que actualiza aunque el seen al servidor esté bloqueado. El respaldo por clics nunca actuó.
+- **Al recargar:** lo resuelve la reescritura de `seen` (probado antes por el usuario).
+- **Aro gris tras recargar:** se leyeron los píxeles de los `<canvas>` del tray con `getImageData` (el `filter` CSS no altera los píxeles). Los 8 usuarios terminados que están en el ledger tienen el aro **dibujado gris por Instagram**. El único desacuerdo era `d.elless`, con una marca vieja anterior al ledger.
+- **No verificado:** el aro gris de un reel terminado **sin recargar** (los clics no avanzan slides de video y no se forzó el avance para no abrir historias de otra persona). Inferencia: Instagram usa el mismo estado en memoria que ya demostró conservar para reanudar. Peor caso: ese aro queda a color hasta recargar.
+**Qué se fue:** `story_resume.js` (monitor de 250 ms, checkpoints, clics y `ArrowRight` sintéticos), el pintado del aro (`__md_applyGhostVisuals`: intervalo de 1 s, CSS `#md-ghost-styles`, estilos inline `data-md-ghost-ring`), `__md_markStoryAsGhostSeen`, el "Story Alert" y el parámetro `checkResetFn` de `media_parser.js`, los espejos `window.__md_vanishMode/ghostOnline/ghostSeen` (solo los leía `story_resume.js`; la página ya no los ve), el `dataset` (`cur/total/ready`) de `#md-story-counter` (solo lo leía `story_resume.js`) y la llamada a `__md_applyGhostVisuals` del escaneo SSR.
+**Qué queda en `ghost_mode.js`:** tras un seen bloqueado → ledger (`recordLocalSeen`), historial del popup (`MD_GHOST_HISTORY_ADD`, ahora en cada vista bloqueada) y aviso con rate-limit.
+**Migración v3** (`ghost_storage.js`, clave `md_ghost_storage_schema`): borra una vez `md_ghost_seen_users`, `md_ghost_story_checkpoints` y `md_ghost_seen_schema`; conserva `md_ghost_reel_seen`.
+**Medidas:** `ghost_mode.js` 215 → 89 líneas, `media_parser.js` 133 → 100, `ghost_storage.js` 57 → 37, `story_resume.js` 361 → 0. `dist/ig_interceptor.bundle.js` 31.4 KB (HEAD) → 25.8 KB, con 0 `setInterval` (antes: uno cada 250 ms y otro cada 1 s).
+**Tests:** se quitaron los escenarios 11 y 12 de `ghost_mode.test.js` (probaban lo retirado; copia en `.trash/`), se agregaron 13g (historial del popup) y 14a–c (migración). El golden de la barra de progreso se re-grabó: idéntico al anterior salvo las claves `cur/total/ready` (comparado ignorándolas). 18 suites en verde.

@@ -28,9 +28,6 @@ function updateCounter(container, index, total) {
     if (!counter) return;
     const formatted = `${index}/${total}`;
     if (counter.textContent !== formatted) counter.textContent = formatted;
-    counter.dataset.cur = String(index);
-    counter.dataset.total = String(total);
-    counter.dataset.ready = 'true';
 }
 
 /** Re-reads the story media at most every 250 ms (or on a segment change) to avoid layout thrashing. */

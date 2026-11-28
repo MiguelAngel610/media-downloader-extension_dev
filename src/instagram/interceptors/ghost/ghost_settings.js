@@ -66,11 +66,6 @@ function applySettings(next) {
     const isFirstSnapshot = !settingsReceived;
     currentSettings = Object.freeze(next);
 
-    // Legacy mirrors still read by story_resume.js.
-    window.__md_vanishMode = next.vanishMode;
-    window.__md_ghostOnline = next.ghostOnline;
-    window.__md_ghostSeen = next.ghostSeen;
-
     if (isFirstSnapshot || previous.vanishMode !== next.vanishMode) {
         logFlag('👻 Vanish Mode', next.vanishMode, 'Enabled — Stealth protocol active', '#8b5cf6');
     }

@@ -24,6 +24,9 @@ class MDShortcutManager {
 
         // Global keydown listener (Use capture phase to defeat React stopPropagation)
         window.addEventListener('keydown', (e) => {
+            // Only a real key press may download: script-dispatched keys (e.g. the story auto-advance's
+            // ArrowRight, or the page itself) have isTrusted === false.
+            if (!e.isTrusted) return;
             if (!this.currentShortcut) return;
             
             // Match logic: use code for precision (Numpad vs Digit), fallback to key

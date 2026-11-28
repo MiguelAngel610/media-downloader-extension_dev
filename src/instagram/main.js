@@ -40,6 +40,9 @@ if (window.MDObserverManager) {
 
 // Global click interceptor to defeat invisible overlays
 document.addEventListener('click', (e) => {
+    // The rescue is for real clicks stolen by an overlay. Synthetic clicks (the story auto-advance,
+    // our own btn.click()) must pass through untouched, or advancing a story would start a download.
+    if (!e.isTrusted) return;
     if (e.target && e.target.closest && e.target.closest('.md-native-btn, .md-post-btn, .md-story-dl-btn-inline, .md-pfp-btn')) {
         return; // Direct click on button, no recovery calculation needed
     }

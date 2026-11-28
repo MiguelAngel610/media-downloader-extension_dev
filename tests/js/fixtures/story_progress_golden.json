@@ -6,10 +6,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "2/3",
-          "ready": "true",
-          "cur": "2",
-          "total": "3"
+          "text": "2/3"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -37,10 +34,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/3",
-          "ready": "true",
-          "cur": "1",
-          "total": "3"
+          "text": "1/3"
         },
         "slider": {
           "value": "0",
@@ -68,10 +62,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "3/3",
-          "ready": "true",
-          "cur": "3",
-          "total": "3"
+          "text": "3/3"
         },
         "slider": {
           "value": "0",
@@ -99,10 +90,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "3/3",
-          "ready": "true",
-          "cur": "3",
-          "total": "3"
+          "text": "3/3"
         },
         "slider": {
           "value": "31.23076923076923",
@@ -130,10 +118,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "2/2",
-          "ready": "true",
-          "cur": "2",
-          "total": "2"
+          "text": "2/2"
         },
         "slider": {
           "value": "15.615384615384615",
@@ -161,10 +146,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "71.05",
@@ -192,10 +174,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "40.599999999999994",
@@ -225,10 +204,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -256,10 +232,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -287,10 +260,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "25.374999999999996",
@@ -320,10 +290,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -351,10 +318,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "25.374999999999996",
@@ -418,10 +382,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/2",
-          "ready": "true",
-          "cur": "1",
-          "total": "2"
+          "text": "1/2"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -466,10 +427,7 @@
         "containerParent": "top",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -497,10 +455,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "20.299999999999997",
@@ -545,10 +500,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -576,10 +528,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "2/3",
-          "ready": "true",
-          "cur": "2",
-          "total": "3"
+          "text": "2/3"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -601,10 +550,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "2/3",
-          "ready": "true",
-          "cur": "2",
-          "total": "3"
+          "text": "2/3"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -632,10 +578,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "2/3",
-          "ready": "true",
-          "cur": "2",
-          "total": "3"
+          "text": "2/3"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -657,10 +600,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "2/3",
-          "ready": "true",
-          "cur": "2",
-          "total": "3"
+          "text": "2/3"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -688,10 +628,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -713,10 +650,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "1/1",
-          "ready": "true",
-          "cur": "1",
-          "total": "1"
+          "text": "1/1"
         },
         "slider": {
           "value": "50.74999999999999",
@@ -744,10 +678,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "2/3",
-          "ready": "true",
-          "cur": "2",
-          "total": "3"
+          "text": "2/3"
         },
         "slider": {
           "value": "40.599999999999994",
@@ -813,10 +744,7 @@
         "containerParent": "row",
         "containerVisible": true,
         "counter": {
-          "text": "2/2",
-          "ready": "true",
-          "cur": "2",
-          "total": "2"
+          "text": "2/2"
         },
         "slider": {
           "value": "50.74999999999999",

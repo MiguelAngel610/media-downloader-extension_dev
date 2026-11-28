@@ -53,6 +53,7 @@ async function buildSuites() {
         { name: 'IG shared post detection (golden)', command: 'node', args: [fromRoot('tests/js/shared_post_golden.test.js'), fromRoot('tests/js/fixtures/shared_post_golden.json')] },
         { name: 'IG story button (golden)', command: 'node', args: [fromRoot('tests/js/story_button_golden.test.js'), fromRoot('tests/js/fixtures/story_button_golden.json')] },
         { name: 'IG story progress bar (golden)', command: 'node', args: [fromRoot('tests/js/story_progress_golden.test.js'), fromRoot('tests/js/fixtures/story_progress_golden.json')] },
+        { name: 'IG synthetic input never downloads', command: 'node', args: [fromRoot('tests/js/synthetic_input.test.js')] },
         { name: 'IG profile pic + X images (DOM)', command: 'node', args: [fromRoot('tests/js/quality_dom.test.js'), fromRoot('src/instagram/utils/pfp_resolver.js'), fromRoot('src/x/x_buttons.js')] },
         { name: 'Toast/popup XSS', command: 'node', args: [fromRoot('tests/js/toast_xss.test.js'), fromRoot('src/shared/utils/toast_manager.js'), fromRoot('src/popup/popup.js')] },
         { name: 'Service worker', command: 'node', args: [fromRoot('tests/js/service_worker.test.js'), repoRoot] },

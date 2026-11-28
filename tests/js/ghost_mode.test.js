@@ -9,18 +9,20 @@ const bundleSource = fs.readFileSync(bundlePath, 'utf8');
 const ORIGIN = 'https://www.instagram.com';
 const timers = [];
 
-function createWorld() {
+/** @param {Record<string, string>} [initialStorage] - localStorage content before the bundle runs */
+function createWorld(initialStorage = {}) {
     const listeners = {};
     const calls = { fetch: [], xhrSend: [], beacon: [], wsSend: [] };
     const win = {};
 
+    class WorldResponse extends Response {}
     const elementStub = () => ({ id: '', style: {}, textContent: '', innerHTML: '', appendChild() {}, setAttribute() {}, querySelectorAll: () => [], closest: () => null });
     const doc = {
         head: elementStub(), documentElement: { ...elementStub(), innerHTML: '' }, body: elementStub(),
         getElementById: () => null, querySelector: () => null, querySelectorAll: () => [],
         createElement: elementStub, activeElement: null,
     };
-    const store = {};
+    const store = { ...initialStorage };
     class FakeXHR {
         static OPENED = 1;
         constructor() { this.readyState = 0; this.responseType = ''; this.responseText = ''; }
@@ -35,11 +37,15 @@ function createWorld() {
     Object.assign(win, {
         window: win, self: win, document: doc, console: { log() {}, warn: (...a) => calls.warn = (calls.warn || []).concat([a.join(' ')]), error() {} },
         location: { href: ORIGIN + '/', origin: ORIGIN, search: '', pathname: '/' },
-        localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
+        localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } },
         navigator: { sendBeacon(url, data) { calls.beacon.push({ url, data }); return true; } },
-        fetch: async (input, init) => { calls.fetch.push({ input, init }); return new Response('{}', { headers: { 'content-type': 'application/json' } }); },
+        // `win.nextResponseBody` lets a scenario feed the response sniffer a specific API payload.
+        fetch: async (input, init) => { calls.fetch.push({ input, init }); return new WorldResponse(win.nextResponseBody || '{}', { headers: { 'content-type': 'application/json' } }); },
         XMLHttpRequest: FakeXHR, WebSocket: FakeWebSocket,
-        Request, Response, URL, URLSearchParams, FormData, Blob, TextDecoder, ArrayBuffer, Uint8Array, Promise, JSON, Object, Array, Math, Date, Error, TypeError, SyntaxError, URIError, String, Number, Set, Map, WeakMap, RegExp, Event: class { constructor(t) { this.type = t; } }, KeyboardEvent: class {}, MouseEvent: class {}, PointerEvent: class {},
+        // The bundle patches JSON.parse and Response.prototype.json: each world gets its own copies
+        // so the hooks never leak into the test runner or into the next world.
+        Request, Response: WorldResponse, URL, URLSearchParams, FormData, Blob, TextDecoder, ArrayBuffer, Uint8Array, Promise,
+        JSON: { parse: JSON.parse, stringify: JSON.stringify }, Object, Array, Math, Date, Error, TypeError, SyntaxError, URIError, String, Number, Set, Map, WeakMap, RegExp, Event: class { constructor(t) { this.type = t; } }, KeyboardEvent: class {}, MouseEvent: class {}, PointerEvent: class {},
         setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); timers.push(t); return t; },
         clearTimeout, setInterval: (fn, ms) => { const t = setInterval(fn, ms); timers.push(t); return t; }, clearInterval,
         requestAnimationFrame: (fn) => setTimeout(fn, 0), queueMicrotask,
@@ -160,6 +166,55 @@ function seenFormData() {
         w.addEventListener('message', (e) => { if (e.data && e.data.type === 'MD_GHOST_SETTINGS_REQUEST') requested = true; });
         await tick();
         check('10 MAIN world requests settings on load (handshake)', requested);
+    }
+    // 13. Native seen replay: a blocked seen request records the opened item's taken_at, and every later
+    //     reel payload Instagram parses carries it as `seen`, so Instagram itself opens the next item.
+    {
+        const w = createWorld();
+        w.deliver(settings(true, false, false));
+        Object.assign(w.location, { href: ORIGIN + '/stories/d.elless/', pathname: '/stories/d.elless/' });
+        const T = 1795800000;
+        const item = (n) => ({ id: `10${n}_99`, pk: `10${n}`, taken_at: T + n * 60, user: { username: 'd.elless' }, image_versions2: { candidates: [{ url: `https://cdn.example/${n}.jpg`, width: 1080, height: 1920 }] } });
+        const reelPayload = (seen) => JSON.stringify({ data: { xdt_api__v1__feed__reels_media: { reels_media: [
+            { id: '99', seen, latest_reel_media: T + 5 * 60, user: { username: 'd.elless' }, items: [1, 2, 3, 4, 5].map(item) },
+            { id: '77', seen: 0, latest_reel_media: T, user: { username: 'other.user' }, items: [] },
+            { id: 'highlight:555', seen: null, latest_reel_media: T, reel_type: 'highlight_reel', user: { username: 'd.elless' }, items: [] },
+        ] } } });
+        const seenBody = (variables) => `fb_api_req_friendly_name=usePolarisStoriesV3SeenMutation&variables=${encodeURIComponent(JSON.stringify(variables))}`;
+        const reelsOf = (text) => w.JSON.parse(text).data.xdt_api__v1__feed__reels_media.reels_media;
+
+        w.nextResponseBody = reelPayload(null);
+        await w.fetch('https://www.instagram.com/graphql/query', { method: 'POST', body: 'doc_id=1&variables={}' });
+        await tick(30);
+        w.fetch('https://www.instagram.com/graphql/query', { method: 'POST', body: seenBody({ reelId: '99', reelMediaId: '103', reelMediaOwnerId: '99', viewSeenAt: T + 999 }) });
+        await tick(30);
+        const [own, other, highlight] = reelsOf(reelPayload(null));
+        check('13a blocked seen of item 3 replays its taken_at as the reel `seen`', own.seen === T + 3 * 60);
+        check('13b reels of other users are untouched', other.seen === 0);
+        check('13f highlights of the same owner are untouched', highlight.seen === null);
+        check('13c a newer server `seen` is never lowered', reelsOf(reelPayload(T + 4 * 60))[0].seen === T + 4 * 60);
+        const viaResponseJson = await new w.Response(reelPayload(0)).json();
+        check('13d Response.json() payloads get the same replay', viaResponseJson.data.xdt_api__v1__feed__reels_media.reels_media[0].seen === T + 3 * 60);
+        // Unknown media id: the request's own reelMediaTakenAt and the story URL identify the item.
+        w.fetch('https://www.instagram.com/graphql/query', { method: 'POST', body: seenBody({ reelId: '99', reelMediaId: '999', reelMediaTakenAt: T + 4 * 60, viewSeenAt: T + 999 }) });
+        await tick(30);
+        check('13e reelMediaTakenAt from the request is used when the item is not in the dictionary', reelsOf(reelPayload(null))[0].seen === T + 4 * 60);
+        let history = null;
+        w.addEventListener('message', (e) => { if (e.data && e.data.type === 'MD_GHOST_HISTORY_ADD') history = e.data.username; });
+        w.fetch('https://www.instagram.com/graphql/query', { method: 'POST', body: seenBody({ reelId: '99', reelMediaId: '104', reelMediaOwnerId: '99', viewSeenAt: T + 999 }) });
+        await tick(30);
+        check('13g every blocked story view still reaches the popup stealth history', history === 'd.elless');
+    }
+    // 14. Records of the retired fallback (gray-ring marks, slide checkpoints) are removed once; the ledger stays.
+    {
+        const ledger = JSON.stringify({ 'd.elless': { takenAt: 1795800000, updatedAt: Date.now() } });
+        const legacy = { md_ghost_seen_users: '{"d.elless":1}', md_ghost_story_checkpoints: '{}', md_ghost_seen_schema: '2', md_ghost_reel_seen: ledger };
+        const w = createWorld(legacy);
+        const retiredGone = ['md_ghost_seen_users', 'md_ghost_story_checkpoints', 'md_ghost_seen_schema'].every((key) => w.localStorage.getItem(key) === null);
+        check('14a retired ghost records are removed on load', retiredGone && w.localStorage.getItem('md_ghost_storage_schema') === '3');
+        check('14b the seen ledger survives the migration', w.localStorage.getItem('md_ghost_reel_seen') === ledger);
+        const again = createWorld({ md_ghost_storage_schema: '3', md_ghost_seen_users: '{"kept":1}' });
+        check('14c the migration runs only once', again.localStorage.getItem('md_ghost_seen_users') === '{"kept":1}');
     }
 
     for (const [status, name] of results) console.log(`${status}  ${name}`);
